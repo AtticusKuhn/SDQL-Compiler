@@ -27,7 +27,7 @@ instance reprDict (a b : Type) [ToString a] [ToString b] : Repr (Dict a b) where
 -- `(tensor (Ty.dict dom range) b).denote`, which is definally
 -- `Dict dom.denote ((tensor range b).denote)`. Typeclass search
 -- often does not unfold `tensor`/`Ty.denote` here, so we register
--- a direct instance at that head-type.
+-- (moved below, after `Ty.denote`, `showDict`, and `tensor` are defined)
 
 namespace Dict
 def empty {α β} (cmp : Ord α) : Dict α β :=
@@ -43,21 +43,51 @@ def find? {α β} (d : Dict α β) (k : α) : Option β :=
 end Dict
 
 
+
+inductive HList {α : Type} (β : α → Type) : List α → Type where
+  | nil : HList β []
+  | cons {x xs} : β x → HList β xs → HList β (x :: xs)
+
+
+def hmap {T : Type} {l : List T} {ftype : T → Type} {gtype : T → Type} (f : {t : T} → ftype t → gtype t) : HList ftype l  → HList gtype l
+  | HList.nil => HList.nil
+  | HList.cons t ts => HList.cons (f t) (hmap f ts)
 @[reducible, simp]
-def Ty.denote (t : Ty) : Type :=
+unsafe def Ty.denote (t : Ty) : Type :=
   match t with
   | .bool => Bool
   | .int => Int
   | .string => String
-  | .record l =>
-    let rec toType (l : List Ty) : Type :=
-      match l with
-      | [] => Unit
-      | ty :: tys => ty.denote × toType tys
-    toType l
-  | .dict dom range =>
-    -- Std.TreeMap dom.denote range.denote
-    Dict dom.denote range.denote
+  | .record l => HList Ty.denote l
+  | .dict dom range => Dict dom.denote range.denote
+
+-- Pretty-printing for record values (HList Ty.denote l)
+mutual
+unsafe def showHList {l : List Ty} : HList Ty.denote l → String
+| .nil => ""
+| .cons h t =>
+  let head := showValue h
+  let tail := showHList t
+  if tail = "" then head else s!"{head}, {tail}"
+
+unsafe def showDict {dom range : Ty} (d : Dict dom.denote range.denote) : String :=
+  "{" ++ d.map.foldl (fun s k v =>
+    s ++ s!"{showValue (t := dom) k} => {showValue (t := range) v}, "
+  ) "" ++ "}"
+
+unsafe def showValue : {t : Ty} → t.denote → String
+  | .bool, b => toString b
+  | .int, n => toString n
+  | .string, s => s
+  | .record l, r => "<" ++ showHList r ++ ">"
+  | .dict dom range, d => showDict (dom := dom) (range := range) d
+end
+
+unsafe instance toStringHList {l : List Ty} : ToString (HList Ty.denote l) where
+  toString := fun h => "<" ++ showHList h ++ ">"
+
+unsafe instance reprHList {l : List Ty} : Repr (HList Ty.denote l) where
+  reprPrec h _ := repr (toString h)
 
 instance instOrdUnit : Ord Unit where
   compare := fun _ _ => Ordering.eq
@@ -65,20 +95,25 @@ instance instOrdUnit : Ord Unit where
 instance instOrdDict (a b : Type) : Ord (Dict a b) where
   compare := fun _ _ => Ordering.eq
 
-def Ty.ord (t : Ty) : Ord t.denote :=
+unsafe def HListOrd {T : Type} {f : T → Type} {l : List T} (o : HList (Ord ∘ f) l) : Ord (HList f l) :=
+  match o with
+    | HList.nil => ⟨fun _ _ => Ordering.eq⟩
+    | HList.cons head tail => ⟨ compareLex (compareOn (ord := head) (fun (HList.cons h _) => h)) (compareOn (ord := HListOrd tail) (fun (HList.cons _ t) => t))⟩
+
+def dmap {T : Type} (l : List T) {ftype : T → Type} (f : (t : T) → ftype t) : HList ftype l :=
+  match l with
+    | [] => HList.nil
+    | t :: ts => HList.cons (f t) (dmap ts f)
+
+unsafe def Ty.ord (t : Ty) : Ord t.denote :=
   match t with
     | .bool => inferInstance
     | .int => inferInstance
     | .string => inferInstance
     | .dict a b => instOrdDict a.denote b.denote
-    | .record l =>
-      let rec helper (l : List Ty) : Ord (Ty.denote (Ty.record l)) :=
-        match l with
-          | [] => instOrdUnit
-          | h :: t => @Prod.Lex.instOrdLexProd h.denote _ (Ty.ord (t := h)) (helper t)
-      helper l
+    | .record l => HListOrd (dmap l Ty.ord)
 
-@[simp]
+@[simp, reducible]
 def tensor (a b : Ty) : Ty :=
   match a with
     | .dict dom range => .dict dom (tensor range b)
@@ -92,15 +127,23 @@ def tensor (a b : Ty) : Ty :=
 -- `(tensor (Ty.dict dom range) b).denote`, which is definally
 -- `Dict dom.denote ((tensor range b).denote)`. Typeclass search
 -- often does not unfold `tensor`/`Ty.denote` here, so we register
--- a direct instance at that head-type.
+-- a direct instance at that head-type. If needed, we can also provide
+-- a custom `Repr` instance here to help `#eval` printing, but we avoid
+-- that for now to keep instance search lightweight.
 
 inductive AddM : Ty → Type where
   | boolA : AddM Ty.bool
   | intA : AddM Ty.int
   | dictA {dom range : Ty} (aRange : AddM range) : AddM (Ty.dict dom range)
-  | recordA {l : List Ty} (fields : ∀ (t : Ty), t ∈ l → AddM t) : AddM (Ty.record l)
+  | recordA {l : List Ty} : HList AddM l → AddM (Ty.record l)
 
-def AddM.denote {t : Ty} : AddM t → t.denote → t.denote → t.denote
+mutual
+unsafe def addHList {l : List Ty} (fields : HList AddM l) (x y : HList Ty.denote l) : HList Ty.denote l :=
+  match l, x, y, fields with
+    | [], _, _, _ => HList.nil
+    | _ :: _, HList.cons xh xt, HList.cons yh yt, HList.cons fh ft => HList.cons (AddM.denote fh xh yh) (addHList ft xt yt)
+
+unsafe def AddM.denote {t : Ty} : AddM t → t.denote → t.denote → t.denote
   | .boolA, x, y => Bool.xor x y
   | .intA, x, y => Int.add x y
   | @AddM.dictA dom range aRange, x, y =>
@@ -111,19 +154,8 @@ def AddM.denote {t : Ty} : AddM t → t.denote → t.denote → t.denote
       | some v1 => Dict.insert acc k (inner v1 v2)
       | none    => Dict.insert acc k v2
     ) x
-  | @AddM.recordA l fields, x, y =>
-    let rec go (l : List Ty)
-        (fields : ∀ (t : Ty), t ∈ l → AddM t)
-        (x y : Ty.denote (.record l)) : Ty.denote (.record l) :=
-      match l with
-      | [] => ()
-      | t :: ts =>
-        let aHead := fields t (by simp)
-        let addHead := AddM.denote aHead
-        let (xh, xt) := x
-        let (yh, yt) := y
-        (addHead xh yh, go ts (fun t' memInTs => fields t' (List.mem_cons_of_mem t memInTs)) xt yt)
-    go l fields x y
+  | @AddM.recordA l fields, x, y => addHList fields x y
+end
 
 inductive ScaleM : Ty → Ty → Type where
   | boolS : ScaleM Ty.bool Ty.bool
@@ -131,24 +163,28 @@ inductive ScaleM : Ty → Ty → Type where
   | dictS {sc dom range : Ty} (sRange : ScaleM sc range) : ScaleM sc (Ty.dict dom range)
   | recordS {sc : Ty} {l : List Ty} (fields : ∀ (t : Ty), t ∈ l → ScaleM sc t) : ScaleM sc (Ty.record l)
 
-def ScaleM.denote {sc t : Ty} : ScaleM sc t → sc.denote → t.denote → t.denote
+def toHList {T : Type} {l : List T} {ftype : T → Type} (f : ∀ (t : T), t ∈ l → ftype t) : HList ftype l :=
+  match l with
+    | [] => HList.nil
+    | t :: ts => HList.cons (f t (by simp only [List.mem_cons, true_or])) (toHList (fun t' => f t' ∘ List.mem_cons_of_mem t))
+
+mutual
+unsafe def go {sc : Ty} (l : List Ty) (a : sc.denote) (fields : HList (ScaleM sc) l)
+    (r : HList Ty.denote l) : HList Ty.denote l :=
+  match l, fields, r with
+  | [], _, _ => HList.nil
+  | _ :: ts, HList.cons fh ft, HList.cons h rest =>
+    HList.cons (ScaleM.denote fh a h) (go ts a ft rest)
+
+unsafe def ScaleM.denote {sc t : Ty} : ScaleM sc t → sc.denote → t.denote → t.denote
   | .boolS, a, x => Bool.and a x
   | .intS, a, x => Int.mul a x
   | @ScaleM.dictS sc dom range sRange, a, d =>
     let inner := ScaleM.denote (sc := sc) (t := range) sRange
     d.map.foldl (fun acc k v => Dict.insert acc k (inner a v)) (Dict.empty (Ty.ord dom))
   | @ScaleM.recordS sc l fields, a, r =>
-    let rec go (l : List Ty) (fields : ∀ (t : Ty), t ∈ l → ScaleM sc t)
-        (r : Ty.denote (.record l)) : Ty.denote (.record l) :=
-      match l with
-      | [] => ()
-      | t :: ts =>
-        let sHead := fields t (by simp)
-        let (h, rest) := r
-        (ScaleM.denote sHead a h,
-         go ts (fun t' memInTs => fields t' (List.mem_cons_of_mem t memInTs)) rest)
-    go l fields r
-
+    go l a (toHList fields) r
+end
 
 
 -- inductive Term' (rep : Ty → Type) : Ty → Type
@@ -158,17 +194,20 @@ def ScaleM.denote {sc t : Ty} : ScaleM sc t → sc.denote → t.denote → t.den
 --   | constString : String → Term' rep Ty.string
 --   | add : {ty sc : Ty} → (_s : SM sc ty) → Term' rep ty → Term' rep ty → Term' rep ty
 
-mutual
-inductive RecordFields (rep : Ty → Type) : List Ty → Type where
-  | nil  : RecordFields rep []
-  | cons : {t : Ty} →  {ts : List Ty} → Term' rep t → RecordFields rep ts → RecordFields rep (t :: ts)
+-- mutual
+-- inductive RecordFields (rep : Ty → Type) : List Ty → Type where
+--   | nil  : RecordFields rep []
+--   | cons : {t : Ty} →  {ts : List Ty} → Term' rep t → RecordFields rep ts → RecordFields rep (t :: ts)
+
 
 inductive Term' (rep : Ty → Type) : Ty → Type
   | var   : {ty : Ty} → rep ty → Term' rep ty
   | constInt : Int → Term' rep Ty.int
   | constBool : Bool → Term' rep Ty.bool
   | constString : String → Term' rep Ty.string
-  | constRecord : {l : List Ty} → RecordFields rep l → Term' rep (.record l)
+  -- | constRecord : {l : List Ty} → RecordFields rep l → Term' rep (.record l)
+  | constRecord : {l : List Ty} → HList (Term' rep) l  → Term' rep (.record l)
+
   | emptyDict: {dom  : Ty} →  {range : Ty} → Term' rep (.dict dom range)
   | dictInsert : {dom  : Ty} →  {range : Ty} → (Term' rep dom) → (Term' rep range) →  Term' rep (.dict dom range) → Term' rep (.dict dom range)
   -- | constDict : {dom  : OrderableTy} →  {range : Ty} → List ( Bool × Term' rep range) → Term' rep (.dict dom range)
@@ -179,22 +218,22 @@ inductive Term' (rep : Ty → Type) : Ty → Type
   | add : {ty : Ty} → (a : AddM ty) → Term' rep ty → Term' rep ty → Term' rep ty
   | mul : { sc t1 t2 : Ty} → (_s1 : ScaleM sc t1) →  (_s2 : ScaleM sc t2) → Term' rep t1 → Term' rep t2 → Term' rep (tensor t1 t2)
   | proj : (l : List (Ty)) → Term' rep (.record l) → (i : Nat) → Term' rep (l.getD i Ty.int)
-end
+-- end
 
-def getProj {l : List Ty} (recordVal : Ty.denote (.record l)) (i : Nat) : (l.getD i Ty.int).denote :=
+unsafe def getProj {l : List Ty} (recordVal : Ty.denote (.record l)) (i : Nat) : (l.getD i Ty.int).denote :=
   match i, l, recordVal with
-  | 0,   _ :: _, (h, _) => h
-  | n+1, _ :: ts, (_, t_val) => getProj t_val n
-  | (Nat.succ n), [], PUnit.unit => by
+  | 0,   _ :: _, (HList.cons h _) => h
+  | n+1, _ :: ts, (HList.cons _ t_val) => getProj t_val n
+  | (Nat.succ n), [], HList.nil => by
     simp only [Nat.succ_eq_add_one, List.getD_eq_getElem?_getD, List.length_nil, Nat.not_lt_zero,
       not_false_eq_true, getElem?_neg, Option.getD_none, Ty.denote]
     exact 0
-  | Nat.zero, [], PUnit.unit => by
+  | Nat.zero, [], HList.nil => by
     simp only [Nat.zero_eq, List.getD_eq_getElem?_getD, List.length_nil, Nat.lt_irrefl,
       not_false_eq_true, getElem?_neg, Option.getD_none, Ty.denote]
     exact 0
 
-def Term'.denote {ty : Ty} : Term' Ty.denote ty → ty.denote
+unsafe def Term'.denote {ty : Ty} : Term' Ty.denote ty → ty.denote
   | Term'.var v => v
   | Term'.constInt n => n
   | Term'.constBool b => b
@@ -210,11 +249,11 @@ def Term'.denote {ty : Ty} : Term' Ty.denote ty → ty.denote
   | .proj l record index =>
     let dr := denote record
     getProj dr index
-  | .constRecord fields =>
-    let rec denoteFields {l : List Ty} : RecordFields Ty.denote l → Ty.denote (.record l)
-      | .nil => ()
-      | .cons h t => (denote h, denoteFields t)
-    denoteFields fields
+  | .constRecord fields => hmap denote fields
+    -- let rec denoteFields {l : List Ty} : HList (Term' Ty.denote) l → Ty.denote (.record l)
+    --   | .nil => HList.nil
+    --   | .cons h t => HList.cons (denote h) (denoteFields t)
+    -- denoteFields fields
   | @Term'.emptyDict _ dom range => Dict.empty (Ty.ord dom)
   | .dictInsert key val dict => Dict.insert (dict.denote) key.denote val.denote
   | @Term'.mul _ sc t1 t2 s1 s2 t1e t2e =>
@@ -226,10 +265,14 @@ def Term'.denote {ty : Ty} : Term' Ty.denote ty → ty.denote
       match s1 with
       | .boolS =>
         by
-          simpa using (ScaleM.denote s2 lval rval)
+          -- sc = bool, t1 = bool
+          -- tensor Ty.bool t2 = t2, so scale the right value by the left factor
+          exact ScaleM.denote s2 lval rval
       | .intS =>
         by
-          simpa [tensor] using (ScaleM.denote s2 lval rval)
+          -- sc = int, t1 = int
+          -- tensor Ty.int t2 = t2, so scale the right value by the left factor
+          exact ScaleM.denote s2 lval rval
       | @ScaleM.dictS sc dom range sRange =>
         let acc : Dict dom.denote (Ty.denote (tensor range t2)) := Dict.empty (Ty.ord dom)
         let res := lval.map.foldl (fun acc k v =>
@@ -241,21 +284,18 @@ def Term'.denote {ty : Ty} : Term' Ty.denote ty → ty.denote
           exact res
       | @ScaleM.recordS sc l fields =>
         let rec go (l : List Ty)
-            (fields : ∀ (t : Ty), t ∈ l → ScaleM sc t)
+            (fields : HList (ScaleM sc) l)
             (lv : Ty.denote (.record l))
             : Ty.denote (.record (l.map (fun t => tensor t t2))) :=
-          match l with
-          | [] => ()
-          | t :: ts =>
-            let sHead : ScaleM sc t := fields t (by simp)
-            match lv with
-            | (h, rest) =>
-              let h' := mulDenote (t1 := t) sHead s2 h rval
-              let rest' := go ts (fun t' memInTs => fields t' (List.mem_cons_of_mem t memInTs)) rest
-              (h', rest')
+          match l, fields , lv with
+          | [], HList.nil, HList.nil => HList.nil
+          | t :: ts, HList.cons fh ft, HList.cons h rest =>
+            let h' := mulDenote (t1 := t) fh s2 h rval
+            let rest' := go ts ft rest
+            HList.cons h' rest'
         by
           unfold tensor
-          exact (go l fields lval)
+          exact (go l (toHList fields) lval)
     mulDenote s1 s2 lval rval
 
 def Term'.show {ty : Ty} : Term' (fun _ => String) ty → String
@@ -272,10 +312,13 @@ def Term'.show {ty : Ty} : Term' (fun _ => String) ty → String
   |(dictInsert a b c)=> s!"\{{a.show} -> {b.show}} ++ {c.show}"
   | (emptyDict)=> "{}"
   | (constRecord r)=>
-    let rec show_r {l : List Ty} (r : RecordFields (fun _ ↦ String) l) : String :=
+    let rec show_r {l : List Ty} (r : HList (Term' (fun _ ↦ String)) l) : String :=
       match r with
         | .nil => ""
-        | .cons h t => s!"{h.show}, {show_r t}"
+        | .cons h t =>
+          let hStr := (Term'.show h)
+          let tStr := show_r t
+          if tStr = "" then hStr else s!"{hStr}, {tStr}"
     "<" ++ show_r r ++ ">"
   -- | _ => "(unsuppoted)"
 
@@ -349,6 +392,18 @@ def rec_ii : Term (Ty.record [Ty.int, Ty.int]) :=
 --             (ScaleM.intS)
 --             rec_ii (.constInt 3)
 
+-- Additional record examples with pretty-printing
+def rec_nested : Term (Ty.record [Ty.int, Ty.record [Ty.bool, Ty.string]]) :=
+  .constRecord
+    (.cons (.constInt 42)
+      (.cons (.constRecord (.cons (.constBool false) (.cons (.constString "ok") .nil)))
+        .nil))
+
+def dict_record_values : Term (Ty.dict Ty.string (Ty.record [Ty.int, Ty.bool])) :=
+  .dictInsert (.constString "x")
+              (.constRecord (.cons (.constInt 7) (.cons (.constBool false) .nil)))
+              .emptyDict
+
 def Term.show {ty : Ty} (t : Term ty) : String :=
   Term'.show (t)
 -- set_option pp.explicit true
@@ -357,7 +412,7 @@ def Term.show {ty : Ty} (t : Term ty) : String :=
 #eval Term'.denote test2
 #eval Term'.denote test3
 #eval Term'.denote test4
-#eval Term'.denote test5
+#eval ("<" ++ showHList (Term'.denote test5) ++ ">")
 #eval Term'.denote test6
 
 -- #eval Term'.denote mul_int_int
@@ -368,17 +423,26 @@ def Term.show {ty : Ty} (t : Term ty) : String :=
 --     simp only [tensor, Ty.denote, Ty.denote.toType]
 -- #eval (tensor (Ty.string.dict Ty.int) (Ty.record [Ty.int]))
 #eval Term.show mul_dict_record
--- Pretty-printed results for complex nested tensor types via casts
-#eval (let h : (tensor (Ty.string.dict Ty.int) (Ty.record [Ty.int])).denote
-              = Dict String (Int × Unit) := by
-         simp [Ty.denote, Ty.denote.toType]
-       toString (cast h (Term'.denote mul_dict_record)))
+-- Printing directly via `Repr` for this nested tensor type can trigger
+-- heavy instance search/unfolding. Use the explicit pretty-printer.
+#eval showDict (dom := Ty.string) (range := Ty.record [Ty.int]) (Term'.denote mul_dict_record)
 
-#eval (let h : (tensor (Ty.string.dict Ty.int) (Ty.string.dict Ty.int)).denote
-              = Dict String (Dict String Int) := by
-         simp [tensor, Ty.denote]
-       toString (cast h (Term'.denote mul_dict_dict)))
+-- Pretty-printed results for complex nested tensor types via casts
+-- (These casts relied on older helper lemmas; they are disabled for now.)
+-- #eval (let h : (tensor (Ty.string.dict Ty.int) (Ty.record [Ty.int])).denote
+--               = Dict String (Int × Unit) := by
+--          simp [Ty.denote]
+--        toString (cast h (Term'.denote mul_dict_record)))
+
+-- #eval (let h : (tensor (Ty.string.dict Ty.int) (Ty.string.dict Ty.int)).denote
+--               = Dict String (Dict String Int) := by
+--          simp [tensor, Ty.denote]
+--        toString (cast h (Term'.denote mul_dict_dict)))
 -- #eval Term'.denote mul_record_int
 
 #eval Term.show test
 #eval Term.show test2
+
+-- Pretty-print record values (via Repr/ToString instances)
+#eval ("<" ++ showHList (Term'.denote rec_nested) ++ ">")
+#eval showDict (dom := Ty.string) (range := Ty.record [Ty.int, Ty.bool]) (Term'.denote dict_record_values)
