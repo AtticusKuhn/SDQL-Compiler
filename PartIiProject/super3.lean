@@ -1,6 +1,7 @@
 import Std.Data.TreeMap.Basic
 import Mathlib.Data.Prod.Lex
 set_option linter.style.longLine false
+set_option linter.unusedVariables false
 
 inductive Ty : Type where
   | bool : Ty
@@ -36,6 +37,10 @@ def insert {α β} (d : Dict α β) (k : α) (v : β) : Dict α β :=
 
 def find? {α β} (d : Dict α β) (k : α) : Option β :=
   d.map.get? (cmp := fun a b => d.cmp.compare a b) k
+
+-- Map values of a Dict while preserving its ordering
+def mapValues {α β γ} (d : Dict α β) (f : β → γ) : Dict α γ :=
+  d.map.foldl (fun acc k v => Dict.insert acc k (f v)) (Dict.empty d.cmp)
 end Dict
 
 
@@ -197,6 +202,42 @@ unsafe def ScaleM.denote {sc t : Ty} : ScaleM sc t → sc.denote → t.denote �
 end
 
 
+-- Shape-directed multiplication helper for `Term'.mul`
+unsafe def ScaleM.mulDenote {sc t1 t2 : Ty}
+    (s1 : ScaleM sc t1) (s2 : ScaleM sc t2)
+    : t1.denote → t2.denote → (tensor t1 t2).denote :=
+  match s1 with
+  | .boolS =>
+    fun l r =>
+      -- tensor Ty.bool t2 = t2
+      ScaleM.denote s2 l r
+  | .intS =>
+    fun l r =>
+      -- tensor Ty.int t2 = t2
+      ScaleM.denote s2 l r
+  | @ScaleM.dictS sc dom range sRange =>
+    fun l r =>
+      -- tensor {dom -> range} t2 = {dom -> (tensor range t2)}
+      let res := Dict.mapValues l (fun v => ScaleM.mulDenote (t1 := range) sRange s2 v r)
+      by
+        unfold tensor
+        exact res
+  | @ScaleM.recordS sc l fields =>
+    fun lval rval =>
+      let rec go
+          (l : List Ty)
+          (fs : HList (ScaleM sc) l)
+          (lv : HList Ty.denote l)
+          : HList Ty.denote (l.map (fun t => tensor t t2)) :=
+        match l, fs, lv with
+        | [], HList.nil, HList.nil => HList.nil
+        | t :: ts, HList.cons fh ft, HList.cons h rest =>
+          HList.cons (ScaleM.mulDenote (t1 := t) fh s2 h rval)
+                    (go ts ft rest)
+      by
+        unfold tensor
+        exact (go l (toHList fields) lval)
+
 -- Core terms (PHOAS) with typed addition/multiplication evidence
 inductive Term' (rep : Ty → Type) : Ty → Type
   | var   : {ty : Ty} → rep ty → Term' rep ty
@@ -208,8 +249,6 @@ inductive Term' (rep : Ty → Type) : Ty → Type
   | emptyDict: {dom  : Ty} →  {range : Ty} → Term' rep (.dict dom range)
   | dictInsert : {dom  : Ty} →  {range : Ty} → (Term' rep dom) → (Term' rep range) →  Term' rep (.dict dom range) → Term' rep (.dict dom range)
   | lookup : {dom range : Ty} → (aRange : AddM range) → Term' rep (.dict dom range) → Term' rep dom → Term' rep range
-  -- | constDict : {dom  : OrderableTy} →  {range : Ty} → List ( Bool × Term' rep range) → Term' rep (.dict dom range)
-  -- | constRecord : {l : List (Ty)} → (fields : toRecordType (Term' rep) l ) → Term' rep (.record l)
   | not : Term' rep Ty.bool → Term' rep Ty.bool
   | ite : {ty : Ty} → Term' rep Ty.bool → Term' rep ty → Term' rep ty → Term' rep ty
   | letin : {ty₁ ty₂ : Ty} → Term' rep ty₁ → (rep ty₁ → Term' rep ty₂) → Term' rep ty₂
@@ -268,46 +307,7 @@ unsafe def Term'.denote {ty : Ty} : Term' Ty.denote ty → ty.denote
       )
       zero
   | @Term'.mul _ sc t1 t2 s1 s2 t1e t2e =>
-    let lval := denote t1e
-    let rval := denote t2e
-    let rec mulDenote {sc t1 t2 : Ty}
-        (s1 : ScaleM sc t1) (s2 : ScaleM sc t2)
-        (lval : t1.denote) (rval : t2.denote) : (tensor t1 t2).denote :=
-      match s1 with
-      | .boolS =>
-        by
-          -- sc = bool, t1 = bool
-          -- tensor Ty.bool t2 = t2, so scale the right value by the left factor
-          exact ScaleM.denote s2 lval rval
-      | .intS =>
-        by
-          -- sc = int, t1 = int
-          -- tensor Ty.int t2 = t2, so scale the right value by the left factor
-          exact ScaleM.denote s2 lval rval
-      | @ScaleM.dictS sc dom range sRange =>
-        let acc : Dict dom.denote (Ty.denote (tensor range t2)) := Dict.empty (Ty.ord dom)
-        let res := lval.map.foldl (fun acc k v =>
-          let v' := mulDenote (t1 := range) sRange s2 v rval
-          Dict.insert acc k v'
-        ) acc
-        by
-          unfold tensor
-          exact res
-      | @ScaleM.recordS sc l fields =>
-        let rec go (l : List Ty)
-            (fields : HList (ScaleM sc) l)
-            (lv : Ty.denote (.record l))
-            : Ty.denote (.record (l.map (fun t => tensor t t2))) :=
-          match l, fields , lv with
-          | [], HList.nil, HList.nil => HList.nil
-          | t :: ts, HList.cons fh ft, HList.cons h rest =>
-            let h' := mulDenote (t1 := t) fh s2 h rval
-            let rest' := go ts ft rest
-            HList.cons h' rest'
-        by
-          unfold tensor
-          exact (go l (toHList fields) lval)
-    mulDenote s1 s2 lval rval
+    ScaleM.mulDenote s1 s2 (denote t1e) (denote t2e)
 
 def Term'.show {ty : Ty} : Term' (fun _ => String) ty → String
   | .var v           => v
