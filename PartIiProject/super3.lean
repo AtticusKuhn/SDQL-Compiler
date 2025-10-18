@@ -82,12 +82,11 @@ unsafe def showValue : {t : Ty} → t.denote → String
   | .record l, r => "<" ++ showHList r ++ ">"
   | .dict dom range, d => showDict (dom := dom) (range := range) d
 end
-
-unsafe instance toStringHList {l : List Ty} : ToString (HList Ty.denote l) where
-  toString := fun h => "<" ++ showHList h ++ ">"
-
-unsafe instance reprHList {l : List Ty} : Repr (HList Ty.denote l) where
-  reprPrec h _ := repr (toString h)
+inductive AddM : Ty → Type where
+  | boolA : AddM Ty.bool
+  | intA : AddM Ty.int
+  | dictA {dom range : Ty} (aRange : AddM range) : AddM (Ty.dict dom range)
+  | recordA {l : List Ty} : HList AddM l → AddM (Ty.record l)
 
 instance instOrdUnit : Ord Unit where
   compare := fun _ _ => Ordering.eq
@@ -99,6 +98,7 @@ unsafe def HListOrd {T : Type} {f : T → Type} {l : List T} (o : HList (Ord ∘
   match o with
     | HList.nil => ⟨fun _ _ => Ordering.eq⟩
     | HList.cons head tail => ⟨ compareLex (compareOn (ord := head) (fun (HList.cons h _) => h)) (compareOn (ord := HListOrd tail) (fun (HList.cons _ t) => t))⟩
+
 
 def dmap {T : Type} (l : List T) {ftype : T → Type} (f : (t : T) → ftype t) : HList ftype l :=
   match l with
@@ -112,6 +112,26 @@ unsafe def Ty.ord (t : Ty) : Ord t.denote :=
     | .string => inferInstance
     | .dict a b => instOrdDict a.denote b.denote
     | .record l => HListOrd (dmap l Ty.ord)
+
+-- Additive identities for AddM types
+mutual
+unsafe def zeroHList {l : List Ty} : HList AddM l → HList Ty.denote l
+  | .nil => HList.nil
+  | .cons h t => HList.cons (AddM.zero h) (zeroHList t)
+
+unsafe def AddM.zero {t : Ty} : AddM t → t.denote
+  | .boolA => false
+  | .intA => 0
+  | @AddM.dictA dom range aRange => Dict.empty (Ty.ord dom)
+  | @AddM.recordA l fields => zeroHList fields
+end
+
+unsafe instance toStringHList {l : List Ty} : ToString (HList Ty.denote l) where
+  toString := fun h => "<" ++ showHList h ++ ">"
+
+unsafe instance reprHList {l : List Ty} : Repr (HList Ty.denote l) where
+  reprPrec h _ := repr (toString h)
+
 
 @[simp, reducible]
 def tensor (a b : Ty) : Ty :=
@@ -131,11 +151,6 @@ def tensor (a b : Ty) : Ty :=
 -- a custom `Repr` instance here to help `#eval` printing, but we avoid
 -- that for now to keep instance search lightweight.
 
-inductive AddM : Ty → Type where
-  | boolA : AddM Ty.bool
-  | intA : AddM Ty.int
-  | dictA {dom range : Ty} (aRange : AddM range) : AddM (Ty.dict dom range)
-  | recordA {l : List Ty} : HList AddM l → AddM (Ty.record l)
 
 mutual
 unsafe def addHList {l : List Ty} (fields : HList AddM l) (x y : HList Ty.denote l) : HList Ty.denote l :=
@@ -210,6 +225,7 @@ inductive Term' (rep : Ty → Type) : Ty → Type
 
   | emptyDict: {dom  : Ty} →  {range : Ty} → Term' rep (.dict dom range)
   | dictInsert : {dom  : Ty} →  {range : Ty} → (Term' rep dom) → (Term' rep range) →  Term' rep (.dict dom range) → Term' rep (.dict dom range)
+  | lookup : {dom range : Ty} → (aRange : AddM range) → Term' rep (.dict dom range) → Term' rep dom → Term' rep range
   -- | constDict : {dom  : OrderableTy} →  {range : Ty} → List ( Bool × Term' rep range) → Term' rep (.dict dom range)
   -- | constRecord : {l : List (Ty)} → (fields : toRecordType (Term' rep) l ) → Term' rep (.record l)
   | not : Term' rep Ty.bool → Term' rep Ty.bool
@@ -217,6 +233,7 @@ inductive Term' (rep : Ty → Type) : Ty → Type
   | letin : {ty₁ ty₂ : Ty} → Term' rep ty₁ → (rep ty₁ → Term' rep ty₂) → Term' rep ty₂
   | add : {ty : Ty} → (a : AddM ty) → Term' rep ty → Term' rep ty → Term' rep ty
   | mul : { sc t1 t2 : Ty} → (_s1 : ScaleM sc t1) →  (_s2 : ScaleM sc t2) → Term' rep t1 → Term' rep t2 → Term' rep (tensor t1 t2)
+  | sum : {dom range ty : Ty} → (a : AddM ty) → Term' rep (.dict dom range) → (rep (.record [dom, range]) → Term' rep ty) → Term' rep ty
   | proj : (l : List (Ty)) → Term' rep (.record l) → (i : Nat) → Term' rep (l.getD i Ty.int)
 -- end
 
@@ -246,6 +263,12 @@ unsafe def Term'.denote {ty : Ty} : Term' Ty.denote ty → ty.denote
     | true => (denote t1)
     | false => (denote t2)
   | .letin t1 f => denote (f (denote t1))
+  | @Term'.lookup _ dom range aRange d k =>
+    let dv := denote d
+    let kv := denote k
+    match Dict.find? dv kv with
+    | some v => v
+    | none => AddM.zero aRange
   | .proj l record index =>
     let dr := denote record
     getProj dr index
@@ -256,6 +279,18 @@ unsafe def Term'.denote {ty : Ty} : Term' Ty.denote ty → ty.denote
     -- denoteFields fields
   | @Term'.emptyDict _ dom range => Dict.empty (Ty.ord dom)
   | .dictInsert key val dict => Dict.insert (dict.denote) key.denote val.denote
+  | @Term'.sum _ dom range ty a d f =>
+    let dv := denote d
+    let add := AddM.denote a
+    let zero := AddM.zero a
+    dv.map.foldl
+      (fun acc k v =>
+        let recVal : Ty.denote (.record [dom, range]) := HList.cons k (HList.cons v HList.nil)
+        let term := f recVal
+        let val := denote term
+        add acc val
+      )
+      zero
   | @Term'.mul _ sc t1 t2 s1 s2 t1e t2e =>
     let lval := denote t1e
     let rval := denote t2e
@@ -304,9 +339,11 @@ def Term'.show {ty : Ty} : Term' (fun _ => String) ty → String
   | .constBool b     => toString b
   | .constString s   => s
   | .add _ t1 t2     => s!"{t1.show} + {t2.show}"  -- note: ignore the Add evidence
+  | .lookup _ d k    => s!"{d.show}({k.show})"
   | (proj _ b c) => s!"{b.show}.{c}"
   | (mul _ _ b c)=> s!"{b.show} * {c.show}"
   | (letin  a b)=> s!"let x = {a.show} in {(b "x").show}"
+  | (sum _ d f) => s!"sum(x in {d.show}) {(f "x").show}"
   |(ite c t f)=> s!"if {c.show} then {t.show} else {f.show}"
   | (not e)=> s!"not {e.show}"
   |(dictInsert a b c)=> s!"\{{a.show} -> {b.show}} ++ {c.show}"
@@ -446,3 +483,28 @@ def Term.show {ty : Ty} (t : Term ty) : String :=
 -- Pretty-print record values (via Repr/ToString instances)
 #eval ("<" ++ showHList (Term'.denote rec_nested) ++ ">")
 #eval showDict (dom := Ty.string) (range := Ty.record [Ty.int, Ty.bool]) (Term'.denote dict_record_values)
+
+-- Dictionary lookup and sum examples
+def dict_ii : Term (Ty.dict Ty.int Ty.int) :=
+  Term'.dictInsert (.constInt 1) (.constInt 2)
+    (Term'.dictInsert (.constInt 3) (.constInt 4) (Term'.emptyDict))
+
+-- Lookup existing and missing keys (missing defaults to 0 via AddM.intA)
+def lookup_hit : Term Ty.int :=
+  Term'.lookup (aRange := AddM.intA) (dict_ii) (.constInt 1)
+
+def lookup_miss : Term Ty.int :=  Term'.lookup (aRange := AddM.intA) (dict_ii) (.constInt 0)
+
+-- Sum values in a dictionary: sum(x in d) x.val
+def sum_vals : Term Ty.int :=
+    Term'.sum (a := AddM.intA) (dict_ii)
+      (fun x =>
+        -- x : rep <int, int>; project index 1 (value)
+        Term'.proj [Ty.int, Ty.int] (Term'.var x) 1)
+
+#eval Term.show lookup_hit
+#eval Term'.denote lookup_hit
+#eval Term.show lookup_miss
+#eval Term'.denote lookup_miss
+#eval Term.show sum_vals
+#eval Term'.denote sum_vals
