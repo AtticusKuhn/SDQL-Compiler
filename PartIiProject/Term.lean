@@ -1,5 +1,8 @@
 import Std.Data.TreeMap.Basic
 import Mathlib.Data.Prod.Lex
+import PartIiProject.Dict
+import PartIiProject.HList
+
 set_option linter.style.longLine false
 set_option linter.unusedVariables false
 
@@ -11,48 +14,9 @@ inductive Ty : Type where
   | int :  Ty
   deriving Inhabited
 
-structure Dict (α β : Type) where
-  cmp : Ord α
-  map : Std.TreeMap (cmp := fun a b => cmp.compare a b) α β
-
-instance toStringDict (a b : Type) [ToString a] [ToString b] : ToString (Dict a b) where
-  toString := fun s =>
-    "{" ++ s.map.foldl (fun acc k v => acc ++ s!"{k} -> {v}, ") "" ++ "}"
-
--- Provide a Repr instance for Dict so #eval can display it using its
--- existing ToString rendering.
-instance reprDict (a b : Type) [ToString a] [ToString b] : Repr (Dict a b) where
-  reprPrec d _ := repr (toString d)
-
--- Pretty-printing helpers live below, after `Ty.denote` and `tensor`.
-
-namespace Dict
-def empty {α β} (cmp : Ord α) : Dict α β :=
-  { cmp := cmp
-  , map := Std.TreeMap.empty (α := α) (β := β) (cmp := fun a b => cmp.compare a b)
-  }
-
-def insert {α β} (d : Dict α β) (k : α) (v : β) : Dict α β :=
-  { d with map := d.map.insert (cmp := fun a b => d.cmp.compare a b) k v }
-
-def find? {α β} (d : Dict α β) (k : α) : Option β :=
-  d.map.get? (cmp := fun a b => d.cmp.compare a b) k
-
--- Map values of a Dict while preserving its ordering
-def mapValues {α β γ} (d : Dict α β) (f : β → γ) : Dict α γ :=
-  d.map.foldl (fun acc k v => Dict.insert acc k (f v)) (Dict.empty d.cmp)
-end Dict
 
 
 
-inductive HList {α : Type} (β : α → Type) : List α → Type where
-  | nil : HList β []
-  | cons {x xs} : β x → HList β xs → HList β (x :: xs)
-
-
-def hmap {T : Type} {l : List T} {ftype : T → Type} {gtype : T → Type} (f : {t : T} → ftype t → gtype t) : HList ftype l  → HList gtype l
-  | HList.nil => HList.nil
-  | HList.cons t ts => HList.cons (f t) (hmap f ts)
 @[reducible, simp]
 unsafe def Ty.denote (t : Ty) : Type :=
   match t with
@@ -64,7 +28,7 @@ unsafe def Ty.denote (t : Ty) : Type :=
 
 -- Pretty-printing for record values (HList Ty.denote l)
 mutual
-unsafe def showHList {_l : List Ty} : HList Ty.denote _l → String
+unsafe def showHList {l : List Ty} : HList Ty.denote l → String
 | .nil => ""
 | .cons h t =>
   let head := showValue h
@@ -100,11 +64,6 @@ unsafe def HListOrd {T : Type} {f : T → Type} {l : List T} (o : HList (Ord ∘
     | HList.nil => ⟨fun _ _ => Ordering.eq⟩
     | HList.cons head tail => ⟨ compareLex (compareOn (ord := head) (fun (HList.cons h _) => h)) (compareOn (ord := HListOrd tail) (fun (HList.cons _ t) => t))⟩
 
-
-def dmap {T : Type} (l : List T) {ftype : T → Type} (f : (t : T) → ftype t) : HList ftype l :=
-  match l with
-    | [] => HList.nil
-    | t :: ts => HList.cons (f t) (dmap ts f)
 
 unsafe def Ty.ord (t : Ty) : Ord t.denote :=
   match t with
@@ -183,13 +142,13 @@ def toHList {T : Type} {l : List T} {ftype : T → Type} (f : ∀ (t : T), t ∈
 
 mutual
 unsafe def scaleRecordHList {sc : Ty}
-    (l : List Ty) (a : sc.denote)
+    {l : List Ty} (a : sc.denote)
     (fields : HList (ScaleM sc) l)
     (r : HList Ty.denote l) : HList Ty.denote l :=
-  match l, fields, r with
-  | [], _, _ => HList.nil
-  | _ :: ts, HList.cons fh ft, HList.cons h rest =>
-    HList.cons (ScaleM.denote fh a h) (scaleRecordHList ts a ft rest)
+  match fields, r with
+  | HList.nil, HList.nil => HList.nil
+  | HList.cons fh ft, HList.cons h rest =>
+    HList.cons (ScaleM.denote fh a h) (scaleRecordHList a ft rest)
 
 unsafe def ScaleM.denote {sc t : Ty} : ScaleM sc t → sc.denote → t.denote → t.denote
   | .boolS, a, x => Bool.and a x
@@ -198,7 +157,7 @@ unsafe def ScaleM.denote {sc t : Ty} : ScaleM sc t → sc.denote → t.denote �
     let inner := ScaleM.denote (sc := sc) (t := range) sRange
     d.map.foldl (fun acc k v => Dict.insert acc k (inner a v)) (Dict.empty (Ty.ord dom))
   | @ScaleM.recordS sc l fields, a, r =>
-    scaleRecordHList l a (toHList fields) r
+    scaleRecordHList a (toHList fields) r
 end
 
 
@@ -225,18 +184,18 @@ unsafe def ScaleM.mulDenote {sc t1 t2 : Ty}
   | @ScaleM.recordS sc l fields =>
     fun lval rval =>
       let rec go
-          (l : List Ty)
+          {l : List Ty}
           (fs : HList (ScaleM sc) l)
           (lv : HList Ty.denote l)
           : HList Ty.denote (l.map (fun t => tensor t t2)) :=
-        match l, fs, lv with
-        | [], HList.nil, HList.nil => HList.nil
-        | t :: ts, HList.cons fh ft, HList.cons h rest =>
-          HList.cons (ScaleM.mulDenote (t1 := t) fh s2 h rval)
-                    (go ts ft rest)
+        match fs, lv with
+        | HList.nil, HList.nil => HList.nil
+        | HList.cons fh ft, HList.cons h rest =>
+          HList.cons (ScaleM.mulDenote fh s2 h rval)
+                    (go ft rest)
       by
         unfold tensor
-        exact (go l (toHList fields) lval)
+        exact (go (toHList fields) lval)
 
 -- Core terms (PHOAS) with typed addition/multiplication evidence
 inductive Term' (rep : Ty → Type) : Ty → Type
@@ -260,15 +219,11 @@ inductive Term' (rep : Ty → Type) : Ty → Type
 private unsafe def getProj {l : List Ty}
     (recordVal : Ty.denote (.record l)) (i : Nat)
     : (l.getD i Ty.int).denote :=
-  match i, l, recordVal with
-  | 0,   _ :: _, (HList.cons h _) => h
-  | n+1, _ :: ts, (HList.cons _ t_val) => getProj t_val n
-  | (Nat.succ n), [], HList.nil => by
-    simp only [Nat.succ_eq_add_one, List.getD_eq_getElem?_getD, List.length_nil, Nat.not_lt_zero,
-      not_false_eq_true, getElem?_neg, Option.getD_none, Ty.denote]
-    exact 0
-  | Nat.zero, [], HList.nil => by
-    simp only [Nat.zero_eq, List.getD_eq_getElem?_getD, List.length_nil, Nat.lt_irrefl,
+  match i, recordVal with
+  | 0, (HList.cons h _) => h
+  | n+1, (HList.cons _ t_val) => getProj t_val n
+  | _, HList.nil => by
+    simp only [ List.getD_eq_getElem?_getD, List.length_nil, Nat.not_lt_zero,
       not_false_eq_true, getElem?_neg, Option.getD_none, Ty.denote]
     exact 0
 
