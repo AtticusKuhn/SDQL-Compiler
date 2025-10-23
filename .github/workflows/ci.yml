@@ -1,0 +1,29 @@
+name: SDQL CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ "**" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Lean toolchain
+        uses: leanprover/lean-action@v1
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build library and tests
+        run: |
+          lake build sdql-tests
+
+      - name: Run tests
+        run: |
+          lake exe sdql-tests
+

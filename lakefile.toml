@@ -16,3 +16,10 @@ scope = "leanprover-community"
 
 [[lean_lib]]
 name = "PartIiProject"
+
+[[lean_lib]]
+name = "Tests"
+
+[[lean_exe]]
+name = "sdql-tests"
+root = "Tests.Main"

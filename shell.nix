@@ -6,6 +6,8 @@ mkShell {
     pkgs.aider-chat
     pkgs.codex
     pkgs.uv
+    pkgs.rustc
+    pkgs.cargo
   ];
 shellHook = ''
 # lake exe cache get!

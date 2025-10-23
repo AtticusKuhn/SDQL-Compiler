@@ -87,7 +87,7 @@ mutual
     | .litString s => s!"\"{s}\""
     | .tuple es => paren <| String.intercalate ", " (es.map (fun e => showExpr e indent))
     | .mapEmpty => "std::collections::BTreeMap::new()"
-    | .mapInsert m k v => s!"{showExpr m indent}.update_with({showExpr k indent}, {showExpr v indent})"
+    | .mapInsert m k v => s!"map_insert({showExpr m indent}, {showExpr k indent}, {showExpr v indent})"
     | .binop op a b => s!"{showExpr a indent} {showBinOp op} {showExpr b indent}"
     | .not a => s!"!{showExpr a indent}"
     | .ite c t f =>
@@ -118,7 +118,7 @@ mutual
     | .assign n e, indent => s!"{indentStr indent}{n} = {showExpr e indent};"
     | .expr e, indent => s!"{indentStr indent}{showExpr e indent};"
     | .forKV k v m body, indent =>
-        let head := indentStr indent ++ "for (" ++ k ++ ", " ++ v ++ ") in " ++ showExpr m indent ++ ".iter() {"
+        let head := indentStr indent ++ "for (" ++ k ++ ", " ++ v ++ ") in " ++ showExpr m indent ++ ".into_iter() {"
         let inner := String.intercalate "\n" (body.map (fun s => showStmt s (indent+1)))
         let tail := "\n" ++ indentStr indent ++ "}"
         head ++ (if inner = "" then "" else "\n" ++ inner) ++ tail

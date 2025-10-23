@@ -60,7 +60,7 @@
             # Keep this minimal to avoid attr or non-derivation issues on some channels.
             packages =
               (with pkgs.lean; [ lean-all ])
-              ++ (with pkgs; [ git unzip rustc cargo ]);
+              ++ (with pkgs; [ git unzip rustc cargo codex uv ]);
           };
         };
     };
