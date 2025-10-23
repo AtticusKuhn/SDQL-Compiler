@@ -1,3 +1,5 @@
 /.lake
 old
 AGENTS.md
+.sdql-test-out/*.bin
+result
