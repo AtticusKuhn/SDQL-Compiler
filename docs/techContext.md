@@ -7,6 +7,13 @@ Stack:
 - Dependencies: `Std` (TreeMap), `Mathlib` (lexicographic ordering helpers).
 - Rust toolchain (`rustc` and `cargo`) available in dev/CI environments.
 
+Dev environment:
+
+- Enter with `nix develop`. The shell uses `elan` to install and expose the
+  Lean/Lake toolchain specified in `lean-toolchain` (currently `leanprover/lean4:v4.24.0`).
+  We avoid pinning Lean via a Nix overlay to prevent version skew with Mathlib; the
+  shell prepends the matching `elan` toolchain `bin` directory to `PATH`.
+
 Key modules:
 
 - `PartIiProject/Term.lean`: core types, semimodule evidence, tensor, PHOAS terms, interpreter, printers, examples.
