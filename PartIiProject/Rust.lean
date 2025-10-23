@@ -84,7 +84,7 @@ mutual
     | .var s => s
     | .litInt n => toString n
     | .litBool b => if b then "true" else "false"
-    | .litString s => s!"\"{s}\""
+    | .litString s => s!"String::from(\"{s}\")"
     | .tuple es => paren <| String.intercalate ", " (es.map (fun e => showExpr e indent))
     | .mapEmpty => "std::collections::BTreeMap::new()"
     | .mapInsert m k v => s!"map_insert({showExpr m indent}, {showExpr k indent}, {showExpr v indent})"

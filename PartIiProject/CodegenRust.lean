@@ -8,7 +8,7 @@ namespace PartIiProject
 open Rust
 
 /- Type translation ------------------------------------------------------- -/
-partial def coreTyToRustTy : _root_.Ty → Rust.Ty
+def coreTyToRustTy : _root_.Ty → Rust.Ty
   | .bool => .bool
   | .int => .i64
   | .string => .str
@@ -17,11 +17,11 @@ partial def coreTyToRustTy : _root_.Ty → Rust.Ty
 
 /- Zeros for additive monoids (used for lookup defaults and sum inits). -/
 mutual
-  partial def zerosForHList : {l : List _root_.Ty} → _root_.HList _root_.AddM l → List Rust.Expr
+  def zerosForHList : {l : List _root_.Ty} → _root_.HList _root_.AddM l → List Rust.Expr
     | [], .nil => []
     | _ :: ts, .cons h t => zeroOfAddM h :: zerosForHList t
 
-  partial def zeroOfAddM : {t : _root_.Ty} → _root_.AddM t → Rust.Expr
+  def zeroOfAddM : {t : _root_.Ty} → _root_.AddM t → Rust.Expr
     | .bool, .boolA => .litBool false
     | .int, .intA => .litInt 0
     | .dict _ _, @_root_.AddM.dictA _ _ _ => .mapEmpty
@@ -34,7 +34,7 @@ namespace Compile
 mutual
   /- Compile an SDQL term into a Rust simplified AST expression.
      `nameEnv` maps each runtime parameter (free variable) index to its Rust identifier. -/
-  partial def compile {n : Nat} {fvar : Fin n → _root_.Ty} {ty : _root_.Ty}
+  def compile {n : Nat} {fvar : Fin n → _root_.Ty} {ty : _root_.Ty}
       (nameEnv : Fin n → String)
       : _root_.Term' (fun _ => String) fvar ty → Rust.Expr
   | .var v => .var v
@@ -88,7 +88,7 @@ mutual
   | .proj l r i => .call "proj" [compile nameEnv r, .litInt (Int.ofNat i)]
 
   /- Compile a record literal represented as an HList of sub-terms. -/
-  partial def compileRecordFields {n : Nat} {fvar : Fin n → _root_.Ty}
+  def compileRecordFields {n : Nat} {fvar : Fin n → _root_.Ty}
     (nameEnv : Fin n → String)
     : {l : List _root_.Ty} → _root_.HList (_root_.Term' (fun _ => String) fvar) l → List Rust.Expr
     | _, .nil => []
