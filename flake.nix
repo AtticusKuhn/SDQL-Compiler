@@ -4,8 +4,6 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    # Use a local path input so edits are picked up without committing.
-    # This avoids flake.lock pinning to a specific local git rev.
     lean4-nix.url = "git+file:///home/atticusk/coding/part_ii_project/lean4nix/lean4-nix";
   };
 
@@ -61,7 +59,7 @@
             # Provide Lean + Lake matching ./lean-toolchain, plus essential tools.
             # Keep this minimal to avoid attr or non-derivation issues on some channels.
             packages =
-              (with pkgs.lean; [ lean-all ])
+              [ pkgs.lean.lean pkgs.lean.lake]
               ++ (with pkgs; [ git unzip rustc cargo codex uv ]);
           };
         };
