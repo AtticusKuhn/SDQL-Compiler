@@ -1,5 +1,5 @@
 import Std.Data.TreeMap.Basic
-import Mathlib.Data.Prod.Lex
+-- import Mathlib.Data.Prod.Lex
 
 structure Dict (α β : Type) where
   cmp : Ord α

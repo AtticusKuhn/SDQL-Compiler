@@ -4,6 +4,7 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
+    # Use local git repo (requires committing changes)
     lean4-nix.url = "git+file:///home/atticusk/coding/part_ii_project/lean4nix/lean4-nix";
   };
 
@@ -32,7 +33,11 @@
           sdqlTests = (lake.mkPackage {
             src = ./.;
             # Explicit roots to avoid auto-capitalization from manifest name
-            roots = [ "Tests" ];
+            roots = [
+              # Build the library part too so tests can import it
+              { mod = "PartIiProject"; glob = "andSubmodules"; }
+              "Tests.Main"
+            ];
           }).executable;
         in
         {

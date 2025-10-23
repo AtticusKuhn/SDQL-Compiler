@@ -1,7 +1,7 @@
 import PartIiProject.Term
 import PartIiProject.Rust
 
-set_option linter.style.longLine false
+-- set_option linter.style.longLine false
 
 namespace PartIiProject
 

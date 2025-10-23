@@ -1,9 +1,8 @@
 import Std.Data.TreeMap.Basic
-import Mathlib.Data.Prod.Lex
 import PartIiProject.Dict
 import PartIiProject.HList
 
-set_option linter.style.longLine false
+-- set_option linter.style.longLine false
 set_option linter.unusedVariables false
 
 inductive Ty : Type where
