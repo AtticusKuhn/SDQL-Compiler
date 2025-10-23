@@ -4,14 +4,14 @@ Stack:
 
 - Lean 4 (`lean-toolchain` pinned to `v4.24.0`).
 - Lake build (`lake build`) and `#eval` for in-file demos.
-- Dependencies: `Std` (TreeMap), `Mathlib` (lexicographic ordering helpers).
+- Dependencies: `Std` (TreeMap); no direct `Mathlib` imports in the active core.
 - Rust toolchain (`rustc` and `cargo`) available in dev/CI environments.
 
 Dev environment:
 
 - Enter with `nix develop`. The shell uses `elan` to install and expose the
   Lean/Lake toolchain specified in `lean-toolchain` (currently `leanprover/lean4:v4.24.0`).
-  We avoid pinning Lean via a Nix overlay to prevent version skew with Mathlib; the
+  We avoid pinning Lean via a Nix overlay beyond what `lean4-nix` derives from `lean-toolchain`; the
   shell prepends the matching `elan` toolchain `bin` directory to `PATH`.
 
 Key modules:
@@ -26,6 +26,10 @@ Key modules:
   - `Tests/Cases.lean`: SDQL test cases and expected measures.
   - `Tests/Main.lean`: test runner that compiles and executes Rust programs.
 
+Nix/flake integration:
+
+- `flake.nix` wires `lean4-nix` to the `lean-toolchain`, exposes a dev shell, and provides a package/app to run the `sdql-tests` executable directly via `nix run`.
+
 How to run:
 
 - Build library: `lake build`.
@@ -37,7 +41,7 @@ Notes/constraints:
 
 - Boolean addition is currently XOR by design; aligning with SDQL would switch to OR. Boolean scaling remains AND.
 - Codegen uses placeholder helpers (`sdql_mul`, `dict_add`, `tuple_add`). Execution path for tests relies on embedded runtime shims (`map_insert`, `lookup_or_default`, `SDQLMeasure`) in the generated program.
-- Rust iteration now uses `.into_iter()` in emitted code to match ownership in helpers.
+- Rust iteration uses `.into_iter()` in the printed `for` loops to match ownership in helpers.
 - Kinds and scalar promotion are not modeled yet; only `bool` and `int` scalars are implemented.
 CI:
 

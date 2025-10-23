@@ -12,6 +12,7 @@ Recent changes (captured here):
 - Introduced `renderRustMeasured` to emit standalone Rust programs with embedded mini-runtime (map helpers and `SDQLMeasure`).
 - Adjusted Rust AST printer to use `map_insert(...)` and `.into_iter()` to match runtime helper semantics.
 - Added GitHub Actions workflow to build and run tests on pushes/PRs.
+- Memory Bank correction: removed `Mathlib` as a stated dependency in tech docs; the active core only imports `Std` and local modules.
 
 Next steps (proposed):
 
