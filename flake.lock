@@ -44,15 +44,15 @@
       "locked": {
         "lastModified": 1761085434,
         "narHash": "sha256-qlMUovAY4tdl7skTfLBf8v2O2zeeI9vbnSgs/i2O7dk=",
-        "owner": "lenianiva",
-        "repo": "lean4-nix",
+        "ref": "refs/heads/main",
         "rev": "b19d919edcf9a531d4a3ab033ceeeda5de1b8974",
-        "type": "github"
+        "revCount": 213,
+        "type": "git",
+        "url": "file:///home/atticusk/coding/part_ii_project/lean4nix/lean4-nix"
       },
       "original": {
-        "owner": "lenianiva",
-        "repo": "lean4-nix",
-        "type": "github"
+        "type": "git",
+        "url": "file:///home/atticusk/coding/part_ii_project/lean4nix/lean4-nix"
       }
     },
     "nixpkgs": {
