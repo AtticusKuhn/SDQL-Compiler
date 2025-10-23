@@ -198,13 +198,13 @@ unsafe def ScaleM.mulDenote {sc t1 t2 : Ty}
         exact (go (toHList fields) lval)
 
 -- Core terms (PHOAS) with typed addition/multiplication evidence
-inductive Term' (rep : Ty → Type)  (fvar : String → Ty) : Ty → Type
+inductive Term' (rep : Ty → Type) {n : Nat} (fvar : Fin n → Ty) : Ty → Type
   | var   : {ty : Ty} → rep ty → Term' rep fvar ty
   | constInt : Int → Term' rep fvar Ty.int
   | constBool : Bool → Term' rep fvar Ty.bool
   | constString : String → Term' rep fvar Ty.string
   | constRecord : {l : List Ty} → HList (Term' rep fvar) l  → Term' rep fvar (.record l)
-  | freeVariable : (s : String) → Term' rep fvar (fvar s)
+  | freeVariable : (f : Fin n) → Term' rep fvar (fvar f)
   | emptyDict: {dom  : Ty} →  {range : Ty} → Term' rep fvar (.dict dom range)
   | dictInsert : {dom  : Ty} →  {range : Ty} → (Term' rep fvar dom) → (Term' rep fvar range) →  Term' rep fvar (.dict dom range) → Term' rep  fvar (.dict dom range)
   | lookup : {dom range : Ty} → (aRange : AddM range) → Term' rep fvar (.dict dom range) → Term' rep fvar dom → Term' rep fvar range
@@ -227,8 +227,8 @@ private unsafe def getProj {l : List Ty}
       not_false_eq_true, getElem?_neg, Option.getD_none, Ty.denote]
     exact 0
 
-unsafe def Term'.denote {fvar : String → Ty} {ty : Ty}
-    (env : (s : String) → (fvar s).denote) :
+unsafe def Term'.denote  {n : Nat} {fvar : Fin n → Ty} {ty : Ty}
+    (env : (s : Fin n) → (fvar s).denote) :
     Term' Ty.denote fvar ty → ty.denote
   | Term'.var v => v
   | Term'.freeVariable s => env s
@@ -253,7 +253,7 @@ unsafe def Term'.denote {fvar : String → Ty} {ty : Ty}
     let dr := denote env record
     getProj dr index
   | .constRecord fields => hmap (denote env) fields
-  | @Term'.emptyDict _ _ dom _ => Dict.empty (Ty.ord dom)
+  | @Term'.emptyDict _ _ _ dom _ => Dict.empty (Ty.ord dom)
   | .dictInsert key val dict => Dict.insert (denote env dict) (denote env key) (denote env val)
   | .sum a d f =>
     let dv := denote env d
@@ -267,9 +267,9 @@ unsafe def Term'.denote {fvar : String → Ty} {ty : Ty}
   | .mul s1 s2 t1e t2e =>
     ScaleM.mulDenote s1 s2 (denote env t1e) (denote env t2e)
 
-def Term'.show {fvar : String → Ty} {ty : Ty} : Term' (fun _ => String) fvar ty → String
+def Term'.show {n : Nat} {fvar : Fin n → Ty} {ty : Ty} : Term' (fun _ => String) fvar ty → String
   | .var v           => v
-  | .freeVariable s  => s
+  | .freeVariable s  => toString s
   | .constInt n      => toString n
   | .constBool b     => toString b
   | .constString s   => s
@@ -284,7 +284,7 @@ def Term'.show {fvar : String → Ty} {ty : Ty} : Term' (fun _ => String) fvar t
   |(dictInsert a b c)=> s!"\{{a.show} -> {b.show}} ++ {c.show}"
   | (emptyDict)=> "{}"
   | (constRecord r)=>
-    let rec show_r {fvar : String → Ty} {l : List Ty} (r : HList (Term' (fun _ ↦ String) fvar) l) : String :=
+    let rec show_r {n : Nat} {fvar : Fin n → Ty} {l : List Ty} (r : HList (Term' (fun _ ↦ String) fvar) l) : String :=
       match r with
         | .nil => ""
         | .cons h t =>
@@ -294,37 +294,37 @@ def Term'.show {fvar : String → Ty} {ty : Ty} : Term' (fun _ => String) fvar t
     "<" ++ show_r r ++ ">"
 
 
-def Term (ty : Ty) := {rep : Ty → Type} → {fvar : String → Ty} → Term' rep fvar ty
+def Term {n : Nat} (fvar : Fin n → Ty) (ty : Ty) := {rep : Ty → Type}  → Term' rep fvar ty
+def f0 (f : Fin 0) : Ty := Ty.int
 
 
-
-def test : Term Ty.int :=
+def test : Term f0 Ty.int :=
   Term'.add (AddM.intA) (Term'.constInt 3) (Term'.constInt 5)
 
-def test2 : Term Ty.bool :=
+def test2 : Term f0 Ty.bool :=
   Term'.add (AddM.boolA) (Term'.constBool true) (Term'.constBool false)
 
-def test3 : Term (Ty.dict Ty.int Ty.string) :=
+def test3 : Term f0 (Ty.dict Ty.int Ty.string) :=
   Term'.dictInsert (.constInt 1) (.constString "one") (Term'.emptyDict)
 
-def test4 : Term Ty.int :=  .add AddM.intA (.constInt 1) (.constInt 2)
-def test5 : Term (Ty.record [Ty.int, Ty.bool]) := .constRecord (.cons (Term'.constInt 15) (.cons (Term'.constBool true) .nil))
-def test6 : Term Ty.int := .proj [Ty.int, Ty.bool] test5 0
-def test7 : Term (Ty.dict Ty.int Ty.string) := .dictInsert (.constInt 1) (.constString "hello") .emptyDict
+def test4 : Term f0 Ty.int :=  .add AddM.intA (.constInt 1) (.constInt 2)
+def test5 : Term f0 (Ty.record [Ty.int, Ty.bool]) := .constRecord (.cons (Term'.constInt 15) (.cons (Term'.constBool true) .nil))
+def test6 : Term f0 Ty.int := .proj [Ty.int, Ty.bool] test5 0
+def test7 : Term f0 (Ty.dict Ty.int Ty.string) := .dictInsert (.constInt 1) (.constString "hello") .emptyDict
 
 -- Multiplication examples
-def mul_int_int : Term (tensor Ty.int Ty.int) :=
+def mul_int_int : Term f0 (tensor Ty.int Ty.int) :=
   Term'.mul (ScaleM.intS) (ScaleM.intS) (.constInt 2) (.constInt 4)
 
-def dict_si : Term (Ty.dict Ty.string Ty.int) :=
+def dict_si : Term f0 (Ty.dict Ty.string Ty.int) :=
   Term'.dictInsert (.constString "a") (.constInt 2)
     (Term'.dictInsert (.constString "b") (.constInt 3) (Term'.emptyDict))
 
-def rec_i : Term (Ty.record [Ty.int]) :=
+def rec_i : Term f0 (Ty.record [Ty.int]) :=
   .constRecord (.cons (.constInt 4) .nil)
 
 -- {"a"->2, "b"->3} * <4>  ==> {"a"-><8>, "b"-><12>}
-def mul_dict_record : Term (tensor (Ty.dict Ty.string Ty.int) (Ty.record [Ty.int])) :=
+def mul_dict_record : Term f0 (tensor (Ty.dict Ty.string Ty.int) (Ty.record [Ty.int])) :=
   let fields1 : ∀ (t : Ty), t ∈ [Ty.int] → ScaleM Ty.int t :=
     fun t ht =>
       by
@@ -334,85 +334,71 @@ def mul_dict_record : Term (tensor (Ty.dict Ty.string Ty.int) (Ty.record [Ty.int
             (ScaleM.recordS fields1)
             dict_si rec_i
 
-def dict2_si : Term (Ty.dict Ty.string Ty.int) :=
+def dict2_si : Term f0 (Ty.dict Ty.string Ty.int) :=
   Term'.dictInsert (.constString "a") (.constInt 4)
     (Term'.dictInsert (.constString "c") (.constInt 5) (Term'.emptyDict))
 
 -- {"a"->2, "b"->3} * {"a"->4, "c"->5}
 -- ==> {"a" -> {4 scaled by 2, 5 scaled by 2}, "b" -> {4 scaled by 3, 5 scaled by 3}}
-def mul_dict_dict : Term (tensor (Ty.dict Ty.string Ty.int) (Ty.dict Ty.string Ty.int)) :=
+def mul_dict_dict : Term f0 (tensor (Ty.dict Ty.string Ty.int) (Ty.dict Ty.string Ty.int)) :=
   Term'.mul (ScaleM.dictS ScaleM.intS)
             (ScaleM.dictS ScaleM.intS)
             dict_si dict2_si
 
-def rec_ii : Term (Ty.record [Ty.int, Ty.int]) :=
+def rec_ii : Term f0 (Ty.record [Ty.int, Ty.int]) :=
   .constRecord (.cons (.constInt 1) (.cons (.constInt 2) .nil))
 
 -- <1,2> * 3 ==> <3,6>
 -- (example left commented for future reference)
 
 -- Additional record examples with pretty-printing
-def rec_nested : Term (Ty.record [Ty.int, Ty.record [Ty.bool, Ty.string]]) :=
+def rec_nested : Term f0 (Ty.record [Ty.int, Ty.record [Ty.bool, Ty.string]]) :=
   .constRecord
     (.cons (.constInt 42)
       (.cons (.constRecord (.cons (.constBool false) (.cons (.constString "ok") .nil)))
         .nil))
 
-def dict_record_values : Term (Ty.dict Ty.string (Ty.record [Ty.int, Ty.bool])) :=
+def dict_record_values : Term f0 (Ty.dict Ty.string (Ty.record [Ty.int, Ty.bool])) :=
   .dictInsert (.constString "x")
               (.constRecord (.cons (.constInt 7) (.cons (.constBool false) .nil)))
               .emptyDict
 
-def Term.show {ty : Ty} (t : Term ty) : String :=
-  Term'.show (t (rep := (fun _ => String)) (fvar := fun _ => Ty.int))
+def Term.show {ty : Ty} {n : Nat} {f : Fin n → Ty} (t : Term f ty) : String :=
+  Term'.show (t (rep := (fun _ => String)))
 -- set_option pp.explicit true
 
 -- Quick checks
--- For closed terms (no free variables), we can pick any `fvar`/`env`.
-def dummyFVar : String → Ty := fun _ => Ty.int
-unsafe def dummyEnv : (s : String) → (dummyFVar s).denote := fun (_ : String) => (0 : Int)
+-- For closed terms (n = 0), `Fin 0` is uninhabited, so an environment is never used.
+unsafe def env0 : (s : Fin 0) → (f0 s).denote := fun s => nomatch s
 
-unsafe abbrev closed {ty} (t : Term ty) : Term' Ty.denote dummyFVar ty :=
-  t (rep := Ty.denote) (fvar := dummyFVar)
 
-#eval Term'.denote (fvar := dummyFVar) dummyEnv (closed test)
-#eval Term'.denote (fvar := dummyFVar) dummyEnv (closed test2)
-#eval Term'.denote (fvar := dummyFVar) dummyEnv (closed test3)
-#eval Term'.denote (fvar := dummyFVar) dummyEnv (closed test4)
-#eval ("<" ++ showHList (Term'.denote (fvar := dummyFVar) dummyEnv (closed test5)) ++ ">")
-#eval Term'.denote (fvar := dummyFVar) dummyEnv (closed test6)
+
 
 #eval Term.show mul_dict_record
 -- Printing directly via `Repr` for nested tensor types is expensive; use `showDict`.
-#eval showDict (dom := Ty.string) (range := Ty.record [Ty.int]) (Term'.denote (fvar := dummyFVar) dummyEnv (closed mul_dict_record))
+#eval showDict (dom := Ty.string) (range := Ty.record [Ty.int]) (Term'.denote (fvar := f0) env0 (mul_dict_record (rep := Ty.denote)))
 
 #eval Term.show test
 #eval Term.show test2
 
 -- Pretty-print record values (via Repr/ToString instances)
-#eval ("<" ++ showHList (Term'.denote (fvar := dummyFVar) dummyEnv (closed rec_nested)) ++ ">")
-#eval showDict (dom := Ty.string) (range := Ty.record [Ty.int, Ty.bool]) (Term'.denote (fvar := dummyFVar) dummyEnv (closed dict_record_values))
+#eval showDict (dom := Ty.string) (range := Ty.record [Ty.int, Ty.bool]) (Term'.denote (fvar := f0) env0 (dict_record_values (rep := Ty.denote)))
 
 -- Dictionary lookup and sum examples
-def dict_ii : Term (Ty.dict Ty.int Ty.int) :=
+def dict_ii : Term f0 (Ty.dict Ty.int Ty.int) :=
   Term'.dictInsert (.constInt 1) (.constInt 2)
     (Term'.dictInsert (.constInt 3) (.constInt 4) (Term'.emptyDict))
 
 -- Lookup existing and missing keys (missing defaults to 0 via AddM.intA)
-def lookup_hit : Term Ty.int :=
+def lookup_hit : Term f0 Ty.int :=
   Term'.lookup (aRange := AddM.intA) (dict_ii) (.constInt 1)
 
-def lookup_miss : Term Ty.int :=  Term'.lookup (aRange := AddM.intA) (dict_ii) (.constInt 0)
+def lookup_miss : Term f0 Ty.int :=  Term'.lookup (aRange := AddM.intA) (dict_ii) (.constInt 0)
 
 -- Sum values in a dictionary: sum(x in d) x.val
-def sum_vals : Term Ty.int :=
+def sum_vals : Term f0 Ty.int :=
     Term'.sum (a := AddM.intA) (dict_ii)
       (fun x _ =>
         (Term'.var x))
 
 #eval Term.show lookup_hit
-#eval Term'.denote (fvar := dummyFVar) dummyEnv (closed lookup_hit)
-#eval Term.show lookup_miss
-#eval Term'.denote (fvar := dummyFVar) dummyEnv (closed lookup_miss)
-#eval Term.show sum_vals
-#eval Term'.denote (fvar := dummyFVar) dummyEnv (closed sum_vals)
