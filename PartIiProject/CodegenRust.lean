@@ -113,39 +113,42 @@ def renderRust {n : Nat} {fvar : Fin n → _root_.Ty} {ty : _root_.Ty}
    and prints a simple numeric "measure" of the result for comparison
    against Lean's evaluator. This avoids full pretty-printing of nested
    dictionaries/records while still catching semantic regressions. -/
+/-- Shared Rust runtime header used by test executables. -/
+def rustRuntimeHeader : String :=
+  "use std::collections::BTreeMap;\n" ++
+  "\n" ++
+  "// Minimal runtime helpers used by generated code\n" ++
+  "fn map_insert<K: Ord, V>(mut m: BTreeMap<K, V>, k: K, v: V) -> BTreeMap<K, V> {\n" ++
+  "    m.insert(k, v);\n" ++
+  "    m\n" ++
+  "}\n" ++
+  "fn lookup_or_default<K: Ord, V: Clone>(m: BTreeMap<K, V>, k: K, default: V) -> V {\n" ++
+  "    match m.get(&k) {\n" ++
+  "        Some(v) => v.clone(),\n" ++
+  "        None => default,\n" ++
+  "    }\n" ++
+  "}\n" ++
+  "\n" ++
+  "// A simple structural measure used for output comparison in tests\n" ++
+  "trait SDQLMeasure { fn measure(&self) -> i64; }\n" ++
+  "impl SDQLMeasure for i64 { fn measure(&self) -> i64 { *self } }\n" ++
+  "impl SDQLMeasure for bool { fn measure(&self) -> i64 { if *self {1} else {0} } }\n" ++
+  "impl SDQLMeasure for String { fn measure(&self) -> i64 { self.len() as i64 } }\n" ++
+  "impl<K: Ord + SDQLMeasure, V: SDQLMeasure> SDQLMeasure for BTreeMap<K, V> {\n" ++
+  "    fn measure(&self) -> i64 {\n" ++
+  "        let mut acc: i64 = 0;\n" ++
+  "        for (k, v) in self.iter() {\n" ++
+  "            acc += 31 * k.measure() + v.measure();\n" ++
+  "        }\n" ++
+  "        acc\n" ++
+  "    }\n" ++
+  "}\n" ++
+  "\n"
+
 def renderRustMeasured {n : Nat} {fvar : Fin n → _root_.Ty} {ty : _root_.Ty}
     (t : _root_.Term fvar ty) : String :=
   let expr := compileToRustExpr t
-  let header := "" ++
-    "use std::collections::BTreeMap;\n" ++
-    "\n" ++
-    "// Minimal runtime helpers used by generated code\n" ++
-    "fn map_insert<K: Ord, V>(mut m: BTreeMap<K, V>, k: K, v: V) -> BTreeMap<K, V> {\n" ++
-    "    m.insert(k, v);\n" ++
-    "    m\n" ++
-    "}\n" ++
-    "fn lookup_or_default<K: Ord, V: Clone>(m: BTreeMap<K, V>, k: K, default: V) -> V {\n" ++
-    "    match m.get(&k) {\n" ++
-    "        Some(v) => v.clone(),\n" ++
-    "        None => default,\n" ++
-    "    }\n" ++
-    "}\n" ++
-    "\n" ++
-    "// A simple structural measure used for output comparison in tests\n" ++
-    "trait SDQLMeasure { fn measure(&self) -> i64; }\n" ++
-    "impl SDQLMeasure for i64 { fn measure(&self) -> i64 { *self } }\n" ++
-    "impl SDQLMeasure for bool { fn measure(&self) -> i64 { if *self {1} else {0} } }\n" ++
-    "impl SDQLMeasure for String { fn measure(&self) -> i64 { self.len() as i64 } }\n" ++
-    "impl<K: Ord + SDQLMeasure, V: SDQLMeasure> SDQLMeasure for BTreeMap<K, V> {\n" ++
-    "    fn measure(&self) -> i64 {\n" ++
-    "        let mut acc: i64 = 0;\n" ++
-    "        for (k, v) in self.iter() {\n" ++
-    "            acc += 31 * k.measure() + v.measure();\n" ++
-    "        }\n" ++
-    "        acc\n" ++
-    "    }\n" ++
-    "}\n" ++
-    "\n"
+  let header := rustRuntimeHeader
   let body :=
     let e := Rust.showExpr expr 1
     "fn main() {\n  let result = " ++ e ++ ";\n  println!(\"{}\", SDQLMeasure::measure(&result));\n}\n"
@@ -173,6 +176,6 @@ def renderRustFn {n : Nat} {fvar : Fin n → _root_.Ty} {ty : _root_.Ty}
   let body := Rust.showExpr (compileOpenToRustExpr paramNames t) 1
   let header := "pub fn " ++ name ++ "(" ++ paramsStr ++ ") -> " ++ retStr ++ " {\n"
   let footer := "\n}\n"
-  header ++ "  " ++ body ++ ";" ++ footer
+  header ++ "  " ++ body ++ footer
 
 end PartIiProject

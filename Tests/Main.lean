@@ -29,10 +29,28 @@ def compileRust (rsPath binPath : FilePath) : IO (Nat × String) := do
 def runBinary (binPath : FilePath) : IO (Nat × String × String) := do
   runProc binPath.toString #[]
 
-def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
+/- Render Rust literals for runtime arguments -/
+mutual
+private unsafe def rustLitHList : {l : List Ty} → HList Ty.denote l → List String
+  | [], .nil => []
+  | _ :: ts, .cons h t => rustLit h :: rustLitHList t
+
+private unsafe def rustLit : {t : Ty} → t.denote → String
+  | .int, n => toString n
+  | .bool, b => if b then "true" else "false"
+  | .string, s => s!"String::from(\"{s}\")"
+  | .record l, r =>
+      let parts := rustLitHList r
+      "(" ++ String.intercalate ", " parts ++ ")"
+  | .dict dom range, d =>
+      let start := "std::collections::BTreeMap::new()"
+      d.map.foldl (fun acc k v => s!"map_insert({acc}, {rustLit (t := dom) k}, {rustLit (t := range) v})") start
+end
+
+unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
   IO.FS.createDirAll outDir
   match c with
-  | .mk name t expected =>
+  | .closed name t expected =>
       let rs := PartIiProject.renderRustMeasured t
       let rsPath := outDir / s!"{name}.rs"
       let binPath := outDir / s!"{name}.bin"
@@ -49,6 +67,34 @@ def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
           return { name, expected, got := some n }
       | none =>
           return { name, expected, got := none, stderr := some s!"Non-integer output: {outStr}" }
+  | .openCase (n := n) (fvar := fvar) name _ termCode args expected =>
+      -- Build a Rust program with a function for the open term and a main that calls it with concrete args
+      -- Parameter naming convention must match Codegen for free variables
+      let paramName : (i : Fin n) → String := fun i => s!"arg{i.val}"
+      let fnSrc := PartIiProject.renderRustFn name paramName termCode
+      -- Build main with concrete values
+      let paramDecls : List String :=
+        (List.finRange n).map (fun i => s!"let {paramName i} = {rustLit (t := fvar i) (args i)};")
+      let callArgs := (List.finRange n).map (fun i => paramName i)
+      let callArgsStr := String.intercalate ", " callArgs
+      let mainBody :=
+        "fn main() {\n" ++
+        String.intercalate "\n" (paramDecls.map (fun s => "  " ++ s)) ++ "\n  " ++
+        "let result = " ++ name ++ "(" ++ callArgsStr ++ ");\n  println!(\"{}\", SDQLMeasure::measure(&result));\n}\n"
+      let rs := PartIiProject.rustRuntimeHeader ++ fnSrc ++ mainBody
+      let rsPath := outDir / s!"{name}.rs"
+      let binPath := outDir / s!"{name}.bin"
+      writeFile rsPath rs
+      let (ccode, cerr) ← compileRust rsPath binPath
+      if ccode != 0 then
+        return { name, expected, got := none, stderr := some cerr }
+      let (rcode, rout, rerr) ← runBinary binPath
+      if rcode != 0 then
+        return { name, expected, got := none, stderr := some rerr }
+      let outStr := rout.trim
+      match outStr.toInt? with
+      | some n => return { name, expected, got := some n }
+      | none => return { name, expected, got := none, stderr := some s!"Non-integer output: {outStr}" }
 
 def formatResult (r : TestResult) : String :=
   match r.got with
