@@ -129,29 +129,38 @@ def rustRuntimeHeader : String :=
   "    }\n" ++
   "}\n" ++
   "\n" ++
-  "// A simple structural measure used for output comparison in tests\n" ++
-  "trait SDQLMeasure { fn measure(&self) -> i64; }\n" ++
-  "impl SDQLMeasure for i64 { fn measure(&self) -> i64 { *self } }\n" ++
-  "impl SDQLMeasure for bool { fn measure(&self) -> i64 { if *self {1} else {0} } }\n" ++
-  "impl SDQLMeasure for String { fn measure(&self) -> i64 { self.len() as i64 } }\n" ++
-  "impl<K: Ord + SDQLMeasure, V: SDQLMeasure> SDQLMeasure for BTreeMap<K, V> {\n" ++
-  "    fn measure(&self) -> i64 {\n" ++
-  "        let mut acc: i64 = 0;\n" ++
+  "// Pretty-printing for SDQL values (mirrors Lean showValue)\n" ++
+  "pub trait SDQLShow { fn show(&self) -> String; }\n" ++
+  "impl SDQLShow for i64 { fn show(&self) -> String { self.to_string() } }\n" ++
+  "impl SDQLShow for bool { fn show(&self) -> String { self.to_string() } }\n" ++
+  "impl SDQLShow for String { fn show(&self) -> String { self.clone() } }\n" ++
+  "impl<K: Ord + SDQLShow, V: SDQLShow> SDQLShow for BTreeMap<K, V> {\n" ++
+  "    fn show(&self) -> String {\n" ++
+  "        let mut s = String::new();\n" ++
+  "        s.push('{');\n" ++
   "        for (k, v) in self.iter() {\n" ++
-  "            acc += 31 * k.measure() + v.measure();\n" ++
+  "            s.push_str(&format!(\"{} -> {}, \", k.show(), v.show()));\n" ++
   "        }\n" ++
-  "        acc\n" ++
+  "        s.push('}');\n" ++
+  "        s\n" ++
   "    }\n" ++
   "}\n" ++
+  "\n" ++
+  "// Tuple/record pretty-printing for small arities\n" ++
+  "impl<T1: SDQLShow> SDQLShow for (T1,) { fn show(&self) -> String { format!(\"<{}>\", self.0.show()) } }\n" ++
+  "impl<T1: SDQLShow, T2: SDQLShow> SDQLShow for (T1, T2) { fn show(&self) -> String { format!(\"<{}, {}>\", self.0.show(), self.1.show()) } }\n" ++
+  "impl<T1: SDQLShow, T2: SDQLShow, T3: SDQLShow> SDQLShow for (T1, T2, T3) { fn show(&self) -> String { format!(\"<{}, {}, {}>\", self.0.show(), self.1.show(), self.2.show()) } }\n" ++
+  "impl<T1: SDQLShow, T2: SDQLShow, T3: SDQLShow, T4: SDQLShow> SDQLShow for (T1, T2, T3, T4) { fn show(&self) -> String { format!(\"<{}, {}, {}, {}>\", self.0.show(), self.1.show(), self.2.show(), self.3.show()) } }\n" ++
+  "impl<T1: SDQLShow, T2: SDQLShow, T3: SDQLShow, T4: SDQLShow, T5: SDQLShow> SDQLShow for (T1, T2, T3, T4, T5) { fn show(&self) -> String { format!(\"<{}, {}, {}, {}, {}>\", self.0.show(), self.1.show(), self.2.show(), self.3.show(), self.4.show()) } }\n" ++
   "\n"
 
-def renderRustMeasured {n : Nat} {fvar : Fin n → _root_.Ty} {ty : _root_.Ty}
+def renderRustShown {n : Nat} {fvar : Fin n → _root_.Ty} {ty : _root_.Ty}
     (t : _root_.Term fvar ty) : String :=
   let expr := compileToRustExpr t
   let header := rustRuntimeHeader
   let body :=
     let e := Rust.showExpr expr 1
-    "fn main() {\n  let result = " ++ e ++ ";\n  println!(\"{}\", SDQLMeasure::measure(&result));\n}\n"
+    "fn main() {\n  let result = " ++ e ++ ";\n  println!(\"{}\", SDQLShow::show(&result));\n}\n"
   header ++ body
 
 /- Open-term compilation helpers. --------------------------------------- -/

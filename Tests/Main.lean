@@ -7,8 +7,8 @@ open System
 
 structure TestResult where
   name : String
-  expected : Int
-  got : Option Int
+  expected : String
+  got : Option String
   stderr : Option String := none
   deriving Inhabited
 
@@ -51,7 +51,7 @@ unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
   IO.FS.createDirAll outDir
   match c with
   | .closed name t expected =>
-      let rs := PartIiProject.renderRustMeasured t
+      let rs := PartIiProject.renderRustShown t
       let rsPath := outDir / s!"{name}.rs"
       let binPath := outDir / s!"{name}.bin"
       writeFile rsPath rs
@@ -62,11 +62,7 @@ unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
       if rcode != 0 then
         return { name, expected, got := none, stderr := some rerr }
       let outStr := rout.trim
-      match outStr.toInt? with
-      | some n =>
-          return { name, expected, got := some n }
-      | none =>
-          return { name, expected, got := none, stderr := some s!"Non-integer output: {outStr}" }
+      return { name, expected, got := some outStr }
   | .openCase (n := n) (fvar := fvar) name _ termCode args expected =>
       -- Build a Rust program with a function for the open term and a main that calls it with concrete args
       -- Parameter naming convention must match Codegen for free variables
@@ -80,7 +76,7 @@ unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
       let mainBody :=
         "fn main() {\n" ++
         String.intercalate "\n" (paramDecls.map (fun s => "  " ++ s)) ++ "\n  " ++
-        "let result = " ++ name ++ "(" ++ callArgsStr ++ ");\n  println!(\"{}\", SDQLMeasure::measure(&result));\n}\n"
+        "let result = " ++ name ++ "(" ++ callArgsStr ++ ");\n  println!(\"{}\", SDQLShow::show(&result));\n}\n"
       let rs := PartIiProject.rustRuntimeHeader ++ fnSrc ++ mainBody
       let rsPath := outDir / s!"{name}.rs"
       let binPath := outDir / s!"{name}.bin"
@@ -92,18 +88,16 @@ unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
       if rcode != 0 then
         return { name, expected, got := none, stderr := some rerr }
       let outStr := rout.trim
-      match outStr.toInt? with
-      | some n => return { name, expected, got := some n }
-      | none => return { name, expected, got := none, stderr := some s!"Non-integer output: {outStr}" }
+      return { name, expected, got := some outStr }
 
 def formatResult (r : TestResult) : String :=
   match r.got with
-  | some n => if n == r.expected then s!"[PASS] {r.name}" else s!"[FAIL] {r.name}: expected {r.expected}, got {n}"
+  | some s => if s == r.expected then s!"[PASS] {r.name}" else s!"[FAIL] {r.name}: expected {r.expected}, got {s}"
   | none => s!"[ERROR] {r.name}: {r.stderr.getD "unknown error"}"
 
 def anyFailures (rs : List TestResult) : Bool :=
   rs.any (fun r => match r.got with
-                   | some n => n != r.expected
+                   | some s => s != r.expected
                    | none => true)
 
 unsafe def main (_args : List String) : IO UInt32 := do
