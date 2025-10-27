@@ -1,6 +1,7 @@
 import PartIiProject.Term
 import PartIiProject.Rust
 import PartIiProject.CodegenRust
+import PartIiProject.SyntaxSDQL
 
 open PartIiProject
 -- import PartIiProject.SurfaceCore

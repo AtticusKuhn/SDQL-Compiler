@@ -12,6 +12,7 @@ Primary objectives:
 - Faithfully model SDQL’s dictionary-centric semantics and tensor-shaped multiply in Lean.
 - Keep terms typed by construction via `AddM`/`ScaleM` evidence for addition and scaling.
 - Support practical experimentation via pretty-printing, `#eval` demos, and Rust codegen stubs.
+- Provide an ergonomic, typed SDQL surface via Lean macros (`[SDQL| ... ]`) that elaborates into the core term language, enabling quick experiments.
 - Provide robust regression testing (Lean→Rust roundtrip) so changes are safe and issues are caught early in CI.
 
 Out of scope for now:

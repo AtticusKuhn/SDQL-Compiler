@@ -15,7 +15,17 @@ Architecture overview:
 - Utilities:
   - `HList`: heterogeneous lists with `hmap`, `hmap2`, `dmap` helpers.
   - `Dict`: wrapper with `empty/insert/find?/mapValues` and `Ord` plumbed via a stored comparator.
-  - Pretty-printers for records and dicts for clean `#eval` output.
+- Pretty-printers for records and dicts for clean `#eval` output.
+
+Surface syntax (mini‑DSL):
+
+- `PartIiProject/SyntaxSDQL.lean` defines a `[SDQL| ... ]` quasiquoter that elaborates directly to the core `Term'`:
+  - Literals: ints, bools, strings.
+  - Records: `< e1, e2 >`, `< e1, e2, e3 >`; projection via `e . n` (0‑based).
+  - Dicts: singleton `{ k -> v }`, typed empty `{}_{ int, int }` (basic scalar types supported).
+  - Lookup: `d(k)`; `sum`: `sum( <k, v> in d ) body`.
+  - Algebra: `e1 + e2`, `e1 *{int} e2`, `e1 *{bool} e2`; `if`, `not`, `let x = e1 in e2`.
+- To keep elaborations succinct, it provides small wrapper typeclasses `HasAddM`/`HasScaleM` and helper combinators `SDQL.add`, `SDQL.mulInt/Bool`, `SDQL.lookup`, `SDQL.sum`, `SDQL.proj'` that select the needed evidence automatically.
 
 Testing infrastructure:
 

@@ -17,6 +17,7 @@ Dev environment:
 Key modules:
 
 - `PartIiProject/Term.lean`: core types, semimodule evidence, tensor, PHOAS terms, interpreter, printers, examples.
+- `PartIiProject/SyntaxSDQL.lean`: Lean macros providing an SDQL mini‑DSL via `[SDQL| ... ]` elaborating to `Term'`. Includes lightweight typeclasses `HasAddM`/`HasScaleM` and helper combinators to infer addition/scaling evidence.
 - `PartIiProject/Dict.lean`: purely functional dictionary wrapper on `Std.TreeMap` with an embedded comparator.
 - `PartIiProject/HList.lean`: minimal heterogeneous list utilities.
 - `PartIiProject/Rust.lean`: simplified Rust AST and pretty-printer.
@@ -36,6 +37,7 @@ How to run:
 - Build tests: `lake build sdql-tests`.
 - Run tests: `lake exe sdql-tests`.
 - Explore: open the `.lean` files and evaluate examples with `#eval`.
+- Try the DSL: define `def t : Term f0 _ := [SDQL| 3 + 5 ]` or more complex SDQL snippets; evaluate via `#eval` using `Term'.denote`.
 
 Notes/constraints:
 
@@ -43,6 +45,7 @@ Notes/constraints:
 - Codegen uses placeholder helpers (`sdql_mul`, `dict_add`, `tuple_add`). Execution path for tests relies on embedded runtime shims (`map_insert`, `lookup_or_default`, `SDQLShow`) in the generated program.
 - Rust iteration uses `.into_iter()` in the printed `for` loops to match ownership in helpers.
 - Kinds and scalar promotion are not modeled yet; only `bool` and `int` scalars are implemented.
+- Nix caveat: adding new modules (like `PartIiProject/SyntaxSDQL.lean`) can require the flake’s lean4‑nix manifest mapping to include them. Lake builds work; if `nix build` reports a missing module attribute, update manifests/lock or bump to the matching lean manifest (v4.24).
 CI:
 
 - GitHub Actions workflow at `.github/workflows/ci.yml` installs Lean and Rust, builds `sdql-tests`, and runs the test executable on pushes/PRs.

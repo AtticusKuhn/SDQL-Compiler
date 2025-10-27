@@ -10,6 +10,7 @@ What it provides today:
 - Semimodule structure: `AddM` (addition) and `ScaleM` (scalar action) for dictionaries, records, and scalars; tensor-shaped multiply.
 - Terms and evaluation: a PHOAS `Term'` with variables, constants, records (construct and positional projection), dictionaries (empty/insert/lookup), boolean ops, `if`, `let`, addition, multiply, and `sum` over dictionaries. An evaluator executes terms.
 - Pretty-printing: custom renderers for records and dictionaries to keep `#eval` usable.
+- Surface syntax macros: a Lean mini‑DSL `[SDQL| ... ]` for ergonomic SDQL terms that elaborates directly to the typed core. Supports literals, records/projection, dict singleton/lookup, typed empty dicts, `sum`, `let`, `if`, `not`, `+`, and `*{int|bool}`.
 - Codegen (prototype): translation of core terms to a compact Rust-like AST and string rendering for quick demos and a path to real backends.
 - Tests: a Lean test executable that compiles SDQL to Rust, builds with `rustc`, runs outputs, and compares the printed string of the Rust program against the printed string from Lean’s evaluator.
 
@@ -22,5 +23,6 @@ How it should work:
 User experience goals:
 
 - Keep examples simple to explore (`#eval`, `Term.show`, and `renderRust`).
+- Provide a compact, readable DSL that mirrors SDQL syntax closely while remaining strictly typed and total.
 - Favor small, typed increments that mirror the spec and are easy to verify.
 - Enable fearless refactors via an automated, Rust-backed test suite and GitHub Actions CI.

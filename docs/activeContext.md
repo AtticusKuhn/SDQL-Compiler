@@ -4,6 +4,7 @@ Current focus:
 
 - Maintain an accurate Memory Bank reflecting the Lean core, Rust codegen, and the new Rust-backed test harness with CI.
 - Keep guidance aligned with the actual codebase (lookup and sum exist; surface/named-records are archived under `old/`).
+ - Introduce a Lean macro-based SDQL mini‑DSL for more ergonomic authoring of terms that elaborate into the core `Term'`.
 
 Recent changes (captured here):
 
@@ -13,6 +14,7 @@ Recent changes (captured here):
 - Adjusted Rust AST printer to use `map_insert(...)` and `.into_iter()` to match runtime helper semantics; dictionary `show` uses `.iter()` for stable order.
 - Added GitHub Actions workflow to build and run tests on pushes/PRs.
 - Memory Bank correction: removed `Mathlib` as a stated dependency in tech docs; the active core only imports `Std` and local modules.
+- New: `PartIiProject/SyntaxSDQL.lean` implements `[SDQL| ... ]` macros that cover literals, records/projection, dict singleton/lookup, typed empty dicts `{}_{T1,T2}`, `sum(<k,v> in d)`, `let`, `if`, `not`, addition, and multiply with scalar tags (`*{int}`, `*{bool}`). Added examples with `#eval` to verify.
 
 Next steps (proposed):
 
@@ -22,9 +24,11 @@ Next steps (proposed):
 - Scalar promotion: add explicit scalar universes and a `promote` term; extend `ScaleM` to additional semirings.
 - Surface sugar: sets/arrays/range and `dom` via elaboration to the core.
 - Grow the test suite: add dict addition, nested records/dicts, `ite`, `letin`, more `sum` patterns, and negative cases.
+ - DSL: support multi-entry dictionary literals `{ k1 -> v1, k2 -> v2, ... }`, n-ary records, and named field syntax (later) or a surface translator. Align boolean semiring with the paper (OR/AND) when ready.
 
 Open questions:
 
 - How strictly to follow the paper’s boolean semiring in the core vs. keep XOR for debugging convenience?
 - Preferred path for named records (core vs. surface translation) given current goals.
 - Whether to use `cargo` and a shared Rust crate for runtime helpers vs. embedding helpers in generated sources.
+ - How to wire lean4‑nix manifests so `nix build` recognizes newly added modules (lake build already works).
