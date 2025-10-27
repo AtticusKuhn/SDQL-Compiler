@@ -20,17 +20,17 @@ Architecture overview:
 Testing infrastructure:
 
 - Lean test runner:
-  - `Tests/Cases.lean`: defines closed SDQL terms and computes expected results using the Lean evaluator plus a structural “measure”.
+- `Tests/Cases.lean`: defines SDQL terms and computes expected results using the Lean evaluator’s pretty-printer (`showValue`).
   - `Tests/Main.lean`: compiles each term to a standalone Rust program via `renderRustMeasured`, writes sources to `.sdql-test-out/`, builds with `rustc`, runs binaries, and compares integer outputs.
   - Lake executable target `sdql-tests` drives execution: `lake build sdql-tests` and `lake exe sdql-tests`.
 
 - Rust runtime shims (embedded in generated sources):
-  - `map_insert`, `lookup_or_default` helpers for maps; `SDQLMeasure` trait for ints, bools, strings, and `BTreeMap`.
+- `map_insert`, `lookup_or_default` helpers for maps; `SDQLShow` trait for ints, bools, strings, tuples (limited arities), and `BTreeMap`.
   - The Rust AST printer emits `map_insert(...)` and iterates maps with `.into_iter()` to match the shim.
 
 Code generation integration:
 
-- `renderRustMeasured` emits a complete Rust `main` that prints the result’s measure, aligning with Lean’s `sdqlMeasure` for comparison.
+- `renderRustShown` emits a complete Rust `main` that prints the result via the `SDQLShow` trait for comparison with Lean’s `showValue`.
 - Current tests avoid `sdql_mul` and complex tuple ops in Rust; those remain placeholders to expand later.
 
 Code generation:
@@ -47,7 +47,7 @@ Notable patterns:
 - Shape-directed multiply is implemented at the interpreter level via `ScaleM.mulDenote`, ensuring compile-time result shape `tensor t1 t2`.
 - Addition and scaling are encoded as explicit evidence, guiding both typing and evaluation.
 - Lookups and sums rely on the additive identity of the result to stay total and align with sparse semantics.
-- Tests compare Lean vs. Rust via a structural measure instead of pretty-printed values, simplifying output while remaining sensitive to semantic changes.
+- Tests compare Lean vs. Rust by printing values on both sides and checking string equality. Rust programs use `SDQLShow::show(&result)`; Lean uses `showValue`.
 
 Legacy/experiments:
 

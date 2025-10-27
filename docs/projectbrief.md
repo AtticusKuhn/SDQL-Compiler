@@ -4,7 +4,7 @@ This project implements a typed core calculus and verified foundations for the S
 
 - A mechanized core: types, semimodule structure, tensor-shaped multiplication, and a PHOAS term language with a definitional evaluator.
 - A minimal code generation path: compile core terms to a small Rust-like AST to explore execution and future optimization/compilation.
-- A Rust-backed test harness and CI that compiles generated Rust, executes tests, and compares results against the Lean evaluator.
+- A Rust-backed test harness and CI that compiles generated Rust, executes tests, and compares printed outputs against the Lean evaluator’s printed outputs.
 - Room to extend toward the full SDQL spec (kinds, additional semirings, surface sugar, and verified optimizations).
 
 Primary objectives:

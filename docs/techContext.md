@@ -20,11 +20,11 @@ Key modules:
 - `PartIiProject/Dict.lean`: purely functional dictionary wrapper on `Std.TreeMap` with an embedded comparator.
 - `PartIiProject/HList.lean`: minimal heterogeneous list utilities.
 - `PartIiProject/Rust.lean`: simplified Rust AST and pretty-printer.
-- `PartIiProject/CodegenRust.lean`: core→Rust AST compiler; `renderRust`/`renderRustFn` and `renderRustMeasured` helpers.
+- `PartIiProject/CodegenRust.lean`: core→Rust AST compiler; `renderRust`/`renderRustFn` and `renderRustShown` helpers; embeds `SDQLShow` runtime for printing.
 - `PartIiProject.lean`: examples invoking `renderRust` for quick demos.
 - Tests:
-  - `Tests/Cases.lean`: SDQL test cases and expected measures.
-  - `Tests/Main.lean`: test runner that compiles and executes Rust programs.
+  - `Tests/Cases.lean`: SDQL test cases and expected printed strings.
+  - `Tests/Main.lean`: test runner that compiles and executes Rust programs; compares `stdout` string to expected.
 
 Nix/flake integration:
 
@@ -40,7 +40,7 @@ How to run:
 Notes/constraints:
 
 - Boolean addition is currently XOR by design; aligning with SDQL would switch to OR. Boolean scaling remains AND.
-- Codegen uses placeholder helpers (`sdql_mul`, `dict_add`, `tuple_add`). Execution path for tests relies on embedded runtime shims (`map_insert`, `lookup_or_default`, `SDQLMeasure`) in the generated program.
+- Codegen uses placeholder helpers (`sdql_mul`, `dict_add`, `tuple_add`). Execution path for tests relies on embedded runtime shims (`map_insert`, `lookup_or_default`, `SDQLShow`) in the generated program.
 - Rust iteration uses `.into_iter()` in the printed `for` loops to match ownership in helpers.
 - Kinds and scalar promotion are not modeled yet; only `bool` and `int` scalars are implemented.
 CI:

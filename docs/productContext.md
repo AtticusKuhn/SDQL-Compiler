@@ -11,7 +11,7 @@ What it provides today:
 - Terms and evaluation: a PHOAS `Term'` with variables, constants, records (construct and positional projection), dictionaries (empty/insert/lookup), boolean ops, `if`, `let`, addition, multiply, and `sum` over dictionaries. An evaluator executes terms.
 - Pretty-printing: custom renderers for records and dictionaries to keep `#eval` usable.
 - Codegen (prototype): translation of core terms to a compact Rust-like AST and string rendering for quick demos and a path to real backends.
-- Tests: a Lean test executable that compiles SDQL to Rust, builds with `rustc`, runs outputs, and compares a structural measure against Lean’s evaluator results.
+- Tests: a Lean test executable that compiles SDQL to Rust, builds with `rustc`, runs outputs, and compares the printed string of the Rust program against the printed string from Lean’s evaluator.
 
 How it should work:
 

@@ -8,16 +8,17 @@ Current focus:
 Recent changes (captured here):
 
 - Moved inline tests out of `Term.lean` and top-level into `Tests/`.
-- Added a Lean test executable `sdql-tests` that compiles SDQL → Rust, builds with `rustc`, runs binaries, and compares a structural measure against Lean’s evaluator.
-- Introduced `renderRustMeasured` to emit standalone Rust programs with embedded mini-runtime (map helpers and `SDQLMeasure`).
-- Adjusted Rust AST printer to use `map_insert(...)` and `.into_iter()` to match runtime helper semantics.
+- Added a Lean test executable `sdql-tests` that compiles SDQL → Rust, builds with `rustc`, runs binaries, and compares printed strings from Rust against Lean’s pretty-printed results.
+- Introduced `renderRustShown` and a new embedded runtime trait `SDQLShow` (replacing `SDQLMeasure`) for value pretty-printing in Rust.
+- Adjusted Rust AST printer to use `map_insert(...)` and `.into_iter()` to match runtime helper semantics; dictionary `show` uses `.iter()` for stable order.
 - Added GitHub Actions workflow to build and run tests on pushes/PRs.
 - Memory Bank correction: removed `Mathlib` as a stated dependency in tech docs; the active core only imports `Std` and local modules.
 
 Next steps (proposed):
 
-- Boolean semiring alignment: switch `AddM.boolA` from XOR to OR; update tests and Rust runtime (`tuple_add`/`dict_add` if introduced).
+- Boolean semiring alignment: switch `AddM.boolA` from XOR to OR; update examples and, if needed, Rust helpers.
 - Expand Rust runtime and codegen to cover multiplication (`sdql_mul`) and record operations so tests can include those.
+- Extend `SDQLShow` tuple implementations beyond arity 5 as needed for larger records.
 - Scalar promotion: add explicit scalar universes and a `promote` term; extend `ScaleM` to additional semirings.
 - Surface sugar: sets/arrays/range and `dom` via elaboration to the core.
 - Grow the test suite: add dict addition, nested records/dicts, `ite`, `letin`, more `sum` patterns, and negative cases.
