@@ -126,7 +126,7 @@ syntax (name := sdqlFalse) "false"    : sdql
 syntax "(" sdql ")"                  : sdql
 syntax "<" sdql "," sdql ">"        : sdql
 syntax "<" sdql "," sdql "," sdql ">" : sdql
-syntax "{" sdql "->" sdql "}"        : sdql
+syntax "{" sepBy(sdql "->" sdql, ",")  "}"        : sdql
 
 -- field projection and lookup (postfix-ish)
 syntax:70 sdql:70 "." num : sdql
@@ -212,11 +212,32 @@ mutual
         | `(sdql| < $a:sdql, $b:sdql, $c:sdql >) => do
             let ta ← elabSDQL a; let tb ← elabSDQL b; let tc ← elabSDQL c
             `(Term'.constRecord (HList.cons $ta (HList.cons $tb (HList.cons $tc HList.nil))))
+        -- n-ary dictionary literal: { k1 -> v1, ..., kn -> vn }
+        | `(sdql| { $[$k:sdql -> $v:sdql],* }) => do
+            let ks : Array (TSyntax `sdql) := k
+            let vs : Array (TSyntax `sdql) := v
+            elabDictPairs ks vs
         | `(sdql| { $k:sdql -> $v:sdql }) => do
             let tk ← elabSDQL k; let tv ← elabSDQL v
             `(Term'.dictInsert $tk $tv Term'.emptyDict)
         | _ => Macro.throwError s!"unrecognized SDQL syntax: {stx}"
 
+  partial def elabDictPairs (ks : Array (TSyntax `sdql)) (vs : Array (TSyntax `sdql)) : MacroM (TSyntax `term) := do
+    let n := ks.size
+    if n == 0 then
+      Macro.throwError "empty dictionary requires a type annotation: {}_{ Tdom, Trange }"
+    else if n != vs.size then
+      Macro.throwError "mismatched key/value pairs in dictionary literal"
+    else
+      let rec mk (i : Nat) : MacroM (TSyntax `term) := do
+        if i == n then
+          `(Term'.emptyDict)
+        else
+          let tk ← elabSDQL (ks[i]!)
+          let tv ← elabSDQL (vs[i]!)
+          let tail ← mk (i + 1)
+          `(Term'.dictInsert $tk $tv $tail)
+      mk 0
 end
 /- Quasiquoter entry point: elaborates to a `Term f ty` function
    (`rep`-polymorphic). -/
@@ -245,7 +266,7 @@ unsafe def env0 : (s : Fin 0) → (f0 s).denote := fun s => nomatch s
 
 
 -- 4) dictionary singleton and lookup
-def ex_dict_lookup : Term f0 Ty.int := [SDQL| { 3 -> 7 }(3) ]
+def ex_dict_lookup : Term f0 Ty.int := [SDQL| { 3 -> 7 , 5 -> 7} (3) ]
 
 -- 5) typed empty dictionary
 def ex_empty : Term f0 (Ty.dict Ty.int Ty.int) := [SDQL| {}_{ int, int } ]
