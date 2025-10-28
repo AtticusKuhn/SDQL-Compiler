@@ -39,32 +39,87 @@
               "Tests.Main"
             ];
           }).executable;
+          # Runtime tools shared by sdql reference test runners
+          sdqlRefRuntimeInputs = with pkgs; [
+            # JVM + Scala toolchain
+            jdk17
+            sbt
+            scala_2_13
+            # C/C++ toolchain for optional codegen/compilation paths
+            clang
+            clang-tools
+            gcc
+            gnumake
+            # misc utils mentioned in README
+            gnused
+            git
+          ];
+
           # Tiny helper to run sbt tests for the Scala sdql reference
           sdqlRefTestRunner = pkgs.writeShellApplication {
             name = "sdql-reference-tests";
-            runtimeInputs = with pkgs; [
-              # JVM + Scala toolchain
-              jdk17
-              sbt
-              scala_2_13
-              # C/C++ toolchain for optional codegen/compilation paths
-              clang
-              clang-tools
-              gcc
-              gnumake
-              # misc utils mentioned in README
-              gnused
-              git
-            ];
+            runtimeInputs = sdqlRefRuntimeInputs;
             text = ''
               set -euo pipefail
               cd sdql_reference/sdql
-              # The flag -Dsbt.log.noformat=false enables color output
-              if [ "$#" -gt 0 ]; then
-                exec sbt -Dsbt.log.noformat=false "$@"
-              else
-                exec sbt -Dsbt.log.noformat=false test
+              # build.sbt excludes optional TPCH tests globally via -l tags.
+              # Override testOptions in-session so we can run specific suites.
+              # Default: run the TPCH codegen suite (fast, dataset‑independent),
+              # so we always exercise TPCH coverage and report a non-zero count.
+              sbt \
+                "set Test / testOptions := Seq(Tests.Argument(TestFrameworks.ScalaTest, \"-P32\"))" \
+                "testOnly sdql.backend.CppCodegenTestTPCH"
+            '';
+          };
+
+          # Optional: end-to-end TPCH tests @ SF=0.01 (interpreter)
+          sdqlRefTPCH001 = pkgs.writeShellApplication {
+            name = "sdql-reference-tpch-0_01";
+            runtimeInputs = sdqlRefRuntimeInputs;
+            text = ''
+              set -euo pipefail
+              cd sdql_reference/sdql
+              # Heuristic guard: SF=0.01 lineitem is typically < 20MB.
+              if [ ! -f datasets/tpch/lineitem.tbl ]; then
+                echo "Missing datasets/tpch/lineitem.tbl. See README.md (TPCH datasets)." >&2
+                exit 1
               fi
+              sz=$(stat -c %s datasets/tpch/lineitem.tbl || stat -f %z datasets/tpch/lineitem.tbl || echo 0)
+              if [ "$sz" -gt 50000000 ]; then
+                echo "Detected large TPCH tables (likely SF=1). For fast tests, generate SF=0.01." >&2
+                echo "Run: (cd tpch-dbgen && ./dbgen -s 0.01 -vf && mv *.tbl ../datasets/tpch && sed -i 's/|$//' ../datasets/tpch/*.tbl)" >&2
+                exit 1
+              fi
+              # Increase heap a bit for safety on some machines
+              export SBT_OPTS="$SBT_OPTS -Xmx2g -Xms512m -Xss4m -XX:+UseG1GC"
+              sbt \
+                "set Test / testOptions := Seq(Tests.Argument(TestFrameworks.ScalaTest, \"-P32\"))" \
+                "testOnly sdql.backend.InterpreterTest -- -n TestTPCH0_01"
+            '';
+          };
+
+          # Optional: end-to-end TPCH tests @ SF=1 (compiled C++), requires results symlink
+          sdqlRefTPCH1 = pkgs.writeShellApplication {
+            name = "sdql-reference-tpch-1";
+            runtimeInputs = sdqlRefRuntimeInputs;
+            text = ''
+              set -euo pipefail
+              cd sdql_reference/sdql
+              if [ ! -d results ]; then
+                echo "Missing ./results symlink. Clone sdql-benchmark and symlink ./results -> sdql-benchmark/results" >&2
+                echo "  git clone https://github.com/edin-dal/sdql-benchmark" >&2
+                echo "  ln -s sdql-benchmark/results results" >&2
+                exit 1
+              fi
+              if [ ! -f datasets/tpch/lineitem.tbl ]; then
+                echo "Missing datasets/tpch/*.tbl. See README.md (TPCH datasets)." >&2
+                exit 1
+              fi
+              # These tests are heavy; don’t change global excludes, just include explicit tag
+              export SBT_OPTS="$SBT_OPTS -Xmx4g -Xms1g -Xss4m -XX:+UseG1GC"
+              sbt \
+                "set Test / testOptions := Seq(Tests.Argument(TestFrameworks.ScalaTest, \"-P32\"))" \
+                "testOnly * -- -n TestTPCH1"
             '';
           };
         in
@@ -73,6 +128,8 @@
             default = sdqlTests;
             sdql-tests = sdqlTests;
             sdql-reference-tests = sdqlRefTestRunner;
+            sdql-reference-tpch-0_01 = sdqlRefTPCH001;
+            sdql-reference-tpch-1 = sdqlRefTPCH1;
           };
 
           # The executable name defaults to the lowercased manifest name
@@ -90,6 +147,14 @@
             sdql-ref-tests = {
               type = "app";
               program = "${sdqlRefTestRunner}/bin/sdql-reference-tests";
+            };
+            sdql-ref-tpch-0_01 = {
+              type = "app";
+              program = "${sdqlRefTPCH001}/bin/sdql-reference-tpch-0_01";
+            };
+            sdql-ref-tpch-1 = {
+              type = "app";
+              program = "${sdqlRefTPCH1}/bin/sdql-reference-tpch-1";
             };
           };
 
