@@ -259,14 +259,14 @@ def ex_add : Term f0 Ty.int := [SDQL| 3 + 5 ]
 -- def ex_bool : Term f0 Ty.bool := [SDQL| not (true + false) ]
 
 -- 3) records and projection: < 10, 20 >.1
-def ex_proj : Term f0 Ty.int := [SDQL| < 10, 20 >.1 ]
+def ex_proj : Term f0 Ty.int := [SDQL| < 10 , 10>.1 ]
 
 /- Quick `#eval` checks -/
 unsafe def env0 : (s : Fin 0) → (f0 s).denote := fun s => nomatch s
 
 
 -- 4) dictionary singleton and lookup
-def ex_dict_lookup : Term f0 Ty.int := [SDQL| { 3 -> 7 , 5 -> 7} (3) ]
+def ex_dict_lookup : Term f0 Ty.int := [SDQL| { 3 -> 7 , 5 -> 1 + 1} (3) ]
 
 -- 5) typed empty dictionary
 def ex_empty : Term f0 (Ty.dict Ty.int Ty.int) := [SDQL| {}_{ int, int } ]

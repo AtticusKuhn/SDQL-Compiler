@@ -56,7 +56,7 @@ private def indentStr : Nat → String
 
 private def paren (s : String) : String := s!"({s})"
 
-partial def showBinOp : BinOp → String
+def showBinOp : BinOp → String
   | .add => "+"
   | .sub => "-"
   | .mul => "*"

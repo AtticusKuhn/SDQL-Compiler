@@ -12,20 +12,29 @@ fn lookup_or_default<K: Ord, V: Clone>(m: BTreeMap<K, V>, k: K, default: V) -> V
     }
 }
 
-// A simple structural measure used for output comparison in tests
-trait SDQLMeasure { fn measure(&self) -> i64; }
-impl SDQLMeasure for i64 { fn measure(&self) -> i64 { *self } }
-impl SDQLMeasure for bool { fn measure(&self) -> i64 { if *self {1} else {0} } }
-impl SDQLMeasure for String { fn measure(&self) -> i64 { self.len() as i64 } }
-impl<K: Ord + SDQLMeasure, V: SDQLMeasure> SDQLMeasure for BTreeMap<K, V> {
-    fn measure(&self) -> i64 {
-        let mut acc: i64 = 0;
+// Pretty-printing for SDQL values (mirrors Lean showValue)
+pub trait SDQLShow { fn show(&self) -> String; }
+impl SDQLShow for i64 { fn show(&self) -> String { self.to_string() } }
+impl SDQLShow for bool { fn show(&self) -> String { self.to_string() } }
+impl SDQLShow for String { fn show(&self) -> String { self.clone() } }
+impl<K: Ord + SDQLShow, V: SDQLShow> SDQLShow for BTreeMap<K, V> {
+    fn show(&self) -> String {
+        let mut s = String::new();
+        s.push('{');
         for (k, v) in self.iter() {
-            acc += 31 * k.measure() + v.measure();
+            s.push_str(&format!("{} -> {}, ", k.show(), v.show()));
         }
-        acc
+        s.push('}');
+        s
     }
 }
+
+// Tuple/record pretty-printing for small arities
+impl<T1: SDQLShow> SDQLShow for (T1,) { fn show(&self) -> String { format!("<{}>", self.0.show()) } }
+impl<T1: SDQLShow, T2: SDQLShow> SDQLShow for (T1, T2) { fn show(&self) -> String { format!("<{}, {}>", self.0.show(), self.1.show()) } }
+impl<T1: SDQLShow, T2: SDQLShow, T3: SDQLShow> SDQLShow for (T1, T2, T3) { fn show(&self) -> String { format!("<{}, {}, {}>", self.0.show(), self.1.show(), self.2.show()) } }
+impl<T1: SDQLShow, T2: SDQLShow, T3: SDQLShow, T4: SDQLShow> SDQLShow for (T1, T2, T3, T4) { fn show(&self) -> String { format!("<{}, {}, {}, {}>", self.0.show(), self.1.show(), self.2.show(), self.3.show()) } }
+impl<T1: SDQLShow, T2: SDQLShow, T3: SDQLShow, T4: SDQLShow, T5: SDQLShow> SDQLShow for (T1, T2, T3, T4, T5) { fn show(&self) -> String { format!("<{}, {}, {}, {}, {}>", self.0.show(), self.1.show(), self.2.show(), self.3.show(), self.4.show()) } }
 
 pub fn add_int_param(arg0: i64) -> i64 {
   arg0 + 5
@@ -33,5 +42,5 @@ pub fn add_int_param(arg0: i64) -> i64 {
 fn main() {
   let arg0 = 7;
   let result = add_int_param(arg0);
-  println!("{}", SDQLMeasure::measure(&result));
+  println!("{}", SDQLShow::show(&result));
 }

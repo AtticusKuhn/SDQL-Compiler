@@ -39,11 +39,40 @@
               "Tests.Main"
             ];
           }).executable;
+          # Tiny helper to run sbt tests for the Scala sdql reference
+          sdqlRefTestRunner = pkgs.writeShellApplication {
+            name = "sdql-reference-tests";
+            runtimeInputs = with pkgs; [
+              # JVM + Scala toolchain
+              jdk17
+              sbt
+              scala_2_13
+              # C/C++ toolchain for optional codegen/compilation paths
+              clang
+              clang-tools
+              gcc
+              gnumake
+              # misc utils mentioned in README
+              gnused
+              git
+            ];
+            text = ''
+              set -euo pipefail
+              cd sdql_reference/sdql
+              # The flag -Dsbt.log.noformat=false enables color output
+              if [ "$#" -gt 0 ]; then
+                exec sbt -Dsbt.log.noformat=false "$@"
+              else
+                exec sbt -Dsbt.log.noformat=false test
+              fi
+            '';
+          };
         in
         {
           packages = {
             default = sdqlTests;
             sdql-tests = sdqlTests;
+            sdql-reference-tests = sdqlRefTestRunner;
           };
 
           # The executable name defaults to the lowercased manifest name
@@ -58,6 +87,10 @@
               type = "app";
               program = exePath;
             };
+            sdql-ref-tests = {
+              type = "app";
+              program = "${sdqlRefTestRunner}/bin/sdql-reference-tests";
+            };
           };
 
           devShells.default = pkgs.mkShell {
@@ -65,7 +98,12 @@
             # Keep this minimal to avoid attr or non-derivation issues on some channels.
             packages =
               [ pkgs.lean.lean pkgs.lean.lake]
-              ++ (with pkgs; [ git unzip rustc cargo codex uv ]);
+              ++ (with pkgs; [
+                git unzip rustc cargo codex uv
+                # sdql reference prerequisites
+                jdk17 sbt scala_2_13
+                clang clang-tools gcc gnumake gnused
+              ]);
           };
         };
     };
