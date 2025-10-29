@@ -213,7 +213,7 @@ inductive Term' (rep : Ty → Type) {n : Nat} (fvar : Fin n → Ty) : Ty → Typ
   | add : {ty : Ty} → (a : AddM ty) → Term' rep fvar ty → Term' rep fvar ty → Term' rep fvar ty
   | mul : { sc t1 t2 : Ty} → (_s1 : ScaleM sc t1) →  (_s2 : ScaleM sc t2) → Term' rep fvar t1 → Term' rep fvar t2 → Term' rep fvar (tensor t1 t2)
   | sum : {dom range ty : Ty} → (a : AddM ty) → Term' rep fvar (.dict dom range) → (rep dom → rep range → Term' rep fvar ty) → Term' rep fvar ty
-  | proj : (l : List (Ty)) → Term' rep fvar (.record l) → (i : Nat) → Term' rep fvar (l.getD i Ty.int)
+  | proj : (l : List Ty) → Term' rep fvar (.record l) → (i : Nat) → Term' rep fvar (l.getD i Ty.int)
 
 private unsafe def getProj {l : List Ty}
     (recordVal : Ty.denote (.record l)) (i : Nat)

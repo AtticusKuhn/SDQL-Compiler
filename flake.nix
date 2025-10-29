@@ -91,7 +91,9 @@
                 exit 1
               fi
               # Increase heap a bit for safety on some machines
+              set +u
               export SBT_OPTS="$SBT_OPTS -Xmx2g -Xms512m -Xss4m -XX:+UseG1GC"
+              set -u
               sbt \
                 "set Test / testOptions := Seq(Tests.Argument(TestFrameworks.ScalaTest, \"-P32\"))" \
                 "testOnly sdql.backend.InterpreterTest -- -n TestTPCH0_01"
@@ -116,7 +118,9 @@
                 exit 1
               fi
               # These tests are heavy; don’t change global excludes, just include explicit tag
+              set +u
               export SBT_OPTS="$SBT_OPTS -Xmx4g -Xms1g -Xss4m -XX:+UseG1GC"
+              set -u
               sbt \
                 "set Test / testOptions := Seq(Tests.Argument(TestFrameworks.ScalaTest, \"-P32\"))" \
                 "testOnly * -- -n TestTPCH1"
