@@ -27,6 +27,15 @@ Surface syntax (mini‑DSL):
   - Algebra: `e1 + e2`, `e1 *{int} e2`, `e1 *{bool} e2`; `if`, `not`, `let x = e1 in e2`.
 - To keep elaborations succinct, it provides small wrapper typeclasses `HasAddM`/`HasScaleM` and helper combinators `SDQL.add`, `SDQL.mulInt/Bool`, `SDQL.lookup`, `SDQL.sum`, `SDQL.proj'` that select the needed evidence automatically.
 
+Surface layer with named records:
+
+- `PartIiProject/SurfaceCore.lean` defines an explicit “surface” representation with names:
+  - `SurfaceTy`: mirrors core types but `record` carries a `List (String × SurfaceTy)`.
+  - `SAdd` and `SScale`: surface-side evidence for addition and scaling. `SScale` currently includes only scalar and dictionary scaling; record scaling is deferred to the core.
+  - `STerm'`: surface terms featuring `constRecord` and `projByName` using a `HasField` proof to locate a field by name; plus `add`, `lookup`, `sum`, `let`, `if`, `not`, `dict` empty/insert.
+  - `ToCore.tr`: translation erases names to positional records (`Ty.record (tyFields …)`), translates `SAdd`/`SScale` to core `AddM`/`ScaleM`, and compiles named projection to positional `proj` via an index computed from `HasField` and a lemma relating the index to the underlying field type.
+  - Surface multiplication is not emitted; multiplication remains a core concern to avoid complex `stensor`/`tensor` alignment proofs.
+
 Testing infrastructure:
 
 - Lean test runner:

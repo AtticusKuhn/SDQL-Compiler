@@ -22,6 +22,7 @@ Key modules:
 - `PartIiProject/HList.lean`: minimal heterogeneous list utilities.
 - `PartIiProject/Rust.lean`: simplified Rust AST and pretty-printer.
 - `PartIiProject/CodegenRust.lean`: core→Rust AST compiler; `renderRust`/`renderRustFn` and `renderRustShown` helpers; embeds `SDQLShow` runtime for printing.
+- `PartIiProject/SurfaceCore.lean`: an explicit surface layer with named records and a surface→core translation (`ToCore.tr`) that erases names to positional records. Translation covers `constRecord`, `projByName`, `lookup`, `sum`, `add`, and control flow. Surface scaling covers scalars and dictionaries; record scaling and surface multiplication are handled in the core for now.
 - `PartIiProject.lean`: examples invoking `renderRust` for quick demos.
 - Tests:
   - `Tests/Cases.lean`: SDQL test cases and expected printed strings.
@@ -45,6 +46,7 @@ Notes/constraints:
 - Codegen uses placeholder helpers (`sdql_mul`, `dict_add`, `tuple_add`). Execution path for tests relies on embedded runtime shims (`map_insert`, `lookup_or_default`, `SDQLShow`) in the generated program.
 - Rust iteration uses `.into_iter()` in the printed `for` loops to match ownership in helpers.
 - Kinds and scalar promotion are not modeled yet; only `bool` and `int` scalars are implemented.
+- The surface layer currently avoids emitting multiplication and record scaling to keep translation simple and fully type-directed; this can be revisited once accompanying proofs are in place.
 - Nix caveat: adding new modules (like `PartIiProject/SyntaxSDQL.lean`) can require the flake’s lean4‑nix manifest mapping to include them. Lake builds work; if `nix build` reports a missing module attribute, update manifests/lock or bump to the matching lean manifest (v4.24).
 CI:
 
