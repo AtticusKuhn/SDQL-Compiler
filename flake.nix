@@ -36,6 +36,7 @@
             roots = [
               # Build the library part too so tests can import it
               { mod = "PartIiProject"; glob = "andSubmodules"; }
+              # Ensure auxiliary modules are included explicitly
               "Tests.Main"
             ];
           }).executable;

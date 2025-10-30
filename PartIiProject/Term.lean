@@ -1,6 +1,7 @@
 import Std.Data.TreeMap.Basic
 import PartIiProject.Dict
 import PartIiProject.HList
+import PartIiProject.Mem
 
 -- set_option linter.style.longLine false
 set_option linter.unusedVariables false
@@ -132,12 +133,14 @@ inductive ScaleM : Ty → Ty → Type where
   | boolS : ScaleM Ty.bool Ty.bool
   | intS : ScaleM Ty.int Ty.int
   | dictS {sc dom range : Ty} (sRange : ScaleM sc range) : ScaleM sc (Ty.dict dom range)
-  | recordS {sc : Ty} {l : List Ty} (fields : ∀ (t : Ty), t ∈ l → ScaleM sc t) : ScaleM sc (Ty.record l)
+  | recordS {sc : Ty} {l : List Ty} (fields : ∀ (t : Ty), Mem t l → ScaleM sc t) : ScaleM sc (Ty.record l)
 
-def toHList {T : Type} {l : List T} {ftype : T → Type} (f : ∀ (t : T), t ∈ l → ftype t) : HList ftype l :=
+def toHList {T : Type} {l : List T} {ftype : T → Type}
+  (f : ∀ (t : T), Mem t l → ftype t) : HList ftype l :=
   match l with
     | [] => HList.nil
-    | t :: ts => HList.cons (f t (by simp only [List.mem_cons, true_or])) (toHList (fun t' => f t' ∘ List.mem_cons_of_mem t))
+    | t :: ts =>
+      HList.cons (f t (Mem.head ts)) (toHList (fun t' hp => f t' (Mem.tail t hp)))
 
 mutual
 unsafe def scaleRecordHList {sc : Ty}

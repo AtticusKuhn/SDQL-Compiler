@@ -1,4 +1,5 @@
 import PartIiProject.Term
+import PartIiProject.Mem
 import PartIiProject.Rust
 import PartIiProject.CodegenRust
 import PartIiProject.SyntaxSDQL

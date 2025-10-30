@@ -1,5 +1,6 @@
 import PartIiProject.HList
 import PartIiProject.Term
+import PartIiProject.Mem
 
 namespace PartIiProject
 open Classical
@@ -42,6 +43,9 @@ inductive SScale : SurfaceTy → SurfaceTy → Type where
   | boolS : SScale SurfaceTy.bool SurfaceTy.bool
   | intS : SScale SurfaceTy.int SurfaceTy.int
   | dictS {sc dom range : SurfaceTy} (sRange : SScale sc range) : SScale sc (SurfaceTy.dict dom range)
+  | recordS {sc : SurfaceTy} {σ : Schema}
+      (fields : (p : String × SurfaceTy) → Mem p σ → SScale sc p.snd) :
+      SScale sc (SurfaceTy.record σ)
 
 
 -- def toHList {T : Type} {l : List T} {ftype : T → Type} (f : ∀ (t : T), t ∈ l → ftype t) : HList ftype l :=
@@ -58,6 +62,7 @@ unsafe def stensor (a b : SurfaceTy) : SurfaceTy :=
   | .dict dom range => .dict dom (stensor range b)
   | .record σ => .record (σ.map (fun (nm, t) => (nm, stensor t b)))
   | _ => b
+-- Note: unsafe def, so we do not prove termination here.
 
 unsafe inductive STerm' (rep : SurfaceTy → Type) {n : Nat} (fvar : Fin n → SurfaceTy) : SurfaceTy → Type where
   | var   : {ty : SurfaceTy} → rep ty → STerm' rep fvar ty
@@ -69,6 +74,8 @@ unsafe inductive STerm' (rep : SurfaceTy → Type) {n : Nat} (fvar : Fin n → S
   | ite : {ty : SurfaceTy} → STerm' rep fvar SurfaceTy.bool → STerm' rep fvar ty → STerm' rep fvar ty → STerm' rep fvar ty
   | letin : {ty₁ ty₂ : SurfaceTy} → STerm' rep fvar ty₁ → (rep ty₁ → STerm' rep fvar ty₂) → STerm' rep fvar ty₂
   | add : {ty : SurfaceTy} → (a : SAdd ty) → STerm' rep fvar ty → STerm' rep fvar ty → STerm' rep fvar ty
+  | mul : {sc t1 t2 : SurfaceTy} → (s1 : SScale sc t1) → (s2 : SScale sc t2)
+      → STerm' rep fvar t1 → STerm' rep fvar t2 → STerm' rep fvar (stensor t1 t2)
   | emptyDict : {dom range : SurfaceTy} → STerm' rep fvar (SurfaceTy.dict dom range)
   | dictInsert : {dom range : SurfaceTy} → STerm' rep fvar dom → STerm' rep fvar range → STerm' rep fvar (SurfaceTy.dict dom range) → STerm' rep fvar (SurfaceTy.dict dom range)
   | lookup : {dom range : SurfaceTy} → (aRange : SAdd range) → STerm' rep fvar (SurfaceTy.dict dom range) → STerm' rep fvar dom → STerm' rep fvar range
@@ -107,7 +114,7 @@ mutual
 end
 
 -- Translate surface semimodule evidence to core
-def toCoreAdd : {t : SurfaceTy} → SAdd t → AddM (ty t)
+ def toCoreAdd : {t : SurfaceTy} → SAdd t → AddM (ty t)
   | _, SAdd.boolA => AddM.boolA
   | _, SAdd.intA => AddM.intA
   | _, @SAdd.dictA dom range aRange => AddM.dictA (toCoreAdd aRange)
@@ -121,10 +128,41 @@ def toCoreAdd : {t : SurfaceTy} → SAdd t → AddM (ty t)
           HList.cons (toCoreAdd h) (trFields σ' t)
     AddM.recordA (trFields σ fields)
 
- def toCoreScale : {sc t : SurfaceTy} → SScale sc t → ScaleM (ty sc) (ty t)
-    | _, _, SScale.boolS => ScaleM.boolS
-    | _, _, SScale.intS => ScaleM.intS
-    | _, _, @SScale.dictS sc dom range sRange => ScaleM.dictS (toCoreScale sRange)
+-- (unused helper removed)
+
+-- def mem_empty {α : Type} {x : α} : ¬ (Mem x ([] : List α)) :=
+--   fun h => by cases h
+
+def toCoreScale : {sc t : SurfaceTy} → SScale sc t → ScaleM (ty sc) (ty t)
+  | _, _, SScale.boolS => ScaleM.boolS
+  | _, _, SScale.intS => ScaleM.intS
+  | _, _, @SScale.dictS sc dom range sRange => ScaleM.dictS (toCoreScale sRange)
+  | _, _, @SScale.recordS sc σ fields =>
+      -- Build the per-field scaling function by recursion on the schema,
+      -- using the typed membership `Mem` so we can pattern match.
+      let rec go
+          (σ : Schema)
+          (flds : ∀ (p : String × SurfaceTy), Mem p σ → SScale sc p.snd)
+          : ∀ (t' : Ty), Mem t' (tyFields σ) → ScaleM (ty sc) t'
+        :=
+        match σ with
+        | [] =>
+            fun _ h => by cases h
+        | (nm, tt) :: σ' =>
+            fun t' (h : Mem t' (tyFields ((nm, tt) :: σ'))) => by
+              -- Reexpress membership to expose the head of the list.
+              have h0 : Mem t' (ty tt :: tyFields σ') := by
+                simpa [tyFields_cons] using h
+              cases h0 with
+              | head _ =>
+                  -- Here, definitionaly, t' = ty tt.
+                  simpa using (toCoreScale (flds (nm, tt) (Mem.head σ')))
+              | tail _ hRest =>
+                  -- Recurse on the tail with a restricted field function.
+                  let flds' : ∀ (p : String × SurfaceTy), Mem p σ' → SScale sc p.snd :=
+                    fun p hp => flds p (Mem.tail (nm, tt) hp)
+                  exact go σ' flds' t' hRest
+      ScaleM.recordS (go σ fields)
 
 @[simp]
 theorem tyFields_cons (nm : String) (t : SurfaceTy) (σ : Schema) :
@@ -149,9 +187,34 @@ theorem HasField.index_getD_ty
       simp [HasField.index]
   | (nm', t') :: σ, _, _, HasField.there p => by
       simpa [HasField.index] using HasField.index_getD_ty p
--- Note: a lemma relating `stensor` and core `tensor` was previously used in
--- the translation of multiplication. Since the current surface translation
--- does not emit core multiplication directly, we do not need it here.
+
+-- Relate surface `stensor` to core `tensor`
+mutual
+  unsafe def ty_stensor_eq : ∀ (a b : SurfaceTy), ty (stensor a b) = tensor (ty a) (ty b)
+    | .bool, b => rfl
+    | .int, b => rfl
+    | .string, b => rfl
+    | .dict dom range, b => by
+        rw [ty]
+        rw [ty_stensor_eq]
+        rw [ty]
+        rw [tensor]
+    | .record σ, b => by
+        rw [ty]
+        rw [tyFields_map_stensor]
+        rw [ty]
+        rw [tensor]
+
+  unsafe def tyFields_map_stensor
+      : ∀ (σ : Schema) (b : SurfaceTy),
+        tyFields (σ.map (fun (p : String × SurfaceTy) => (p.fst, stensor p.snd b)))
+          = (tyFields σ).map (fun t => tensor t (ty b))
+    | [], b => rfl
+    | (nm, t) :: σ, b => by
+        -- Head by `ty_stensor_eq`, tail by recursion
+
+        simp [tyFields_map_stensor,ty_stensor_eq, -stensor]
+end
 
 
 mutual
@@ -182,6 +245,12 @@ mutual
     | STerm'.lookup aRange d k => Term'.lookup (toCoreAdd aRange) (tr d) (tr k)
     | STerm'.sum a d f =>
         Term'.sum (toCoreAdd a) (tr d) (fun kd vd => tr (f kd vd))
+    | @STerm'.mul _ _ _ sc t1 t2 s1 s2 e1 e2 =>
+        -- Cast the result type via `ty_stensor_eq` to match core `tensor`.
+        by
+          have hmul : Term' rep (fun i => ty (fvar i)) (tensor (ty t1) (ty t2)) :=
+            Term'.mul (toCoreScale s1) (toCoreScale s2) (tr e1) (tr e2)
+          simpa [ty_stensor_eq, -stensor] using hmul
     | STerm'.constRecord (l := l) fields =>
         by
           have h : Term' rep (fun i => ty (fvar i)) (Ty.record (tyFields l)) :=
