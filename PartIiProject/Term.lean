@@ -101,7 +101,7 @@ def tensor (a b : Ty) : Ty :=
     -- | .int => .int
     -- | .bool => .bool
     -- | .string => .string
-
+termination_by a
 -- The printer for results with shape `(tensor (Ty.dict _ _) b).denote`
 -- benefits from the explicit `showDict` defined above.
 
