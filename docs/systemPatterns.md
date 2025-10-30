@@ -8,7 +8,7 @@ Architecture overview:
   - `tensor : Ty → Ty → Ty`: dictionary nests the right type; record maps fields; scalars act as left units.
 - Semimodule structure:
   - `AddM t`: additive monoid witness for `t`. Current boolean addition uses XOR; integer uses `+`; dict and record are pointwise/fieldwise. `AddM.zero` gives additive identities and is used for lookup defaults and `sum` inits.
-  - `ScaleM sc t`: scalar action of `sc` on `t`. Booleans act via AND; integers via multiplication; extends through dict and record.
+- `ScaleM sc t`: scalar action of `sc` on `t`. Booleans act via AND; integers via multiplication; extends through dict and record. Record scaling uses a typed list‑membership predicate `Mem` in `ScaleM.recordS` to select per‑field scaling evidence in a way that supports structural recursion and definitional equalities.
 - Terms and evaluation:
   - `Term' rep fvar ty`: PHOAS terms with vars, constants, records, dicts (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, and `sum`. `proj` is positional projection (index-based) on records.
   - `Term'.denote`: definitional interpreter using `AddM`/`ScaleM`. `lookup` falls back to `AddM.zero` on misses; `sum` folds with `AddM.denote`.
@@ -31,10 +31,9 @@ Surface layer with named records:
 
 - `PartIiProject/SurfaceCore.lean` defines an explicit “surface” representation with names:
   - `SurfaceTy`: mirrors core types but `record` carries a `List (String × SurfaceTy)`.
-  - `SAdd` and `SScale`: surface-side evidence for addition and scaling. `SScale` currently includes only scalar and dictionary scaling; record scaling is deferred to the core.
-  - `STerm'`: surface terms featuring `constRecord` and `projByName` using a `HasField` proof to locate a field by name; plus `add`, `lookup`, `sum`, `let`, `if`, `not`, `dict` empty/insert.
-  - `ToCore.tr`: translation erases names to positional records (`Ty.record (tyFields …)`), translates `SAdd`/`SScale` to core `AddM`/`ScaleM`, and compiles named projection to positional `proj` via an index computed from `HasField` and a lemma relating the index to the underlying field type.
-  - Surface multiplication is not emitted; multiplication remains a core concern to avoid complex `stensor`/`tensor` alignment proofs.
+  - `SAdd` and `SScale`: surface-side evidence for addition and scaling. Scaling covers scalars, dictionaries, and records via `SScale.recordS`, which accepts a function producing per-field scale evidence from a typed list‑membership proof `Mem`.
+  - `STerm'`: surface terms featuring `constRecord` and `projByName` using a `HasField` proof to locate a field by name; plus `add`, `mul`, `lookup`, `sum`, `let`, `if`, `not`, `dict` empty/insert. A surface tensor shape `stensor` matches the core shape at erased types.
+  - `ToCore.tr`: translation erases names to positional records (`Ty.record (tyFields …)`), translates `SAdd`/`SScale` to core `AddM`/`ScaleM`, compiles named projection to positional `proj` via an index computed from `HasField` and the lemma `HasField.index_getD_ty`, and emits core `mul` while rewriting the result type using lemmas `ty_stensor_eq` and `tyFields_map_stensor` to align `stensor` with core `tensor`.
 
 Testing infrastructure:
 
@@ -63,7 +62,7 @@ Code generation:
 
 Notable patterns:
 
-- Shape-directed multiply is implemented at the interpreter level via `ScaleM.mulDenote`, ensuring compile-time result shape `tensor t1 t2`.
+- Shape-directed multiply is implemented at the interpreter level via `ScaleM.mulDenote`, ensuring compile-time result shape `tensor t1 t2`. On the surface, an unsafe `stensor` is related to core `tensor` by rewrite lemmas to justify emitting `mul` during translation.
 - Addition and scaling are encoded as explicit evidence, guiding both typing and evaluation.
 - Lookups and sums rely on the additive identity of the result to stay total and align with sparse semantics.
 - Tests compare Lean vs. Rust by printing values on both sides and checking string equality. Rust programs use `SDQLShow::show(&result)`; Lean uses `showValue`.

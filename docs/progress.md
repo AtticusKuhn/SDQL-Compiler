@@ -10,13 +10,13 @@ What works:
 - Rust codegen: renders expressions, let-blocks, conditionals, dict ops, lookup-with-default, and `sum` as a loop with an accumulator; open-term functions with typed parameters.
 - Testing: Lean test executable `sdql-tests` compiles SDQL→Rust, builds with `rustc`, runs programs, and compares printed strings against Lean’s interpreter (`showValue`).
 - CI: GitHub Actions workflow builds the project and runs the test executable on pushes/PRs.
- - Surface layer: `PartIiProject/SurfaceCore.lean` implements a named-record surface representation and a surface→core translation. Supports named `constRecord`, `projByName`, dictionary `lookup`, `sum`, `add`, `let`, `if`, and `not`. Builds cleanly and coexists with the DSL and tests.
+- Surface layer: `PartIiProject/SurfaceCore.lean` implements a named-record surface representation and a surface→core translation. Supports named `constRecord`, `projByName`, dictionary `lookup`, `sum`, `add`, `mul`, `let`, `if`, and `not`. Surface scaling includes scalars, dictionaries, and records (`SScale.recordS`). The translation uses membership proofs `Mem` for record scaling, `HasField.index_getD_ty` for named projection, and `stensor` shape lemmas (`ty_stensor_eq`, `tyFields_map_stensor`) to emit core `mul`.
 
 What’s left to build:
 
 - Boolean semiring OR (instead of XOR) to match SDQL; update examples.
 - Promotion and additional scalar semirings beyond `bool`/`int`.
-- Surface multiplication and record scaling evidence on the surface (consider re‑introducing `SScale.recordS` with an `HList`-based approach) and a robust `stensor`/`tensor` alignment lemma if surface emits multiply.
+- Replace unsafe `stensor` and rewrite lemmas with total, proven definitions (or otherwise structure recursion so Lean accepts termination), and clean up any remaining `unsafe` markers.
 - Surface sugar for sets, arrays, `dom`, `range`.
 - Codegen/runtime completeness for multiply (`sdql_mul`) and record/dict addition helpers (or inline expansions) so they can be exercised in tests.
 - Optional: centralize Rust runtime into a crate and drive testing via `cargo` if needed.
