@@ -5,14 +5,18 @@ Stack:
 - Lean 4 (`lean-toolchain` pinned to `v4.24.0`).
 - Lake build (`lake build`) and `#eval` for in-file demos.
 - Dependencies: `Std` (TreeMap); no direct `Mathlib` imports in the active core.
-- Rust toolchain (`rustc` and `cargo`) available in dev/CI environments.
+- Rust toolchain (`rustc` and `cargo`) available in dev/CI environments. The
+  dev shell uses nightly via `oxalica/rust-overlay` to support crates that
+  require `#![feature]` (e.g., running `cargo bench`).
 
 Dev environment:
 
-- Enter with `nix develop`. The shell uses `elan` to install and expose the
-  Lean/Lake toolchain specified in `lean-toolchain` (currently `leanprover/lean4:v4.24.0`).
-  We avoid pinning Lean via a Nix overlay beyond what `lean4-nix` derives from `lean-toolchain`; the
-  shell prepends the matching `elan` toolchain `bin` directory to `PATH`.
+- Enter with `nix develop`.
+  - Lean/Lake: provided via `lean4-nix` reading `lean-toolchain` (currently
+    `leanprover/lean4:v4.24.0`) using `elan` under the hood.
+  - Rust: provided by `rust-overlay` nightly
+    (`rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)`), so
+    `rustc`/`cargo` in PATH are nightly builds.
 
 Key modules:
 
