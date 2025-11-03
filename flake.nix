@@ -6,12 +6,18 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     # Use local git repo (requires committing changes)
     lean4-nix.url = "git+file:///home/atticusk/coding/part_ii_project/lean4nix/lean4-nix";
+    # Rust nightly via oxalica/rust-overlay
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = inputs @ {
     nixpkgs,
     flake-parts,
     lean4-nix,
+    rust-overlay,
     ...
   }:
     flake-parts.lib.mkFlake { inherit inputs; } {
@@ -26,7 +32,10 @@
         let
           pkgs = import nixpkgs {
             inherit system;
-            overlays = [ (lean4-nix.readToolchainFile ./lean-toolchain) ];
+            overlays = [
+              (lean4-nix.readToolchainFile ./lean-toolchain)
+              (import rust-overlay)
+            ];
           };
           lake = (lean4-nix.lake { inherit pkgs; });
           # Build the test executable via lake-manifest integration
@@ -166,10 +175,16 @@
           devShells.default = pkgs.mkShell {
             # Provide Lean + Lake matching ./lean-toolchain, plus essential tools.
             # Keep this minimal to avoid attr or non-derivation issues on some channels.
+            # Use oxalica/rust-overlay nightly toolchain so `cargo bench`
+            # works for crates requiring unstable features.
             packages =
-              [ pkgs.lean.lean pkgs.lean.lake]
+              [
+                pkgs.lean.lean
+                pkgs.lean.lake
+                (pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default))
+              ]
               ++ (with pkgs; [
-                git unzip rustc cargo codex uv
+                git unzip codex uv
                 # sdql reference prerequisites
                 jdk17 sbt scala_2_13
                 clang clang-tools gcc gnumake gnused
