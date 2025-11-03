@@ -203,12 +203,23 @@ mutual
     let n := ns.size
     if n != es.size then
       Macro.throwError "mismatched fields in named record"
-    let rec mkH (i : Nat) : MacroM (TSyntax `term) := do
-      if i < n then
-        let nm := (ns[i]!).getId.toString
+    -- Pair up field names with their original indices, then sort by name.
+    let mut pairs : Array (String × Nat) := #[]
+    for i in [:n] do
+      let nm := (ns[i]!).getId.toString
+      pairs := pairs.push (nm, i)
+    let sorted := pairs.qsort (fun a b => a.fst < b.fst)
+    let sortedList := sorted.toList
+    -- Build the HList in sorted order of field names. This makes
+    -- the record literal independent of the input order of fields.
+    let rec mkH (j : Nat) : MacroM (TSyntax `term) := do
+      if j < sorted.size then
+        let entry := sortedList.get! j
+        let nm := entry.fst
+        let idx := entry.snd
         let sNm := Syntax.mkStrLit nm
-        let vi ← elabSDQL (es[i]!)
-        let tail ← mkH (i+1)
+        let vi ← elabSDQL (es[idx]!)
+        let tail ← mkH (j+1)
         `(HList.cons (x := (Prod.mk $sNm _)) (xs := _) $vi $tail)
       else
         `(HList.nil)
@@ -318,6 +329,9 @@ unsafe def ex_add : STerm f0 SurfaceTy.int := [SDQL| 3 + 5 ]
 -- 3) named record
 unsafe def ex_record : STerm f0 (SurfaceTy.record [("a", .int), ("b", .int)]) :=
   [SDQL| < a = 10 , b = 20 > ]
+
+unsafe def ex_record_2 : STerm f0 (SurfaceTy.record [("a", .int), ("b", .int)]) :=
+  [SDQL| < b = 10 , a = 20 > ]
 
 /- Quick `#eval` checks -/
 open ToCore
