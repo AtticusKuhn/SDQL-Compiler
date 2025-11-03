@@ -6,7 +6,7 @@ What works:
 - Semimodule structure: `AddM` (with zeros) and `ScaleM`; tensor-shaped multiply via `ScaleM.mulDenote`.
 - Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`.
 - Pretty-printing for records/dicts; numerous `#eval` demos.
-- SDQL DSL macros: `[SDQL| ... ]` elaborating to `Term'` with support for literals, records/projection, dict singleton/lookup, typed empty dicts, `sum`, `let`, `if`, `not`, `+`, and `*{int|bool}`; examples are evaluated via `#eval`.
+- SDQL DSL macros: `[SDQL| ... ]` elaborating to surface `STerm'` with support for literals, records (positional and named literals), dict singleton/lookup, typed empty dicts, `sum`, `let`, `if`, `not`, `+`, and `*{int|bool}`; examples are evaluated via `#eval` after `SurfaceCore.ToCore.tr`.
 - Rust codegen: renders expressions, let-blocks, conditionals, dict ops, lookup-with-default, and `sum` as a loop with an accumulator; open-term functions with typed parameters.
 - Testing: Lean test executable `sdql-tests` compiles SDQL→Rust, builds with `rustc`, runs programs, and compares printed strings against Lean’s interpreter (`showValue`).
 - CI: GitHub Actions workflow builds the project and runs the test executable on pushes/PRs.

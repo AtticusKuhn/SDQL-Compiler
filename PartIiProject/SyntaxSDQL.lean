@@ -1,5 +1,6 @@
 import Lean
 import PartIiProject.Term
+import PartIiProject.SurfaceCore
 
 open Lean
 
@@ -33,79 +34,112 @@ namespace PartIiProject
   `Term'.freeVariable`.
 -/
 
-/- Typeclass wrappers so Lean can infer AddM and ScaleM from the surrounding
-   term types. We provide instances for ints/bools and dictionaries. -/
-class HasAddM (ty : Ty) where
-  inst : AddM ty
+/- Surface-level typeclass wrappers so Lean can infer SAdd/SScale from
+   surrounding types (int, bool, dictionaries, and records). -/
 
-class HasScaleM (sc : Ty) (t : Ty) where
-  inst : ScaleM sc t
+-- (no extra opens)
 
-namespace HasAddM
+class HasSAdd (ty : SurfaceTy) where
+  inst : SAdd ty
 
-instance : HasAddM Ty.int := ⟨AddM.intA⟩
-instance : HasAddM Ty.bool := ⟨AddM.boolA⟩
-instance instDict {dom range : Ty} [h : HasAddM range] : HasAddM (Ty.dict dom range) :=
-  ⟨AddM.dictA h.inst⟩
+class HasSScale (sc : SurfaceTy) (t : SurfaceTy) where
+  inst : SScale sc t
 
-end HasAddM
+namespace HasSAdd
 
-namespace HasScaleM
+instance : HasSAdd SurfaceTy.int := ⟨SAdd.intA⟩
+instance : HasSAdd SurfaceTy.bool := ⟨SAdd.boolA⟩
+instance instDict {dom range : SurfaceTy} [h : HasSAdd range] : HasSAdd (SurfaceTy.dict dom range) :=
+  ⟨SAdd.dictA h.inst⟩
 
-instance : HasScaleM Ty.int Ty.int := ⟨ScaleM.intS⟩
-instance : HasScaleM Ty.bool Ty.bool := ⟨ScaleM.boolS⟩
-instance instDict {sc dom range : Ty} [h : HasScaleM sc range] : HasScaleM sc (Ty.dict dom range) :=
-  ⟨ScaleM.dictS h.inst⟩
+-- Build SAdd for named records by recursion on the schema
+class BuildSAddFields (σ : Schema) where
+  inst : HList (fun (_, t) => SAdd t) σ
 
-end HasScaleM
+instance : BuildSAddFields ([] : Schema) := ⟨HList.nil⟩
+
+instance (nm : String) (t : SurfaceTy) (σ : Schema)
+    [ht : HasSAdd t] [rest : BuildSAddFields σ]
+    : BuildSAddFields ((nm, t) :: σ) :=
+  ⟨HList.cons ht.inst rest.inst⟩
+
+instance recRecord {σ : Schema} [BuildSAddFields σ] : HasSAdd (SurfaceTy.record σ) :=
+  ⟨SAdd.recordA (BuildSAddFields.inst (σ := σ))⟩
+
+end HasSAdd
+
+namespace HasSScale
+
+instance : HasSScale SurfaceTy.int SurfaceTy.int := ⟨SScale.intS⟩
+instance : HasSScale SurfaceTy.bool SurfaceTy.bool := ⟨SScale.boolS⟩
+instance instDict {sc dom range : SurfaceTy} [h : HasSScale sc range] : HasSScale sc (SurfaceTy.dict dom range) :=
+  ⟨SScale.dictS h.inst⟩
+
+-- Build SScale for named records by recursion on the schema
+class BuildSScaleFields (sc : SurfaceTy) (σ : Schema) where
+  inst : (p : String × SurfaceTy) → Mem p σ → SScale sc p.snd
+
+instance (sc : SurfaceTy) : BuildSScaleFields sc ([] : Schema) :=
+  ⟨fun _ m => by cases m⟩
+
+instance (sc : SurfaceTy) (nm : String) (t : SurfaceTy) (σ : Schema)
+    [ht : HasSScale sc t] [rest : BuildSScaleFields sc σ]
+    : BuildSScaleFields sc ((nm, t) :: σ) :=
+  ⟨fun p m => by
+    cases m with
+    | head _ =>
+        -- In this branch `p` defeq `(nm, t)` so the goal reduces to `SScale sc t`.
+        exact ht.inst
+    | tail _ m' =>
+        exact rest.inst p m'⟩
+
+instance recRecord {sc : SurfaceTy} {σ : Schema} [BuildSScaleFields sc σ]
+    : HasSScale sc (SurfaceTy.record σ) :=
+  ⟨SScale.recordS (HasSScale.BuildSScaleFields.inst (sc := sc) (σ := σ))⟩
+
+end HasSScale
 
 /- Helper combinators (non-recursive) -/
 namespace SDQL
 
-def add {rep : Ty → Type} {n : Nat} {fvar : Fin n → Ty} {ty : Ty}
-    [h : HasAddM ty]
-    (x y : Term' rep fvar ty) : Term' rep fvar ty :=
-  Term'.add h.inst x y
+unsafe def add {rep : SurfaceTy → Type} {n : Nat} {fvar : Fin n → SurfaceTy} {ty : SurfaceTy}
+    [h : HasSAdd ty]
+    (x y : STerm' rep fvar ty) : STerm' rep fvar ty :=
+  STerm'.add h.inst x y
 
-def lookup {rep : Ty → Type} {n : Nat} {fvar : Fin n → Ty}
-    {dom range : Ty} [h : HasAddM range]
-    (d : Term' rep fvar (.dict dom range))
-    (k : Term' rep fvar dom) : Term' rep fvar range :=
-  Term'.lookup h.inst d k
+unsafe def lookup {rep : SurfaceTy → Type} {n : Nat} {fvar : Fin n → SurfaceTy}
+    {dom range : SurfaceTy} [h : HasSAdd range]
+    (d : STerm' rep fvar (.dict dom range))
+    (k : STerm' rep fvar dom) : STerm' rep fvar range :=
+  STerm'.lookup h.inst d k
 
-def mulInt {rep : Ty → Type} {n : Nat} {fvar : Fin n → Ty}
-    {t1 t2 : Ty} [i1 : HasScaleM Ty.int t1] [i2 : HasScaleM Ty.int t2]
-    (x : Term' rep fvar t1) (y : Term' rep fvar t2)
-    : Term' rep fvar (tensor t1 t2) :=
-  Term'.mul (i1.inst) (i2.inst) x y
+unsafe def mulInt {rep : SurfaceTy → Type} {n : Nat} {fvar : Fin n → SurfaceTy}
+    {t1 t2 : SurfaceTy} [i1 : HasSScale SurfaceTy.int t1] [i2 : HasSScale SurfaceTy.int t2]
+    (x : STerm' rep fvar t1) (y : STerm' rep fvar t2)
+    : STerm' rep fvar (stensor t1 t2) :=
+  STerm'.mul (i1.inst) (i2.inst) x y
 
-def mulBool {rep : Ty → Type} {n : Nat} {fvar : Fin n → Ty}
-    {t1 t2 : Ty} [i1 : HasScaleM Ty.bool t1] [i2 : HasScaleM Ty.bool t2]
-    (x : Term' rep fvar t1) (y : Term' rep fvar t2)
-    : Term' rep fvar (tensor t1 t2) :=
-  Term'.mul (i1.inst) (i2.inst) x y
+unsafe def mulBool {rep : SurfaceTy → Type} {n : Nat} {fvar : Fin n → SurfaceTy}
+    {t1 t2 : SurfaceTy} [i1 : HasSScale SurfaceTy.bool t1] [i2 : HasSScale SurfaceTy.bool t2]
+    (x : STerm' rep fvar t1) (y : STerm' rep fvar t2)
+    : STerm' rep fvar (stensor t1 t2) :=
+  STerm'.mul (i1.inst) (i2.inst) x y
 
-def proj' {rep : Ty → Type} {n : Nat} {fvar : Fin n → Ty}
-    {l : List Ty}
-    (e : Term' rep fvar (.record l)) (i : Nat)
-    : Term' rep fvar (l.getD i Ty.int) :=
-  Term'.proj l e i
+unsafe def emptyDict {rep : SurfaceTy → Type} {n : Nat} {fvar : Fin n → SurfaceTy}
+    {dom range : SurfaceTy} : STerm' rep fvar (.dict dom range) :=
+  STerm'.emptyDict
 
-def emptyDict {rep : Ty → Type} {n : Nat} {fvar : Fin n → Ty}
-    {dom range : Ty} : Term' rep fvar (.dict dom range) :=
-  Term'.emptyDict
+unsafe def dictSingleton {rep : SurfaceTy → Type} {n : Nat} {fvar : Fin n → SurfaceTy}
+    {dom range : SurfaceTy}
+    (k : STerm' rep fvar dom) (v : STerm' rep fvar range)
+    : STerm' rep fvar (.dict dom range) :=
+  STerm'.dictInsert k v STerm'.emptyDict
 
-def dictSingleton {rep : Ty → Type} {n : Nat} {fvar : Fin n → Ty}
-    {dom range : Ty}
-    (k : Term' rep fvar dom) (v : Term' rep fvar range)
-    : Term' rep fvar (.dict dom range) :=
-  Term'.dictInsert k v Term'.emptyDict
-
-def sum {rep : Ty → Type} {n : Nat} {fvar : Fin n → Ty}
-    {dom range ty : Ty} [h : HasAddM ty]
-    (d : Term' rep fvar (.dict dom range))
-    (f : rep dom → rep range → Term' rep fvar ty) : Term' rep fvar ty :=
-  Term'.sum h.inst d f
+unsafe def sum {rep : SurfaceTy → Type} {n : Nat} {fvar : Fin n → SurfaceTy}
+    {dom range ty : SurfaceTy} [h : HasSAdd ty]
+    (d : STerm' rep fvar (.dict dom range))
+    (f : rep dom → rep range → STerm' rep fvar ty) : STerm' rep fvar ty :=
+  STerm'.sum h.inst d f
 
 end SDQL
 
@@ -126,10 +160,11 @@ syntax (name := sdqlFalse) "false"    : sdql
 syntax "(" sdql ")"                  : sdql
 syntax "<" sdql "," sdql ">"        : sdql
 syntax "<" sdql "," sdql "," sdql ">" : sdql
+-- named record fields
+syntax "<" sepBy(ident "=" sdql, ",") ">" : sdql
 syntax "{" sepBy(sdql "->" sdql, ",")  "}"        : sdql
 
--- field projection and lookup (postfix-ish)
-syntax:70 sdql:70 "." num : sdql
+-- lookup (postfix-ish)
 syntax:70 sdql:70 "(" sdql ")" : sdql
 
 -- unary
@@ -153,9 +188,9 @@ syntax (name := sdqltyBool) "bool" : sdqlty
 syntax (name := sdqltyString) "string" : sdqlty
 
 private def elabTy : TSyntax `sdqlty → MacroM (TSyntax `term)
-  | `(sdqlty| int) => `(Ty.int)
-  | `(sdqlty| bool) => `(Ty.bool)
-  | `(sdqlty| string) => `(Ty.string)
+  | `(sdqlty| int) => `(SurfaceTy.int)
+  | `(sdqlty| bool) => `(SurfaceTy.bool)
+  | `(sdqlty| string) => `(SurfaceTy.string)
   | stx => Macro.throwErrorAt stx "unsupported SDQL type in this DSL"
 
 -- typed empty dictionary: {}_{ Tdom, Trange }
@@ -163,25 +198,39 @@ syntax "{" "}" "_" "{" sdqlty "," sdqlty "}" : sdql
 
 /- Elaboration helpers to build HLists and sdql → term -/
 mutual
+  -- Helper to elaborate named record literals
+  partial def elabNamedRecord (ns : Array (TSyntax `ident)) (es : Array (TSyntax `sdql)) : MacroM (TSyntax `term) := do
+    let n := ns.size
+    if n != es.size then
+      Macro.throwError "mismatched fields in named record"
+    let rec mkH (i : Nat) : MacroM (TSyntax `term) := do
+      if i < n then
+        let nm := (ns[i]!).getId.toString
+        let sNm := Syntax.mkStrLit nm
+        let vi ← elabSDQL (es[i]!)
+        let tail ← mkH (i+1)
+        `(HList.cons (x := (Prod.mk $sNm _)) (xs := _) $vi $tail)
+      else
+        `(HList.nil)
+    let hl ← mkH 0
+    `(STerm'.constRecord $hl)
+
   partial def elabSDQL : TSyntax `sdql → MacroM (TSyntax `term)
   -- atoms and parentheses
-  | `(sdql| $n:num) => `(Term'.constInt $n)
-  | `(sdql| $s:str) => `(Term'.constString $s)
-  | `(sdql| $e:sdql . $i:num) => do
-      let ee ← elabSDQL e
-      `(SDQL.proj' $ee $i)
+  | `(sdql| $n:num) => `(STerm'.constInt $n)
+  | `(sdql| $s:str) => `(STerm'.constString $s)
   | `(sdql| $d:sdql ( $k:sdql )) => do
       let dd ← elabSDQL d; let kk ← elabSDQL k
       `(SDQL.lookup $dd $kk)
   | `(sdql| not $e:sdql) => do
       let ee ← elabSDQL e
-      `(Term'.not $ee)
+      `(STerm'.not $ee)
   | `(sdql| if $c:sdql then $t:sdql else $f:sdql) => do
       let cc ← elabSDQL c; let tt ← elabSDQL t; let ff ← elabSDQL f
-      `(Term'.ite $cc $tt $ff)
+      `(STerm'.ite $cc $tt $ff)
   | `(sdql| let $x:ident = $e:sdql in $b:sdql) => do
       let ee ← elabSDQL e; let bb ← elabSDQL b
-      `(Term'.letin $ee (fun $x => $bb))
+      `(STerm'.letin $ee (fun $x => $bb))
   | `(sdql| $x:sdql + $y:sdql) => do
       let xx ← elabSDQL x; let yy ← elabSDQL y
       `(SDQL.add $xx $yy)
@@ -196,22 +245,30 @@ mutual
       `(SDQL.sum $dd (fun $k $v => $bb))
   | stx =>
       if stx.raw.getKind == `PartIiProject.sdqlTrue then
-        `(Term'.constBool Bool.true)
+        `(STerm'.constBool Bool.true)
       else if stx.raw.getKind == `PartIiProject.sdqlFalse then
-        `(Term'.constBool Bool.false)
+        `(STerm'.constBool Bool.false)
       else match stx with
         | `(sdql| {}_{ $dom:sdqlty, $rng:sdqlty }) => do
             let domTy ← elabTy dom
             let rngTy ← elabTy rng
-            `((Term'.emptyDict : Term' rep f0 (Ty.dict $domTy $rngTy)))
-        | `(sdql| $x:ident) => `(Term'.var $x)
+            `((STerm'.emptyDict : STerm' rep f0 (SurfaceTy.dict $domTy $rngTy)))
+        | `(sdql| $x:ident) => `(STerm'.var $x)
         | `(sdql| ( $e:sdql )) => elabSDQL e
         | `(sdql| < $a:sdql, $b:sdql >) => do
             let ta ← elabSDQL a; let tb ← elabSDQL b
-            `(Term'.constRecord (HList.cons $ta (HList.cons $tb HList.nil)))
+            -- positional record: assign placeholder names
+            `(STerm'.constRecord (l := [("_1", _), ("_2", _)])
+                (HList.cons (x := (Prod.mk "_1" _)) (xs := [("_2", _)]) $ta
+                  (HList.cons (x := (Prod.mk "_2" _)) (xs := []) $tb HList.nil)))
         | `(sdql| < $a:sdql, $b:sdql, $c:sdql >) => do
             let ta ← elabSDQL a; let tb ← elabSDQL b; let tc ← elabSDQL c
-            `(Term'.constRecord (HList.cons $ta (HList.cons $tb (HList.cons $tc HList.nil))))
+            `(STerm'.constRecord (l := [("_1", _), ("_2", _), ("_3", _)])
+                (HList.cons (x := (Prod.mk "_1" _)) (xs := [("_2", _), ("_3", _)]) $ta
+                  (HList.cons (x := (Prod.mk "_2" _)) (xs := [("_3", _)]) $tb
+                    (HList.cons (x := (Prod.mk "_3" _)) (xs := []) $tc HList.nil))))
+        | `(sdql| < $[ $n:ident = $e:sdql ],* >) => do
+            elabNamedRecord n e
         -- n-ary dictionary literal: { k1 -> v1, ..., kn -> vn }
         | `(sdql| { $[$k:sdql -> $v:sdql],* }) => do
             let ks : Array (TSyntax `sdql) := k
@@ -219,7 +276,7 @@ mutual
             elabDictPairs ks vs
         | `(sdql| { $k:sdql -> $v:sdql }) => do
             let tk ← elabSDQL k; let tv ← elabSDQL v
-            `(Term'.dictInsert $tk $tv Term'.emptyDict)
+            `(STerm'.dictInsert $tk $tv STerm'.emptyDict)
         | _ => Macro.throwError s!"unrecognized SDQL syntax: {stx}"
 
   partial def elabDictPairs (ks : Array (TSyntax `sdql)) (vs : Array (TSyntax `sdql)) : MacroM (TSyntax `term) := do
@@ -231,53 +288,59 @@ mutual
     else
       let rec mk (i : Nat) : MacroM (TSyntax `term) := do
         if i == n then
-          `(Term'.emptyDict)
+          `(STerm'.emptyDict)
         else
           let tk ← elabSDQL (ks[i]!)
           let tv ← elabSDQL (vs[i]!)
           let tail ← mk (i + 1)
-          `(Term'.dictInsert $tk $tv $tail)
+          `(STerm'.dictInsert $tk $tv $tail)
       mk 0
 end
-/- Quasiquoter entry point: elaborates to a `Term f ty` function
+/- Quasiquoter entry point: elaborates to an `STerm f ty` function
    (`rep`-polymorphic). -/
 syntax "[SDQL|" sdql "]" : term
 
 macro_rules
   | `([SDQL| $e:sdql ]) => do
       let te ← elabSDQL e
-      `(fun {rep : Ty → Type} => ($te : Term' rep f0 _))
+      `(fun {rep : SurfaceTy → Type} => ($te : STerm' rep f0 _))
 
 
 /- Simple examples to exercise the DSL. -/
 -- open SDQL
 
 -- 1) integers: 3 + 5
-def ex_add : Term f0 Ty.int := [SDQL| 3 + 5 ]
+unsafe def ex_add : STerm f0 SurfaceTy.int := [SDQL| 3 + 5 ]
 
 -- 2) boolean example (requires boolean tokens in the parser) -- postponed
 -- def ex_bool : Term f0 Ty.bool := [SDQL| not (true + false) ]
 
--- 3) records and projection: < 10, 20 >.1
-def ex_proj : Term f0 Ty.int := [SDQL| < 10 , 10>.1 ]
+-- 3) named record
+unsafe def ex_record : STerm f0 (SurfaceTy.record [("a", .int), ("b", .int)]) :=
+  [SDQL| < a = 10 , b = 20 > ]
 
 /- Quick `#eval` checks -/
-unsafe def env0 : (s : Fin 0) → (f0 s).denote := fun s => nomatch s
+open ToCore
+unsafe def env0 : (s : Fin 0) → (ToCore.ty (f0 s)).denote := fun s => nomatch s
 
 
 -- 4) dictionary singleton and lookup
-def ex_dict_lookup : Term f0 Ty.int := [SDQL| { 3 -> 7 , 5 -> 1 + 1} (3) ]
+unsafe def ex_dict_lookup : STerm f0 SurfaceTy.int := [SDQL| { 3 -> 7 , 5 -> 1 + 1} (3) ]
 
 -- 5) typed empty dictionary
-def ex_empty : Term f0 (Ty.dict Ty.int Ty.int) := [SDQL| {}_{ int, int } ]
+unsafe def ex_empty : STerm f0 (SurfaceTy.dict .int .int) := [SDQL| {}_{ int, int } ]
 
 -- 6) sum over dictionary
-def ex_sum : Term f0 Ty.int := [SDQL| sum( <k, v> in { 1 -> 10 } ) k ]
+unsafe def ex_sum : STerm f0 SurfaceTy.int := [SDQL| sum( <k, v> in { 1 -> 10 } ) k ]
 
-#eval Term'.show ex_add
-#eval Term'.show ex_empty
-#eval Term'.show ex_proj
-#eval Term'.show ex_sum
-#eval Term'.show ex_dict_lookup
+-- Show via surface→core translation
+unsafe def showCore {t} (e : STerm f0 t) : String :=
+  Term'.show (ToCore.tr e (rep := fun _ => String))
+
+#eval showCore ex_add
+#eval showCore ex_empty
+#eval showCore ex_record
+#eval showCore ex_sum
+#eval showCore ex_dict_lookup
 
 end PartIiProject

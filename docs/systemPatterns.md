@@ -19,13 +19,14 @@ Architecture overview:
 
 Surface syntax (mini‑DSL):
 
-- `PartIiProject/SyntaxSDQL.lean` defines a `[SDQL| ... ]` quasiquoter that elaborates directly to the core `Term'`:
+- `PartIiProject/SyntaxSDQL.lean` defines a `[SDQL| ... ]` quasiquoter that elaborates to surface `STerm'` (from `SurfaceCore`) instead of directly to core `Term'`:
   - Literals: ints, bools, strings.
-  - Records: `< e1, e2 >`, `< e1, e2, e3 >`; projection via `e . n` (0‑based).
-  - Dicts: singleton `{ k -> v }`, typed empty `{}_{ int, int }` (basic scalar types supported).
+  - Records: positional `< e1, e2 >`, `< e1, e2, e3 >`, and named `< a = e1, b = e2, ... >` literals.
+  - Dicts: singleton `{ k -> v }`, typed empty `{}_{ int, int }` (basic scalar types supported), and multi‑entry literals.
   - Lookup: `d(k)`; `sum`: `sum( <k, v> in d ) body`.
   - Algebra: `e1 + e2`, `e1 *{int} e2`, `e1 *{bool} e2`; `if`, `not`, `let x = e1 in e2`.
-- To keep elaborations succinct, it provides small wrapper typeclasses `HasAddM`/`HasScaleM` and helper combinators `SDQL.add`, `SDQL.mulInt/Bool`, `SDQL.lookup`, `SDQL.sum`, `SDQL.proj'` that select the needed evidence automatically.
+- The DSL uses surface wrapper typeclasses `HasSAdd`/`HasSScale` and helpers `SDQL.add`, `SDQL.mulInt/Bool`, `SDQL.lookup`, `SDQL.sum` to infer `SAdd`/`SScale` evidence (ints, bools, dictionaries, and records via recursive builders).
+- To run or print, use `SurfaceCore.ToCore.tr` to translate `STerm'` to core `Term'`.
 
 Surface layer with named records:
 

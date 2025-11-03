@@ -21,7 +21,7 @@ Dev environment:
 Key modules:
 
 - `PartIiProject/Term.lean`: core types, semimodule evidence, tensor, PHOAS terms, interpreter, printers, examples.
-- `PartIiProject/SyntaxSDQL.lean`: Lean macros providing an SDQL mini‑DSL via `[SDQL| ... ]` elaborating to `Term'`. Includes lightweight typeclasses `HasAddM`/`HasScaleM` and helper combinators to infer addition/scaling evidence.
+- `PartIiProject/SyntaxSDQL.lean`: Lean macros providing an SDQL mini‑DSL via `[SDQL| ... ]` elaborating to surface `STerm'` (from `SurfaceCore`). Includes surface wrapper typeclasses `HasSAdd`/`HasSScale` and helper combinators to infer addition/scaling evidence. Supports named record literals in addition to positional records.
 - `PartIiProject/Dict.lean`: purely functional dictionary wrapper on `Std.TreeMap` with an embedded comparator.
 - `PartIiProject/HList.lean`: minimal heterogeneous list utilities.
 - `PartIiProject/Rust.lean`: simplified Rust AST and pretty-printer.
@@ -42,7 +42,7 @@ How to run:
 - Build tests: `lake build sdql-tests`.
 - Run tests: `lake exe sdql-tests`.
 - Explore: open the `.lean` files and evaluate examples with `#eval`.
-- Try the DSL: define `def t : Term f0 _ := [SDQL| 3 + 5 ]` or more complex SDQL snippets; evaluate via `#eval` using `Term'.denote`.
+- Try the DSL: define `def t : STerm f0 _ := [SDQL| 3 + 5 ]`, then translate with `SurfaceCore.ToCore.tr` for printing or evaluation via `Term'.denote`.
 
 Notes/constraints:
 

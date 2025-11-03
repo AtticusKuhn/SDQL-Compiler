@@ -4,7 +4,7 @@ Current focus:
 
 - Maintain an accurate Memory Bank reflecting the Lean core, Rust codegen, the new Rust-backed test harness with CI, and the new surface→core translator.
 - Keep guidance aligned with the actual codebase (lookup and sum exist; a surface/named-records layer now exists in `PartIiProject/SurfaceCore.lean`).
-- Introduce a Lean macro-based SDQL mini‑DSL for ergonomic authoring of terms that elaborate into the core `Term'`.
+- Introduce a Lean macro-based SDQL mini‑DSL for ergonomic authoring of terms that elaborates to surface `STerm'` (then translated to core).
 
 Recent changes (captured here):
 
@@ -14,7 +14,7 @@ Recent changes (captured here):
 - Adjusted Rust AST printer to use `map_insert(...)` and `.into_iter()` to match runtime helper semantics; dictionary `show` uses `.iter()` for stable order.
 - Added GitHub Actions workflow to build and run tests on pushes/PRs.
 - Memory Bank correction: removed `Mathlib` as a stated dependency in tech docs; the active core only imports `Std` and local modules.
-- New: `PartIiProject/SyntaxSDQL.lean` implements `[SDQL| ... ]` macros that cover literals, records/projection, dict singleton/lookup, typed empty dicts `{}_{T1,T2}`, `sum(<k,v> in d)`, `let`, `if`, `not`, addition, and multiply with scalar tags (`*{int}`, `*{bool}`). Added examples with `#eval` to verify.
+- New: `PartIiProject/SyntaxSDQL.lean` implements `[SDQL| ... ]` macros that elaborate to the surface layer (`STerm'`). They cover literals, records (positional and named literals), dict singleton/lookup, typed empty dicts `{}_{T1,T2}`, `sum(<k,v> in d)`, `let`, `if`, `not`, addition, and multiply with scalar tags (`*{int}`, `*{bool}`). Added examples with `#eval` to verify via surface→core translation.
 
 - New: `PartIiProject/SurfaceCore.lean` adds an explicit surface layer with named records and field selection by name, plus a surface→core translation (`ToCore.tr`). Translation erases names to positional records, supports `constRecord`, `projByName`, `lookup`, `sum`, `add`, `mul`, `let`, `if`, and `not`. Surface-side scaling evidence covers scalars, dictionaries, and records (`SScale.recordS` with typed membership `Mem`). Multiplication uses a surface tensor `stensor` and rewrite lemmas (`ty_stensor_eq`, `tyFields_map_stensor`) to align result types with core `tensor`. Named projection uses `HasField.index_getD_ty` to coerce the projected field to the expected core type.
 
