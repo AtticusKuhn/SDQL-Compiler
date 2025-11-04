@@ -7,6 +7,7 @@ What works:
 - Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`.
 - Pretty-printing for records/dicts; numerous `#eval` demos.
 - SDQL DSL macros: `[SDQL| ... ]` elaborating to surface `STerm'` with support for literals, records (positional and named literals), dict singleton/lookup, typed empty dicts, `sum`, `let`, `if`, `not`, `+`, and `*{int|bool}`; examples are evaluated via `#eval` after `SurfaceCore.ToCore.tr`.
+- Program EDSL: `[SDQLProg { T }| ... ]` produces an `SProg` by scanning `load[U]("file")` occurrences, mapping each distinct path to a free variable, and elaborating the body to `STerm'` with those free variables. Examples added at the bottom of `PartIiProject/SyntaxSDQLProg.lean`; use `SurfaceCore.ToCore.trProg` and `Term.show` to inspect the lowered core term.
 - Rust codegen: renders expressions, let-blocks, conditionals, dict ops, lookup-with-default, and `sum` as a loop with an accumulator; open-term functions with typed parameters.
 - Testing: Lean test executable `sdql-tests` compiles SDQL→Rust, builds with `rustc`, runs programs, and compares printed strings against Lean’s interpreter (`showValue`).
 - CI: GitHub Actions workflow builds the project and runs the test executable on pushes/PRs.
@@ -18,6 +19,7 @@ What’s left to build:
 - Promotion and additional scalar semirings beyond `bool`/`int`.
 - Replace unsafe `stensor` and rewrite lemmas with total, proven definitions (or otherwise structure recursion so Lean accepts termination), and clean up any remaining `unsafe` markers.
 - Surface sugar for sets, arrays, `dom`, `range`.
+- Program EDSL polish: configurable load-variable assignment policy (first occurrence vs alphabetical), duplicate-path type consistency checks, and integration hooks for codegen inputs.
 - Codegen/runtime completeness for multiply (`sdql_mul`) and record/dict addition helpers (or inline expansions) so they can be exercised in tests.
 - Optional: centralize Rust runtime into a crate and drive testing via `cargo` if needed.
  - DSL niceties: multi-entry dict literals, n-ary records beyond 3 fields, named fields at the surface level.
@@ -27,4 +29,5 @@ Known issues / caveats:
 - `lookup` returns additive identity on misses; sparse representation may elide zero-valued entries.
 - Codegen depends on helpers/traits included in generated files; multiplication and tuple addition remain placeholders not yet tested end-to-end.
 - Rust printing for tuples (records) is implemented for arities up to 5; extend as needed.
- - `nix build` may fail to resolve newly-added Lean modules unless the lean4‑nix manifest mapping is updated; `lake build` remains authoritative and succeeds.
+- `nix build` may fail to resolve newly-added Lean modules unless the lean4‑nix manifest mapping is updated; `lake build` remains authoritative and succeeds.
+- The program EDSL is not yet imported by default; examples in `SyntaxSDQLProg.lean` compile when that module is built. Unrelated TPCH test scaffolding currently fails in `nix build` and is orthogonal to the program EDSL.

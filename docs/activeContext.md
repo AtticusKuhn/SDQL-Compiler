@@ -5,6 +5,7 @@ Current focus:
 - Maintain an accurate Memory Bank reflecting the Lean core, Rust codegen, the new Rust-backed test harness with CI, and the new surface→core translator.
 - Keep guidance aligned with the actual codebase (lookup and sum exist; a surface/named-records layer now exists in `PartIiProject/SurfaceCore.lean`).
 - Introduce a Lean macro-based SDQL mini‑DSL for ergonomic authoring of terms that elaborates to surface `STerm'` (then translated to core).
+- New: Program EDSL `[SDQLProg { T }| … ]` in `PartIiProject/SyntaxSDQLProg.lean` that scans for `load[U]("path.tbl")`, assigns each distinct path to a free-variable index, replaces loads in the term with free variables, and returns an `SProg` with `fvar`/`loadPaths` populated. Deterministic ordering is alphabetical by path.
 
 Recent changes (captured here):
 
@@ -28,6 +29,15 @@ Next steps (proposed):
 - Grow the test suite: add dict addition, nested records/dicts, `ite`, `letin`, more `sum` patterns, and negative cases.
  - DSL: support multi-entry dictionary literals `{ k1 -> v1, k2 -> v2, ... }`, n-ary records, and named field syntax (later) or use the new surface translator. Align boolean semiring with the paper (OR/AND) when ready.
 - Surface translator: replace `unsafe` pieces (the `stensor` definition and associated lemmas) with total definitions and proven termination; generalize proofs and tidy the translation. Consider integrating named-records at the DSL level or keep the surface→core pass as the front end.
+ - Program EDSL: optional dedup policy (“first occurrence” vs alphabetical), and stricter duplicate-type checking for repeated `load` of the same path.
+
+Quick usage examples (Lean):
+
+- Build an `SProg` for a closed arithmetic term:
+  - `[SDQLProg { int }| 3 + 5 ]`
+- Build an `SProg` referencing an input dictionary file:
+  - `[SDQLProg { { int -> int } }| { 3 -> 7 } + load[{ int -> int }]("data.tbl") ]`
+  - Use `SurfaceCore.ToCore.trProg` and `Term.show` to pretty-print the lowered core term for debugging.
 
 Open questions:
 
