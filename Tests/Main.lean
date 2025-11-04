@@ -1,5 +1,6 @@
 import PartIiProject.CodegenRust
 import Tests.Cases
+import PartIiProject.SurfaceCore
 import Lean
 
 open PartIiProject
@@ -50,34 +51,10 @@ end
 unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
   IO.FS.createDirAll outDir
   match c with
-  | .closed name t expected =>
-      let rs := PartIiProject.renderRustShown t
-      let rsPath := outDir / s!"{name}.rs"
-      let binPath := outDir / s!"{name}.bin"
-      writeFile rsPath rs
-      let (ccode, cerr) ← compileRust rsPath binPath
-      if ccode != 0 then
-        return { name, expected, got := none, stderr := some cerr }
-      let (rcode, rout, rerr) ← runBinary binPath
-      if rcode != 0 then
-        return { name, expected, got := none, stderr := some rerr }
-      let outStr := rout.trim
-      return { name, expected, got := some outStr }
-  | .openCase (n := n) (fvar := fvar) name _ termCode args expected =>
-      -- Build a Rust program with a function for the open term and a main that calls it with concrete args
-      -- Parameter naming convention must match Codegen for free variables
-      let paramName : (i : Fin n) → String := fun i => s!"arg{i.val}"
-      let fnSrc := PartIiProject.renderRustFn name paramName termCode
-      -- Build main with concrete values
-      let paramDecls : List String :=
-        (List.finRange n).map (fun i => s!"let {paramName i} = {rustLit (t := fvar i) (args i)};")
-      let callArgs := (List.finRange n).map (fun i => paramName i)
-      let callArgsStr := String.intercalate ", " callArgs
-      let mainBody :=
-        "fn main() {\n" ++
-        String.intercalate "\n" (paramDecls.map (fun s => "  " ++ s)) ++ "\n  " ++
-        "let result = " ++ name ++ "(" ++ callArgsStr ++ ");\n  println!(\"{}\", SDQLShow::show(&result));\n}\n"
-      let rs := PartIiProject.rustRuntimeHeader ++ fnSrc ++ mainBody
+  | .program name sp expected =>
+      -- Lower to core program and render via program-level codegen
+      let cp := PartIiProject.ToCore.trProg sp
+      let rs := PartIiProject.renderRustProgShown cp
       let rsPath := outDir / s!"{name}.rs"
       let binPath := outDir / s!"{name}.bin"
       writeFile rsPath rs
@@ -98,7 +75,7 @@ def formatResult (r : TestResult) : String :=
 def anyFailures (rs : List TestResult) : Bool :=
   rs.any (fun r => match r.got with
                    | some s => s != r.expected
-                   | none => true)
+                   | none => Bool.true)
 
 unsafe def main (_args : List String) : IO UInt32 := do
   let mut results : List TestResult := []

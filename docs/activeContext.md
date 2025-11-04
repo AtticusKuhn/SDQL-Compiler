@@ -11,18 +11,24 @@ Recent changes (captured here):
 
 - Moved inline tests out of `Term.lean` and top-level into `Tests/`.
 - Added a Lean test executable `sdql-tests` that compiles SDQL → Rust, builds with `rustc`, runs binaries, and compares printed strings from Rust against Lean’s pretty-printed results.
-- Introduced `renderRustShown` and a new embedded runtime trait `SDQLShow` (replacing `SDQLMeasure`) for value pretty-printing in Rust.
+- Introduced `renderRustShown` and a new embedded runtime trait `SDQLShow` for value pretty-printing in Rust.
 - Adjusted Rust AST printer to use `map_insert(...)` and `.into_iter()` to match runtime helper semantics; dictionary `show` uses `.iter()` for stable order.
 - Added GitHub Actions workflow to build and run tests on pushes/PRs.
 - Memory Bank correction: removed `Mathlib` as a stated dependency in tech docs; the active core only imports `Std` and local modules.
 - New: `PartIiProject/SyntaxSDQL.lean` implements `[SDQL| ... ]` macros that elaborate to the surface layer (`STerm'`). They cover literals, records (positional and named literals), dict singleton/lookup, typed empty dicts `{}_{T1,T2}`, `sum(<k,v> in d)`, `let`, `if`, `not`, addition, and multiply with scalar tags (`*{int}`, `*{bool}`). Added examples with `#eval` to verify via surface→core translation.
+
+- New: Program-level Rust codegen from core `Prog` via `renderRustProgShown`. Generated sources embed a small `sdql_runtime` module containing helpers (`map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`), a stub `load<T: Default>` loader, and `SDQLShow` impls for pretty-printing. This shifts codegen from term-level to program-level (inputs are loaded by filename).
+- Tests updated to construct programs using `[SDQLProg { T }| ... ]` and to call `renderRustProgShown` on `ToCore.trProg` results. The test runner now regenerates `.sdql-test-out/*.rs` and `.bin` files using the program pipeline.
+- The stub loader returns `Default::default()`; real parsing is deferred.
 
 - New: `PartIiProject/SurfaceCore.lean` adds an explicit surface layer with named records and field selection by name, plus a surface→core translation (`ToCore.tr`). Translation erases names to positional records, supports `constRecord`, `projByName`, `lookup`, `sum`, `add`, `mul`, `let`, `if`, and `not`. Surface-side scaling evidence covers scalars, dictionaries, and records (`SScale.recordS` with typed membership `Mem`). Multiplication uses a surface tensor `stensor` and rewrite lemmas (`ty_stensor_eq`, `tyFields_map_stensor`) to align result types with core `tensor`. Named projection uses `HasField.index_getD_ty` to coerce the projected field to the expected core type.
 
 Next steps (proposed):
 
 - Boolean semiring alignment: switch `AddM.boolA` from XOR to OR; update examples and, if needed, Rust helpers.
-- Expand Rust runtime and codegen to cover multiplication (`sdql_mul`) and record operations so tests can include those.
+- Expand Rust runtime and codegen to cover multiplication (`sdql_mul`) with full tensor-shape behavior and broaden tuple support.
+- Replace the inlined runtime with a shared Rust crate when switching to `cargo` builds; keep the small embedded module for simple `rustc` paths and tests.
+- Implement typed file loaders for common inputs (CSVs for dicts with scalar values), driven by surface types inferred from `SProg.fvar`.
 - Extend `SDQLShow` tuple implementations beyond arity 5 as needed for larger records.
 - Scalar promotion: add explicit scalar universes and a `promote` term; extend `ScaleM` to additional semirings.
 - Surface sugar: sets/arrays/range and `dom` via elaboration to the core.
@@ -43,5 +49,5 @@ Open questions:
 
 - How strictly to follow the paper’s boolean semiring in the core vs. keep XOR for debugging convenience?
 - Preferred path for named records (core vs. surface translation) given current goals; current direction is a surface→core translator.
-- Whether to use `cargo` and a shared Rust crate for runtime helpers vs. embedding helpers in generated sources.
+- Whether to use `cargo` and a shared Rust crate for runtime helpers vs. embedding helpers in generated sources (current approach embeds a tiny `sdql_runtime` module).
  - How to wire lean4‑nix manifests so `nix build` recognizes newly added modules (lake build already works).

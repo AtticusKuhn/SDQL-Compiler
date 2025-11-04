@@ -58,7 +58,15 @@ mutual
       | .boolA => .binop .bitXor (compile nameEnv t1) (compile nameEnv t2)
       | .intA => .binop .add (compile nameEnv t1) (compile nameEnv t2)
       | @_root_.AddM.dictA dom range aRange => .call "dict_add" [compile nameEnv t1, compile nameEnv t2]
-      | @_root_.AddM.recordA l fields => .call "tuple_add" [compile nameEnv t1, compile nameEnv t2]
+      | @_root_.AddM.recordA l fields =>
+          let fname := match l.length with
+                        | 0 => "tuple_add0"
+                        | 1 => "tuple_add"
+                        | 2 => "tuple_add2"
+                        | 3 => "tuple_add3"
+                        | 4 => "tuple_add4"
+                        | _ => "tuple_add5" -- fallback for 5+
+          .call fname [compile nameEnv t1, compile nameEnv t2]
   | .mul _ _ e1 e2 =>
       -- We surface SDQL's shape-directed multiply as a helper call.
       .call "sdql_mul" [compile nameEnv e1, compile nameEnv e2]
@@ -110,49 +118,79 @@ def renderRust {n : Nat} {fvar : Fin n → _root_.Ty} {ty : _root_.Ty}
   Rust.wrapAsMain (compileToRustExpr t)
 
 /- Render a standalone Rust program that computes the compiled expression
-   and prints a simple numeric "measure" of the result for comparison
-   against Lean's evaluator. This avoids full pretty-printing of nested
-   dictionaries/records while still catching semantic regressions. -/
-/-- Shared Rust runtime header used by test executables. -/
+   and prints the result using a tiny runtime library for SDQL values. -/
+/-- Shared Rust runtime header used by test executables and program codegen.
+    This defines a small `sdql_runtime` module and re-exports its items so
+    generated code can call helpers directly or as `sdql_runtime::...`. -/
 def rustRuntimeHeader : String :=
-  "use std::collections::BTreeMap;\n" ++
-  "\n" ++
-  "// Minimal runtime helpers used by generated code\n" ++
-  "fn map_insert<K: Ord, V>(mut m: BTreeMap<K, V>, k: K, v: V) -> BTreeMap<K, V> {\n" ++
-  "    m.insert(k, v);\n" ++
-  "    m\n" ++
-  "}\n" ++
-  "fn lookup_or_default<K: Ord, V: Clone>(m: BTreeMap<K, V>, k: K, default: V) -> V {\n" ++
-  "    match m.get(&k) {\n" ++
-  "        Some(v) => v.clone(),\n" ++
-  "        None => default,\n" ++
-  "    }\n" ++
-  "}\n" ++
-  "\n" ++
-  "// Pretty-printing for SDQL values (mirrors Lean showValue)\n" ++
-  "pub trait SDQLShow { fn show(&self) -> String; }\n" ++
-  "impl SDQLShow for i64 { fn show(&self) -> String { self.to_string() } }\n" ++
-  "impl SDQLShow for bool { fn show(&self) -> String { self.to_string() } }\n" ++
-  "impl SDQLShow for String { fn show(&self) -> String { self.clone() } }\n" ++
-  "impl<K: Ord + SDQLShow, V: SDQLShow> SDQLShow for BTreeMap<K, V> {\n" ++
-  "    fn show(&self) -> String {\n" ++
-  "        let mut s = String::new();\n" ++
-  "        s.push('{');\n" ++
-  "        for (k, v) in self.iter() {\n" ++
-  "            s.push_str(&format!(\"{} -> {}, \", k.show(), v.show()));\n" ++
-  "        }\n" ++
-  "        s.push('}');\n" ++
-  "        s\n" ++
-  "    }\n" ++
-  "}\n" ++
-  "\n" ++
-  "// Tuple/record pretty-printing for small arities\n" ++
-  "impl<T1: SDQLShow> SDQLShow for (T1,) { fn show(&self) -> String { format!(\"<{}>\", self.0.show()) } }\n" ++
-  "impl<T1: SDQLShow, T2: SDQLShow> SDQLShow for (T1, T2) { fn show(&self) -> String { format!(\"<{}, {}>\", self.0.show(), self.1.show()) } }\n" ++
-  "impl<T1: SDQLShow, T2: SDQLShow, T3: SDQLShow> SDQLShow for (T1, T2, T3) { fn show(&self) -> String { format!(\"<{}, {}, {}>\", self.0.show(), self.1.show(), self.2.show()) } }\n" ++
-  "impl<T1: SDQLShow, T2: SDQLShow, T3: SDQLShow, T4: SDQLShow> SDQLShow for (T1, T2, T3, T4) { fn show(&self) -> String { format!(\"<{}, {}, {}, {}>\", self.0.show(), self.1.show(), self.2.show(), self.3.show()) } }\n" ++
-  "impl<T1: SDQLShow, T2: SDQLShow, T3: SDQLShow, T4: SDQLShow, T5: SDQLShow> SDQLShow for (T1, T2, T3, T4, T5) { fn show(&self) -> String { format!(\"<{}, {}, {}, {}, {}>\", self.0.show(), self.1.show(), self.2.show(), self.3.show(), self.4.show()) } }\n" ++
-  "\n"
+  String.intercalate "\n"
+  [ "use std::collections::BTreeMap;"
+  , "\n// Minimal runtime helpers used by generated code"
+  , "pub mod sdql_runtime {"
+  , "    use std::collections::BTreeMap;"
+  , "    use std::ops::Add;"
+  , "\n    // Insert without mutation at the call-site"
+  , "    pub fn map_insert<K: Ord, V>(mut m: BTreeMap<K, V>, k: K, v: V) -> BTreeMap<K, V> {"
+  , "        m.insert(k, v);"
+  , "        m"
+  , "    }"
+  , "\n    pub fn lookup_or_default<K: Ord, V: Clone>(m: BTreeMap<K, V>, k: K, default: V) -> V {"
+  , "        match m.get(&k) {"
+  , "            Some(v) => v.clone(),"
+  , "            None => default,"
+  , "        }"
+  , "    }"
+  , "\n    // Dictionary addition merges keys with value addition"
+  , "    pub fn dict_add<K: Ord + Clone, V: Add<Output = V> + Clone>(a: BTreeMap<K, V>, b: BTreeMap<K, V>) -> BTreeMap<K, V> {"
+  , "        let mut acc = a;"
+  , "        for (k, v2) in b.into_iter() {"
+  , "            if let Some(v1) = acc.get(&k).cloned() {"
+  , "                acc.insert(k, v1 + v2);"
+  , "            } else {"
+  , "                acc.insert(k, v2);"
+  , "            }"
+  , "        }"
+  , "        acc"
+  , "    }"
+  , "\n    // Tuple/record addition for small arities"
+  , "    pub fn tuple_add0(a: (), _b: ()) -> () { a }"
+  , "    pub fn tuple_add<T1: Add<Output = T1>>(a: (T1,), b: (T1,)) -> (T1,) { (a.0 + b.0,) }"
+  , "    pub fn tuple_add2<T1: Add<Output = T1>, T2: Add<Output = T2>>(a: (T1, T2), b: (T1, T2)) -> (T1, T2) { (a.0 + b.0, a.1 + b.1) }"
+  , "    pub fn tuple_add3<T1: Add<Output = T1>, T2: Add<Output = T2>, T3: Add<Output = T3>>(a: (T1, T2, T3), b: (T1, T2, T3)) -> (T1, T2, T3) { (a.0 + b.0, a.1 + b.1, a.2 + b.2) }"
+  , "    pub fn tuple_add4<T1: Add<Output = T1>, T2: Add<Output = T2>, T3: Add<Output = T3>, T4: Add<Output = T4>>(a: (T1, T2, T3, T4), b: (T1, T2, T3, T4)) -> (T1, T2, T3, T4) { (a.0 + b.0, a.1 + b.1, a.2 + b.2, a.3 + b.3) }"
+  , "    pub fn tuple_add5<T1: Add<Output = T1>, T2: Add<Output = T2>, T3: Add<Output = T3>, T4: Add<Output = T4>, T5: Add<Output = T5>>(a: (T1, T2, T3, T4, T5), b: (T1, T2, T3, T4, T5)) -> (T1, T2, T3, T4, T5) { (a.0 + b.0, a.1 + b.1, a.2 + b.2, a.3 + b.3, a.4 + b.4) }"
+  , "\n    // Generic stub loader: returns Default::default() and prints path"
+  , "    pub fn load<T: Default>(_path: &str) -> T {"
+  , "        // TODO: parse from file at runtime"
+  , "        Default::default()"
+  , "    }"
+  , "\n    // Pretty-printing for SDQL values (mirrors Lean showValue)"
+  , "    pub trait SDQLShow { fn show(&self) -> String; }"
+  , "    impl SDQLShow for i64 { fn show(&self) -> String { self.to_string() } }"
+  , "    impl SDQLShow for bool { fn show(&self) -> String { self.to_string() } }"
+  , "    impl SDQLShow for String { fn show(&self) -> String { self.clone() } }"
+  , "    impl<K: Ord + SDQLShow, V: SDQLShow> SDQLShow for BTreeMap<K, V> {"
+  , "        fn show(&self) -> String {"
+  , "            let mut s = String::new();"
+  , "            s.push('{');"
+  , "            for (k, v) in self.iter() {"
+  , "                s.push_str(&format!(\"{} -> {}, \", k.show(), v.show()));"
+  , "            }"
+  , "            s.push('}');"
+  , "            s"
+  , "        }"
+  , "    }"
+  , "\n    // Tuple/record pretty-printing for small arities"
+  , "    impl<T1: SDQLShow> SDQLShow for (T1,) { fn show(&self) -> String { format!(\"<{}>\", self.0.show()) } }"
+  , "    impl<T1: SDQLShow, T2: SDQLShow> SDQLShow for (T1, T2) { fn show(&self) -> String { format!(\"<{}, {}>\", self.0.show(), self.1.show()) } }"
+  , "    impl<T1: SDQLShow, T2: SDQLShow, T3: SDQLShow> SDQLShow for (T1, T2, T3) { fn show(&self) -> String { format!(\"<{}, {}, {}>\", self.0.show(), self.1.show(), self.2.show()) } }"
+  , "    impl<T1: SDQLShow, T2: SDQLShow, T3: SDQLShow, T4: SDQLShow> SDQLShow for (T1, T2, T3, T4) { fn show(&self) -> String { format!(\"<{}, {}, {}, {}>\", self.0.show(), self.1.show(), self.2.show(), self.3.show()) } }"
+  , "    impl<T1: SDQLShow, T2: SDQLShow, T3: SDQLShow, T4: SDQLShow, T5: SDQLShow> SDQLShow for (T1, T2, T3, T4, T5) { fn show(&self) -> String { format!(\"<{}, {}, {}, {}, {}>\", self.0.show(), self.1.show(), self.2.show(), self.3.show(), self.4.show()) } }"
+  , "} // end module sdql_runtime"
+  , "\n// Re-export runtime helpers at crate root for convenience"
+  , "use sdql_runtime::*;"
+  , "\n"
+  ]
 
 def renderRustShown {n : Nat} {fvar : Fin n → _root_.Ty} {ty : _root_.Ty}
     (t : _root_.Term fvar ty) : String :=
@@ -186,5 +224,36 @@ def renderRustFn {n : Nat} {fvar : Fin n → _root_.Ty} {ty : _root_.Ty}
   let header := "pub fn " ++ name ++ "(" ++ paramsStr ++ ") -> " ++ retStr ++ " {\n"
   let footer := "\n}\n"
   header ++ "  " ++ body ++ footer
+
+/- Program-level codegen ------------------------------------------------- -/
+
+/-- Render a Rust program from a `Prog`. The generated program:
+    - defines and re-exports a tiny runtime library (`sdql_runtime`),
+    - loads each free variable from the provided file path via a stub `load`,
+    - evaluates the compiled term, and
+    - prints the pretty-printed result. -/
+def renderRustProgShown (p : _root_.Prog) : String :=
+  let header := rustRuntimeHeader
+  -- Parameter names for free variables
+  let paramName : (i : Fin p.n) → String := fun i => s!"arg{i.val}"
+  -- Emit `let arg<i> : <Ty> = sdql_runtime::load::<Ty>("path");`
+  let idxs := (List.finRange p.n)
+  let paramDecls : List String := idxs.map (fun i =>
+    let tyStr := Rust.showTy (coreTyToRustTy (p.fvar i))
+    let nm := paramName i
+    -- escape Rust string literal – here we assume paths are well-formed; add minimal escaping
+    let path := (p.loadPaths i)
+    let lit := path.replace "\\" "\\\\" |>.replace "\"" "\\\""
+    s!"let {nm}: {tyStr} = sdql_runtime::load::<{tyStr}>(\"{lit}\");"
+  )
+  -- Compile the open term with the chosen names
+  let expr := compileOpenToRustExpr paramName (p.term (rep := fun _ => String))
+  let bodyExpr := Rust.showExpr expr 1
+  let loadsStr := String.intercalate "\n" (paramDecls.map (fun s => "  " ++ s))
+  let mainBody :=
+    "fn main() {\n" ++
+    loadsStr ++ "\n  " ++
+    "let result = " ++ bodyExpr ++ ";\n  println!(\"{}\", SDQLShow::show(&result));\n}\n"
+  header ++ mainBody
 
 end PartIiProject

@@ -249,7 +249,7 @@ macro_rules
       -- We implement these as `fun i => match i.val with | 0 => ... | 1 => ...` for simplicity.
       -- Helper: array → function by indexing Fin.nat
       let buildFn (arr : Array (TSyntax `term)) : MacroM (TSyntax `term) := do
-        `(fun (i : Fin $nLit) => (#[ $[$arr],* ]).get! i.val)
+        `(fun (i : Fin $nLit) => (#[ $[$arr],* ])[i.val]!)
       -- fvar : Fin n → SurfaceTy
       let fvarFn ← buildFn fvarArr
       -- loadPaths : Fin n → String
@@ -259,7 +259,7 @@ macro_rules
       `(SProg.mk $tTerm $nLit $fvarFn (fun {rep : SurfaceTy → Type} => ($termBody : STerm' rep (fun i => ($fvarFn i)) $tTerm)) $loadPathsFn)
 
 end PartIiProject
- 
+
 -- Examples
 namespace PartIiProject
 open ToCore
