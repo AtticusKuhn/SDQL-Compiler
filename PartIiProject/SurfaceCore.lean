@@ -1,10 +1,9 @@
 import PartIiProject.HList
 import PartIiProject.Term
 import PartIiProject.Mem
+import Std
 
 namespace PartIiProject
-open Classical
-set_option maxRecDepth 4096
 
 /-
 Surface layer with named products (records) and field selection by name.
@@ -17,10 +16,12 @@ inductive SurfaceTy : Type where
   | int : SurfaceTy
   | string : SurfaceTy
   | dict : SurfaceTy → SurfaceTy → SurfaceTy
+  -- | record : Std.TreeMap.Raw String SurfaceTy → SurfaceTy
   | record : (List (String × SurfaceTy)) → SurfaceTy
   deriving Inhabited
 
 abbrev Schema := List (String × SurfaceTy)
+-- abbrev Schema := Std.TreeMap.Raw String SurfaceTy
 
 -- Field-membership proof with index extraction
 inductive HasField : Schema → String → SurfaceTy → Type where
@@ -37,7 +38,7 @@ inductive SAdd : SurfaceTy → Type where
   | boolA : SAdd .bool
   | intA  : SAdd .int
   | dictA {k v : SurfaceTy} (av : SAdd v) : SAdd (.dict k v)
-  | recordA {σ : Schema} : (HList (fun (_, t) => SAdd t) σ) →  SAdd (.record σ)
+  | recordA {σ : Schema} : (HList (fun (_, t) => SAdd t) σ ) →  SAdd (.record σ)
 
 inductive SScale : SurfaceTy → SurfaceTy → Type where
   | boolS : SScale SurfaceTy.bool SurfaceTy.bool
@@ -56,11 +57,12 @@ inductive SScale : SurfaceTy → SurfaceTy → Type where
 -- Surface tensor shape (matches core `tensor` on erased types)
 -- marked unsafe because the termination checker cannot prove that stensor terminates
 
+
 @[simp, reducible]
 unsafe def stensor (a b : SurfaceTy) : SurfaceTy :=
   match a with
   | .dict dom range => .dict dom (stensor range b)
-  | .record σ => .record (σ.map (fun (nm, t) => (nm, stensor t b)))
+  | .record σ => .record (σ.map (fun (n,t) =>  (n, stensor t b)))
   | _ => b
 -- Note: unsafe def, so we do not prove termination here.
 
@@ -90,6 +92,7 @@ unsafe inductive STerm' (rep : SurfaceTy → Type) {n : Nat} (fvar : Fin n → S
 
 unsafe def STerm {n : Nat} (fvar : Fin n → SurfaceTy) (ty : SurfaceTy) :=
   {rep : SurfaceTy → Type} → STerm' rep fvar ty
+def f0 (f : Fin 0) : SurfaceTy  := nomatch f
 
 /- Surface → Core translation -/
 namespace ToCore
@@ -152,7 +155,7 @@ def toCoreScale : {sc t : SurfaceTy} → SScale sc t → ScaleM (ty sc) (ty t)
             fun t' (h : Mem t' (tyFields ((nm, tt) :: σ'))) => by
               -- Reexpress membership to expose the head of the list.
               have h0 : Mem t' (ty tt :: tyFields σ') := by
-                simpa [tyFields_cons] using h
+                exact h
               cases h0 with
               | head _ =>
                   -- Here, definitionaly, t' = ty tt.
@@ -269,6 +272,14 @@ mutual
             simpa using (projCast (rep := rep) (fvar := fun i => ty (fvar i)) rr idx (HasField.index_getD_ty (σ := σ) (nm := _nm) (t := t) p)))
 
 end
+
+unsafe def ex1 : STerm f0 (.record [("name", .string), ("age", .int)]) := .constRecord (.cons (.constString "Alice") (.cons (.constInt 30) .nil))
+
+unsafe def ex2 : STerm f0 .string := .projByName (HasField.here) ex1
+#eval Term.show (tr ex1)
+#eval Term.show (tr ex2)
+#eval Term'.denote (fun (x : Fin 0) => nomatch x) (tr ex2)
+
 
 end ToCore
 
