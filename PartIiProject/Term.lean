@@ -218,6 +218,8 @@ inductive Term' (rep : Ty → Type) {n : Nat} (fvar : Fin n → Ty) : Ty → Typ
   | sum : {dom range ty : Ty} → (a : AddM ty) → Term' rep fvar (.dict dom range) → (rep dom → rep range → Term' rep fvar ty) → Term' rep fvar ty
   | proj : (l : List Ty) → Term' rep fvar (.record l) → (i : Nat) → Term' rep fvar (l.getD i Ty.int)
 
+
+
 private unsafe def getProj {l : List Ty}
     (recordVal : Ty.denote (.record l)) (i : Nat)
     : (l.getD i Ty.int).denote :=
@@ -271,7 +273,7 @@ unsafe def Term'.denote  {n : Nat} {fvar : Fin n → Ty} {ty : Ty}
 
 def Term'.show {n : Nat} {fvar : Fin n → Ty} {ty : Ty} : Term' (fun _ => String) fvar ty → String
   | .var v           => v
-  | .freeVariable s  => toString s
+  | .freeVariable s  => s!"fv_{toString s}"
   | .constInt n      => toString n
   | .constBool b     => toString b
   | .constString s   => s
@@ -297,8 +299,18 @@ def Term'.show {n : Nat} {fvar : Fin n → Ty} {ty : Ty} : Term' (fun _ => Strin
 
 
 def Term {n : Nat} (fvar : Fin n → Ty) (ty : Ty) := {rep : Ty → Type}  → Term' rep fvar ty
-def f0 (f : Fin 0) : Ty := Ty.int
+def f0 (f : Fin 0) : Ty := nomatch f
 
+/-
+Prog has no semantic meaning, it's just used for code
+generation.
+-/
+structure Prog  : Type 1 where
+  t : Ty
+  n : Nat
+  fvar : Fin n → Ty
+  term : Term fvar t
+  loadPaths : Fin n → String
 
 
 def Term.show {ty : Ty} {n : Nat} {f : Fin n → Ty} (t : Term f ty) : String :=

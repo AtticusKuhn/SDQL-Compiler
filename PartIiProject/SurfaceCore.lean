@@ -90,8 +90,18 @@ unsafe inductive STerm' (rep : SurfaceTy → Type) {n : Nat} (fvar : Fin n → S
       → STerm' rep fvar (.record σ)
       → STerm' rep fvar t
 
+
 unsafe def STerm {n : Nat} (fvar : Fin n → SurfaceTy) (ty : SurfaceTy) :=
   {rep : SurfaceTy → Type} → STerm' rep fvar ty
+
+unsafe structure SProg  : Type 1 where
+  t : SurfaceTy
+  n : Nat
+  fvar : Fin n → SurfaceTy
+  term : STerm fvar t
+  loadPaths : Fin n → String
+
+
 def f0 (f : Fin 0) : SurfaceTy  := nomatch f
 
 /- Surface → Core translation -/
@@ -272,6 +282,13 @@ mutual
             simpa using (projCast (rep := rep) (fvar := fun i => ty (fvar i)) rr idx (HasField.index_getD_ty (σ := σ) (nm := _nm) (t := t) p)))
 
 end
+
+unsafe def trProg (p : SProg) : Prog :=
+  { t := ty p.t
+    n := p.n
+    fvar := ty ∘ p.fvar
+    term := tr p.term
+    loadPaths := p.loadPaths }
 
 unsafe def ex1 : STerm f0 (.record [("name", .string), ("age", .int)]) := .constRecord (.cons (.constString "Alice") (.cons (.constInt 30) .nil))
 

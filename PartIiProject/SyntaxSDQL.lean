@@ -331,7 +331,7 @@ unsafe def ex_record : STerm f0 (SurfaceTy.record [("a", .int), ("b", .int)]) :=
   [SDQL| < a = 10 , b = 20 > ]
 
 unsafe def ex_record_2 : STerm f0 (SurfaceTy.record [("a", .int), ("b", .int)]) :=
-  [SDQL| < b = 10 , a = 20 > ]
+  [SDQL| < b = 20 , a = 10 > ]
 
 /- Quick `#eval` checks -/
 open ToCore
@@ -354,6 +354,7 @@ unsafe def showCore {t} (e : STerm f0 t) : String :=
 #eval showCore ex_add
 #eval showCore ex_empty
 #eval showCore ex_record
+#eval showCore ex_record_2
 #eval showCore ex_sum
 #eval showCore ex_dict_lookup
 

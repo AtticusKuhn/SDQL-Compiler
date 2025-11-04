@@ -3,6 +3,7 @@ import PartIiProject.Mem
 import PartIiProject.Rust
 import PartIiProject.CodegenRust
 import PartIiProject.SyntaxSDQL
+-- import PartIiProject.SDQLTests.TPCH.Q01
 
 open PartIiProject
 -- import PartIiProject.SurfaceCore
