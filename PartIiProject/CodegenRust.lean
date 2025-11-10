@@ -10,6 +10,7 @@ open Rust
 /- Type translation ------------------------------------------------------- -/
 def coreTyToRustTy : _root_.Ty → Rust.Ty
   | .bool => .bool
+  | .real => .i64
   | .int => .i64
   | .string => .str
   | .dict k v => .map (coreTyToRustTy k) (coreTyToRustTy v)
@@ -23,6 +24,7 @@ mutual
 
   def zeroOfAddM : {t : _root_.Ty} → _root_.AddM t → Rust.Expr
     | .bool, .boolA => .litBool false
+    | .real, .realA => .litInt 0
     | .int, .intA => .litInt 0
     | .dict _ _, @_root_.AddM.dictA _ _ _ => .mapEmpty
     | .record _, @_root_.AddM.recordA _ fields => .tuple (zerosForHList fields)
@@ -56,6 +58,7 @@ mutual
   | .add a t1 t2 =>
       match a with
       | .boolA => .binop .bitXor (compile nameEnv t1) (compile nameEnv t2)
+      | .realA => .binop .add (compile nameEnv t1) (compile nameEnv t2)
       | .intA => .binop .add (compile nameEnv t1) (compile nameEnv t2)
       | @_root_.AddM.dictA dom range aRange => .call "dict_add" [compile nameEnv t1, compile nameEnv t2]
       | @_root_.AddM.recordA l fields =>
@@ -84,6 +87,7 @@ mutual
         let updated :=
           match a with
           | .boolA => .binop .bitXor (.var accName) bodyExpr
+          | .realA => .binop .add (.var accName) bodyExpr
           | .intA => .binop .add (.var accName) bodyExpr
           | @_root_.AddM.dictA dom range aRange => .call "dict_add" [.var accName, bodyExpr]
           | @_root_.AddM.recordA l fields => .call "tuple_add" [.var accName, bodyExpr]
@@ -94,6 +98,14 @@ mutual
         ]
         (.var accName)
   | .proj l r i => .call "proj" [compile nameEnv r, .litInt (Int.ofNat i)]
+  | .builtin b a =>
+      match b with
+      | .And => .call "ext_and" [compile nameEnv a]
+      | .Or => .call "ext_or" [compile nameEnv a]
+      | .Eq _ => .call "ext_eq" [compile nameEnv a]
+      | .StrEndsWith => .call "ext_str_ends_with" [compile nameEnv a]
+      | .Dom => .call "ext_dom" [compile nameEnv a]
+      | .Range => .call "ext_range" [compile nameEnv a]
 
   /- Compile a record literal represented as an HList of sub-terms. -/
   def compileRecordFields {n : Nat} {fvar : Fin n → _root_.Ty}
