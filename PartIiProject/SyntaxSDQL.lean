@@ -176,6 +176,15 @@ syntax "let" ident "=" sdql "in" sdql : sdql
 syntax:60 sdql:60 "+" sdql:61          : sdql
 syntax:55 sdql:55 "*" "{" "int" "}" sdql:56  : sdql -- scaled multiply
 syntax:55 sdql:55 "*" "{" "bool" "}" sdql:56 : sdql
+syntax:58 sdql:58 "&&" sdql:59           : sdql
+syntax:57 sdql:57 "||" sdql:58           : sdql
+syntax:59 sdql:59 "==" sdql:60           : sdql
+
+-- builtins/functions
+syntax "dom" "(" sdql ")"               : sdql
+syntax "range" "(" sdql ")"             : sdql
+syntax "endsWith" "(" sdql "," sdql ")" : sdql
+syntax "unique" "(" sdql ")"            : sdql
 
 -- summation over dictionaries
 syntax "sum" "(" "<" ident "," ident ">" "in" sdql ")" sdql : sdql
@@ -186,11 +195,13 @@ declare_syntax_cat sdqlty
 syntax (name := sdqltyInt) "int" : sdqlty
 syntax (name := sdqltyBool) "bool" : sdqlty
 syntax (name := sdqltyString) "string" : sdqlty
+syntax (name := sdqltyReal) "real" : sdqlty
 
 private def elabTy : TSyntax `sdqlty → MacroM (TSyntax `term)
   | `(sdqlty| int) => `(SurfaceTy.int)
   | `(sdqlty| bool) => `(SurfaceTy.bool)
   | `(sdqlty| string) => `(SurfaceTy.string)
+  | `(sdqlty| real) => `(SurfaceTy.real)
   | stx => Macro.throwErrorAt stx "unsupported SDQL type in this DSL"
 
 -- typed empty dictionary: {}_{ Tdom, Trange }
@@ -245,12 +256,50 @@ mutual
   | `(sdql| $x:sdql + $y:sdql) => do
       let xx ← elabSDQL x; let yy ← elabSDQL y
       `(SDQL.add $xx $yy)
+  | `(sdql| $x:sdql && $y:sdql) => do
+      let xx ← elabSDQL x; let yy ← elabSDQL y
+      let recArg ← `(
+        STerm'.constRecord (l := [("_1", _), ("_2", _)])
+          (HList.cons (x := (Prod.mk "_1" _)) (xs := [("_2", _)]) $xx
+            (HList.cons (x := (Prod.mk "_2" _)) (xs := []) $yy HList.nil))
+      )
+      `(STerm'.builtin PartIiProject.SBuiltin.And $recArg)
+  | `(sdql| $x:sdql || $y:sdql) => do
+      let xx ← elabSDQL x; let yy ← elabSDQL y
+      let recArg ← `(
+        STerm'.constRecord (l := [("_1", _), ("_2", _)])
+          (HList.cons (x := (Prod.mk "_1" _)) (xs := [("_2", _)]) $xx
+            (HList.cons (x := (Prod.mk "_2" _)) (xs := []) $yy HList.nil))
+      )
+      `(STerm'.builtin PartIiProject.SBuiltin.Or $recArg)
+  | `(sdql| $x:sdql == $y:sdql) => do
+      let xx ← elabSDQL x; let yy ← elabSDQL y
+      let recArg ← `(
+        STerm'.constRecord (l := [("_1", _), ("_2", _)])
+          (HList.cons (x := (Prod.mk "_1" _)) (xs := [("_2", _)]) $xx
+            (HList.cons (x := (Prod.mk "_2" _)) (xs := []) $yy HList.nil))
+      )
+      `(STerm'.builtin (PartIiProject.SBuiltin.Eq) $recArg)
   | `(sdql| $x:sdql * { int } $y:sdql) => do
       let xx ← elabSDQL x; let yy ← elabSDQL y
       `(SDQL.mulInt $xx $yy)
   | `(sdql| $x:sdql * { bool } $y:sdql) => do
       let xx ← elabSDQL x; let yy ← elabSDQL y
       `(SDQL.mulBool $xx $yy)
+  | `(sdql| dom ( $e:sdql )) => do
+      `(STerm'.builtin (PartIiProject.SBuiltin.Dom) $(← elabSDQL e))
+  | `(sdql| range ( $e:sdql )) => do
+      `(STerm'.builtin PartIiProject.SBuiltin.Range $(← elabSDQL e))
+  | `(sdql| endsWith ( $x:sdql , $y:sdql )) => do
+      let xx ← elabSDQL x; let yy ← elabSDQL y
+      let recArg ← `(
+        STerm'.constRecord (l := [("_1", _), ("_2", _)])
+          (HList.cons (x := (Prod.mk "_1" _)) (xs := [("_2", _)]) $xx
+            (HList.cons (x := (Prod.mk "_2" _)) (xs := []) $yy HList.nil))
+      )
+      `(STerm'.builtin PartIiProject.SBuiltin.StrEndsWith $recArg)
+  | `(sdql| unique ( $e:sdql )) => do
+      elabSDQL e
   | `(sdql| sum( < $k:ident , $v:ident > in $d:sdql ) $body:sdql) => do
       let dd ← elabSDQL d; let bb ← elabSDQL body
       `(SDQL.sum $dd (fun $k $v => $bb))
@@ -260,10 +309,7 @@ mutual
       else if stx.raw.getKind == `PartIiProject.sdqlFalse then
         `(STerm'.constBool Bool.false)
       else match stx with
-        | `(sdql| {}_{ $dom:sdqlty, $rng:sdqlty }) => do
-            let domTy ← elabTy dom
-            let rngTy ← elabTy rng
-            `((STerm'.emptyDict : STerm' rep f0 (SurfaceTy.dict $domTy $rngTy)))
+        -- typed empty dict not supported in this surface DSL right now (handled in program DSL)
         | `(sdql| $x:ident) => `(STerm'.var $x)
         | `(sdql| ( $e:sdql )) => elabSDQL e
         | `(sdql| < $a:sdql, $b:sdql >) => do
@@ -342,7 +388,7 @@ unsafe def env0 : (s : Fin 0) → (ToCore.ty (f0 s)).denote := fun s => nomatch 
 unsafe def ex_dict_lookup : STerm f0 SurfaceTy.int := [SDQL| { 3 -> 7 , 5 -> 1 + 1} (3) ]
 
 -- 5) typed empty dictionary
-unsafe def ex_empty : STerm f0 (SurfaceTy.dict .int .int) := [SDQL| {}_{ int, int } ]
+-- unsafe def ex_empty : STerm f0 (SurfaceTy.dict .int .int) := [SDQL| {}_{ int, int } ]
 
 -- 6) sum over dictionary
 unsafe def ex_sum : STerm f0 SurfaceTy.int := [SDQL| sum( <k, v> in { 1 -> 10 } ) k ]
@@ -352,7 +398,7 @@ unsafe def showCore {t} (e : STerm f0 t) : String :=
   Term'.show (ToCore.tr e (rep := fun _ => String))
 
 #eval showCore ex_add
-#eval showCore ex_empty
+-- #eval showCore ex_empty
 #eval showCore ex_record
 #eval showCore ex_record_2
 #eval showCore ex_sum
