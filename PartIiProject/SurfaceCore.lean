@@ -14,6 +14,7 @@ surface→core translation that erases names to positional records.
 inductive SurfaceTy : Type where
   | bool : SurfaceTy
   | int : SurfaceTy
+  | real : SurfaceTy
   | string : SurfaceTy
   | dict : SurfaceTy → SurfaceTy → SurfaceTy
   -- | record : Std.TreeMap.Raw String SurfaceTy → SurfaceTy
@@ -37,12 +38,14 @@ def HasField.index : {σ : Schema} → {n : String} → {t : SurfaceTy} → HasF
 inductive SAdd : SurfaceTy → Type where
   | boolA : SAdd .bool
   | intA  : SAdd .int
+  | realA : SAdd .real
   | dictA {k v : SurfaceTy} (av : SAdd v) : SAdd (.dict k v)
   | recordA {σ : Schema} : (HList (fun (_, t) => SAdd t) σ ) →  SAdd (.record σ)
 
 inductive SScale : SurfaceTy → SurfaceTy → Type where
   | boolS : SScale SurfaceTy.bool SurfaceTy.bool
   | intS : SScale SurfaceTy.int SurfaceTy.int
+  | realS : SScale SurfaceTy.real SurfaceTy.real
   | dictS {sc dom range : SurfaceTy} (sRange : SScale sc range) : SScale sc (SurfaceTy.dict dom range)
   | recordS {sc : SurfaceTy} {σ : Schema}
       (fields : (p : String × SurfaceTy) → Mem p σ → SScale sc p.snd) :
@@ -66,6 +69,14 @@ unsafe def stensor (a b : SurfaceTy) : SurfaceTy :=
   | _ => b
 -- Note: unsafe def, so we do not prove termination here.
 
+inductive SBuiltin : SurfaceTy → SurfaceTy → Type where
+  | And : SBuiltin (.record [("_1", .bool), ("_2", .bool)]) .bool
+  | Or  : SBuiltin (.record [("_1", .bool), ("_2", .bool)]) .bool
+  | Eq {t : SurfaceTy} : SBuiltin (.record [("_1", t), ("_2", t)]) .bool
+  | StrEndsWith : SBuiltin (.record [("_1", .string), ("_2", .string)]) .bool
+  | Dom {dom range : SurfaceTy} : SBuiltin (.dict dom range) (.dict dom .bool)
+  | Range : SBuiltin .int (.dict .int .bool)
+
 unsafe inductive STerm' (rep : SurfaceTy → Type) {n : Nat} (fvar : Fin n → SurfaceTy) : SurfaceTy → Type where
   | var   : {ty : SurfaceTy} → rep ty → STerm' rep fvar ty
   | freeVariable : (f : Fin n) → STerm' rep fvar (fvar f)
@@ -78,7 +89,7 @@ unsafe inductive STerm' (rep : SurfaceTy → Type) {n : Nat} (fvar : Fin n → S
   | add : {ty : SurfaceTy} → (a : SAdd ty) → STerm' rep fvar ty → STerm' rep fvar ty → STerm' rep fvar ty
   | mul : {sc t1 t2 : SurfaceTy} → (s1 : SScale sc t1) → (s2 : SScale sc t2)
       → STerm' rep fvar t1 → STerm' rep fvar t2 → STerm' rep fvar (stensor t1 t2)
-  | emptyDict : {dom range : SurfaceTy} → STerm' rep fvar (SurfaceTy.dict dom range)
+  | emptyDict : {domain ran : SurfaceTy} → STerm' rep fvar (SurfaceTy.dict domain ran)
   | dictInsert : {dom range : SurfaceTy} → STerm' rep fvar dom → STerm' rep fvar range → STerm' rep fvar (SurfaceTy.dict dom range) → STerm' rep fvar (SurfaceTy.dict dom range)
   | lookup : {dom range : SurfaceTy} → (aRange : SAdd range) → STerm' rep fvar (SurfaceTy.dict dom range) → STerm' rep fvar dom → STerm' rep fvar range
   | sum : {dom range ty : SurfaceTy} → (a : SAdd ty) → STerm' rep fvar (SurfaceTy.dict dom range) → (rep dom → rep range → STerm' rep fvar ty) → STerm' rep fvar ty
@@ -89,6 +100,7 @@ unsafe inductive STerm' (rep : SurfaceTy → Type) {n : Nat} (fvar : Fin n → S
       → (p : HasField σ nm t)
       → STerm' rep fvar (.record σ)
       → STerm' rep fvar t
+  | builtin : {a b : SurfaceTy} → SBuiltin a b → STerm' rep fvar a → STerm' rep fvar b
 
 
 unsafe def STerm {n : Nat} (fvar : Fin n → SurfaceTy) (ty : SurfaceTy) :=
@@ -117,6 +129,7 @@ mutual
   def ty : SurfaceTy → Ty
     | .bool => .bool
     | .int => .int
+    | .real => .real
     | .string => .string
     | .dict k v => .dict (ty k) (ty v)
     | .record σ => .record (tyFields σ)
@@ -130,6 +143,7 @@ end
  def toCoreAdd : {t : SurfaceTy} → SAdd t → AddM (ty t)
   | _, SAdd.boolA => AddM.boolA
   | _, SAdd.intA => AddM.intA
+  | _, SAdd.realA => AddM.realA
   | _, @SAdd.dictA dom range aRange => AddM.dictA (toCoreAdd aRange)
   | _, @SAdd.recordA σ fields =>
     let rec trFields
@@ -149,6 +163,7 @@ end
 def toCoreScale : {sc t : SurfaceTy} → SScale sc t → ScaleM (ty sc) (ty t)
   | _, _, SScale.boolS => ScaleM.boolS
   | _, _, SScale.intS => ScaleM.intS
+  | _, _, SScale.realS => ScaleM.realS
   | _, _, @SScale.dictS sc dom range sRange => ScaleM.dictS (toCoreScale sRange)
   | _, _, @SScale.recordS sc σ fields =>
       -- Build the per-field scaling function by recursion on the schema,
@@ -206,6 +221,7 @@ mutual
   unsafe def ty_stensor_eq : ∀ (a b : SurfaceTy), ty (stensor a b) = tensor (ty a) (ty b)
     | .bool, b => rfl
     | .int, b => rfl
+    | .real, b => rfl
     | .string, b => rfl
     | .dict dom range, b => by
         rw [ty]
@@ -280,6 +296,15 @@ mutual
         show Term' rep (ty ∘ fvar) (ty t) from
           (by
             simpa using (projCast (rep := rep) (fvar := fun i => ty (fvar i)) rr idx (HasField.index_getD_ty (σ := σ) (nm := _nm) (t := t) p)))
+    | STerm'.builtin b a =>
+        match b with
+        | SBuiltin.And => Term'.builtin BuiltinFn.And (tr a)
+        | SBuiltin.Or  => Term'.builtin BuiltinFn.Or (tr a)
+        | @SBuiltin.Eq (t := t) =>
+            Term'.builtin (BuiltinFn.Eq (ty t)) (tr a)
+        | SBuiltin.StrEndsWith => Term'.builtin BuiltinFn.StrEndsWith (tr a)
+        | @SBuiltin.Dom dom range => Term'.builtin (BuiltinFn.Dom (dom := ty dom) (range := ty range)) (tr a)
+        | SBuiltin.Range => Term'.builtin BuiltinFn.Range (tr a)
 
 end
 
