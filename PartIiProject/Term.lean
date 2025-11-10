@@ -8,6 +8,7 @@ set_option linter.unusedVariables false
 
 inductive Ty : Type where
   | bool : Ty
+  | real : Ty
   | dict : Ty → Ty → Ty
   | record : (List (Ty)) → Ty
   | string : Ty
@@ -21,6 +22,7 @@ inductive Ty : Type where
 unsafe def Ty.denote (t : Ty) : Type :=
   match t with
   | .bool => Bool
+  | .real => Float
   | .int => Int
   | .string => String
   | .record l => HList Ty.denote l
@@ -42,6 +44,7 @@ unsafe def showDict {dom range : Ty} (d : Dict dom.denote range.denote) : String
 
 unsafe def showValue : {t : Ty} → t.denote → String
   | .bool, b => toString b
+  | .real, n => toString n
   | .int, n => toString n
   | .string, s => s
   | .record l, r => "<" ++ showHList r ++ ">"
@@ -49,6 +52,7 @@ unsafe def showValue : {t : Ty} → t.denote → String
 end
 inductive AddM : Ty → Type where
   | boolA : AddM Ty.bool
+  | realA : AddM Ty.real
   | intA : AddM Ty.int
   | dictA {dom range : Ty} (aRange : AddM range) : AddM (Ty.dict dom range)
   | recordA {l : List Ty} : HList AddM l → AddM (Ty.record l)
@@ -59,6 +63,12 @@ instance instOrdUnit : Ord Unit where
 instance instOrdDict (a b : Type) : Ord (Dict a b) where
   compare := fun _ _ => Ordering.eq
 
+instance instOrdFloat : Ord Float where
+  compare := fun a b =>
+    if a < b then Ordering.lt
+    else if a == b then Ordering.eq
+    else Ordering.gt
+
 unsafe def HListOrd {T : Type} {f : T → Type} {l : List T} (o : HList (Ord ∘ f) l) : Ord (HList f l) :=
   match o with
     | HList.nil => ⟨fun _ _ => Ordering.eq⟩
@@ -68,6 +78,7 @@ unsafe def HListOrd {T : Type} {f : T → Type} {l : List T} (o : HList (Ord ∘
 unsafe def Ty.ord (t : Ty) : Ord t.denote :=
   match t with
     | .bool => inferInstance
+    | .real => inferInstance
     | .int => inferInstance
     | .string => inferInstance
     | .dict a b => instOrdDict a.denote b.denote
@@ -81,6 +92,7 @@ unsafe def zeroHList {l : List Ty} : HList AddM l → HList Ty.denote l
 
 unsafe def AddM.zero {t : Ty} : AddM t → t.denote
   | .boolA => false
+  | .realA => (0.0 : Float)
   | .intA => 0
   | @AddM.dictA dom range aRange => Dict.empty (Ty.ord dom)
   | @AddM.recordA l fields => zeroHList fields
@@ -117,6 +129,7 @@ unsafe def addHList {l : List Ty} (fields : HList AddM l)
 
 unsafe def AddM.denote {t : Ty} : AddM t → t.denote → t.denote → t.denote
   | .boolA, x, y => Bool.xor x y
+  | .realA, x, y => x + y
   | .intA, x, y => Int.add x y
   | @AddM.dictA dom range aRange, x, y =>
     let inner := AddM.denote aRange
@@ -131,6 +144,7 @@ end
 
 inductive ScaleM : Ty → Ty → Type where
   | boolS : ScaleM Ty.bool Ty.bool
+  | realS : ScaleM Ty.real Ty.real
   | intS : ScaleM Ty.int Ty.int
   | dictS {sc dom range : Ty} (sRange : ScaleM sc range) : ScaleM sc (Ty.dict dom range)
   | recordS {sc : Ty} {l : List Ty} (fields : ∀ (t : Ty), Mem t l → ScaleM sc t) : ScaleM sc (Ty.record l)
@@ -154,6 +168,7 @@ unsafe def scaleRecordHList {sc : Ty}
 
 unsafe def ScaleM.denote {sc t : Ty} : ScaleM sc t → sc.denote → t.denote → t.denote
   | .boolS, a, x => Bool.and a x
+  | .realS, a, x => a * x
   | .intS, a, x => Int.mul a x
   | @ScaleM.dictS sc dom range sRange, a, d =>
     let inner := ScaleM.denote (sc := sc) (t := range) sRange
@@ -175,6 +190,10 @@ unsafe def ScaleM.mulDenote {sc t1 t2 : Ty}
   | .intS =>
     fun l r =>
       -- tensor Ty.int t2 = t2
+      ScaleM.denote s2 l r
+  | .realS =>
+    fun l r =>
+      -- tensor Ty.real t2 = t2
       ScaleM.denote s2 l r
   | @ScaleM.dictS sc dom range sRange =>
     fun l r =>
@@ -199,6 +218,14 @@ unsafe def ScaleM.mulDenote {sc t1 t2 : Ty}
         unfold tensor
         exact (go (toHList fields) lval)
 
+inductive BuiltinFn : Ty → Ty → Type
+  | Or : BuiltinFn (Ty.record [.bool, .bool]) Ty.bool
+  | And : BuiltinFn (Ty.record [.bool, .bool]) Ty.bool
+  | Eq (t : Ty) : BuiltinFn (Ty.record [t, t]) Ty.bool
+  | StrEndsWith : BuiltinFn (Ty.record [.string, .string]) Ty.bool
+  | Dom : {dom range : Ty} →  BuiltinFn (.dict dom range) (.dict dom Ty.bool)
+  | Range : BuiltinFn Ty.int (Ty.dict Ty.int Ty.bool)
+
 -- Core terms (PHOAS) with typed addition/multiplication evidence
 inductive Term' (rep : Ty → Type) {n : Nat} (fvar : Fin n → Ty) : Ty → Type
   | var   : {ty : Ty} → rep ty → Term' rep fvar ty
@@ -217,6 +244,7 @@ inductive Term' (rep : Ty → Type) {n : Nat} (fvar : Fin n → Ty) : Ty → Typ
   | mul : { sc t1 t2 : Ty} → (_s1 : ScaleM sc t1) →  (_s2 : ScaleM sc t2) → Term' rep fvar t1 → Term' rep fvar t2 → Term' rep fvar (tensor t1 t2)
   | sum : {dom range ty : Ty} → (a : AddM ty) → Term' rep fvar (.dict dom range) → (rep dom → rep range → Term' rep fvar ty) → Term' rep fvar ty
   | proj : (l : List Ty) → Term' rep fvar (.record l) → (i : Nat) → Term' rep fvar (l.getD i Ty.int)
+  | builtin : {a b : Ty} → BuiltinFn a b → Term' rep fvar a → Term' rep fvar b
 
 
 
@@ -270,6 +298,33 @@ unsafe def Term'.denote  {n : Nat} {fvar : Fin n → Ty} {ty : Ty}
       zero
   | .mul s1 s2 t1e t2e =>
     ScaleM.mulDenote s1 s2 (denote env t1e) (denote env t2e)
+  | .builtin fn arg =>
+    match fn with
+    | BuiltinFn.Or =>
+        match denote env arg with
+        | HList.cons a (HList.cons b HList.nil) => Bool.or a b
+    | BuiltinFn.And =>
+        match denote env arg with
+        | HList.cons a (HList.cons b HList.nil) => Bool.and a b
+    | BuiltinFn.Eq t =>
+        match t, denote env arg with
+        | .int, HList.cons a (HList.cons b HList.nil) => a == b
+        | .string, HList.cons a (HList.cons b HList.nil) => decide (a = b)
+        | .real, HList.cons a (HList.cons b HList.nil) => a == b
+        | _, _ => false
+    | BuiltinFn.StrEndsWith =>
+        match denote env arg with
+        | HList.cons s (HList.cons suf HList.nil) => s.endsWith suf
+    | @BuiltinFn.Dom dom range =>
+        let d := denote env arg
+        d.map.foldl (fun acc k _v => Dict.insert acc k true) (Dict.empty (Ty.ord dom))
+    | BuiltinFn.Range =>
+        let n := denote env arg
+        let rec build (i : Int) (acc : Dict Int Bool) : Dict Int Bool :=
+          if i < n then
+            build (i + 1) (Dict.insert acc i true)
+          else acc
+        (build 0 (Dict.empty inferInstance))
 
 def Term'.show {n : Nat} {fvar : Fin n → Ty} {ty : Ty} : Term' (fun _ => String) fvar ty → String
   | .var v           => v
@@ -296,6 +351,7 @@ def Term'.show {n : Nat} {fvar : Fin n → Ty} {ty : Ty} : Term' (fun _ => Strin
           let tStr := show_r t
           if tStr = "" then hStr else s!"{hStr}, {tStr}"
     "<" ++ show_r r ++ ">"
+  | (builtin _ a) => s!"builtin({a.show})"
 
 
 def Term {n : Nat} (fvar : Fin n → Ty) (ty : Ty) := {rep : Ty → Type}  → Term' rep fvar ty
