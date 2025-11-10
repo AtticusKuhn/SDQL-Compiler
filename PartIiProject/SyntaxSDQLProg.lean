@@ -28,12 +28,21 @@ namespace PartIiProject
 
 -- Reuse the `sdqlty` category declared in `SyntaxSDQL.lean`.
 syntax (name := sdqltyDict) "{" sdqlty "->" sdqlty "}" : sdqlty
+syntax (name := sdqltyVec) "@vec" "{" sdqlty "->" sdqlty "}" : sdqlty
+syntax (name := sdqltyRealP) "real" : sdqlty
+syntax (name := sdqltyVarchar) "varchar" "(" num ")" : sdqlty
 syntax (name := sdqltyRecord) "<" sepBy(ident ":" sdqlty, ",") ">" : sdqlty
 
 private partial def elabTyP : TSyntax `sdqlty → MacroM (TSyntax `term)
   | `(sdqlty| int) => `(SurfaceTy.int)
   | `(sdqlty| bool) => `(SurfaceTy.bool)
   | `(sdqlty| string) => `(SurfaceTy.string)
+  | `(sdqlty| real) => `(SurfaceTy.real)
+  | `(sdqlty| varchar($_)) => `(SurfaceTy.string)
+  | `(sdqlty| @vec { $k:sdqlty -> $v:sdqlty }) => do
+      let kk ← elabTyP k
+      let vv ← elabTyP v
+      `(SurfaceTy.dict $kk $vv)
   | `(sdqlty| { $k:sdqlty -> $v:sdqlty }) => do
       let kk ← elabTyP k
       let vv ← elabTyP v
@@ -65,8 +74,11 @@ private partial def elabTyP : TSyntax `sdqlty → MacroM (TSyntax `term)
       `(SurfaceTy.record $ret)
   | stx => Macro.throwErrorAt stx "unsupported SDQL type in program DSL"
 
-/- Extend term grammar with loads -/
+/- Extend term grammar with loads and a few extra forms -/
 syntax (name := sdqlLoad) "load" "[" sdqlty "]" "(" str ")" : sdql
+syntax (name := sdqlSumBind) "sum" "(" "<" ident "," ident ">" "<-" sdql ")" sdql : sdql
+syntax:70 sdql:70 "." ident : sdql
+syntax (name := sdqlEmptyDict) "{" "}" "_" "{" sdqlty "," sdqlty "}"  : sdql
 
 
 /- Utilities: collect loads and elaborate the term to STerm' with free vars -/
@@ -92,13 +104,21 @@ private partial def collectLoads (stx : TSyntax `sdql) : MacroM (Array (LoadKey 
     | `(sdql| $x:sdql + $y:sdql) => do let acc ← go x acc; go y acc
     | `(sdql| $x:sdql * { int } $y:sdql) => do let acc ← go x acc; go y acc
     | `(sdql| $x:sdql * { bool } $y:sdql) => do let acc ← go x acc; go y acc
+    | `(sdql| $x:sdql && $y:sdql) => do let acc ← go x acc; go y acc
+    | `(sdql| $x:sdql || $y:sdql) => do let acc ← go x acc; go y acc
+    | `(sdql| $x:sdql == $y:sdql) => do let acc ← go x acc; go y acc
     | `(sdql| not $x:sdql) => go x acc
     | `(sdql| if $c:sdql then $t:sdql else $f:sdql) => do
         let acc ← go c acc; let acc ← go t acc; go f acc
     | `(sdql| let $x:ident = $e:sdql in $b:sdql) => do
         let acc ← go e acc; go b acc
     | `(sdql| $d:sdql ( $k:sdql )) => do let acc ← go d acc; go k acc
-    | `(sdql| {}_{ $dom:sdqlty, $rng:sdqlty }) => return acc
+    | `(sdql| dom ( $e:sdql )) => go e acc
+    | `(sdql| range ( $e:sdql )) => go e acc
+    | `(sdql| endsWith ( $x:sdql , $y:sdql )) => do let acc ← go x acc; go y acc
+    | `(sdql| unique ( $e:sdql )) => go e acc
+    -- typed empty dict: ignore in load-collection
+    | `(sdql| {}_{ $_:sdqlty, $_:sdqlty }) => return acc
     | `(sdql| < $a:sdql, $b:sdql >) => do let acc ← go a acc; go b acc
     | `(sdql| < $a:sdql, $b:sdql, $c:sdql >) => do
         let acc ← go a acc; let acc ← go b acc; go c acc
@@ -113,6 +133,9 @@ private partial def collectLoads (stx : TSyntax `sdql) : MacroM (Array (LoadKey 
         for vv in v do accm ← go vv accm
         return accm
     | `(sdql| sum( < $ki:ident , $vi:ident > in $d:sdql ) $body:sdql) => do
+        let acc ← go d acc
+        go body acc
+    | `(sdql| sum( < $ki:ident , $vi:ident > <- $d:sdql ) $body:sdql) => do
         let acc ← go d acc
         go body acc
     | _ => return acc
@@ -150,17 +173,71 @@ private partial def elabSDQLProg
     | `(sdql| not $e:sdql) => do `(STerm'.not $(← go e))
     | `(sdql| if $c:sdql then $t:sdql else $f:sdql) => do
         `(STerm'.ite $(← go c) $(← go t) $(← go f))
+    -- Expand let x = load[<fields>](path) in b by also binding each field name
+    | `(sdql| true) => `(STerm'.constBool Bool.true)
+    | `(sdql| false) => `(STerm'.constBool Bool.false)
     | `(sdql| let $x:ident = $e:sdql in $b:sdql) => do
         let ee ← go e; let bb ← go b
         `(STerm'.letin $ee (fun $x => $bb))
     | `(sdql| $x:sdql + $y:sdql) => do `(SDQL.add $(← go x) $(← go y))
+    | `(sdql| $x:sdql && $y:sdql) => do
+        let xx ← go x; let yy ← go y
+        let recArg ← `(
+          STerm'.constRecord (l := [("_1", _), ("_2", _)])
+            (HList.cons (x := (Prod.mk "_1" _)) (xs := [("_2", _)]) $xx
+              (HList.cons (x := (Prod.mk "_2" _)) (xs := []) $yy HList.nil))
+        )
+        `(STerm'.builtin PartIiProject.SBuiltin.And $recArg)
+    | `(sdql| $x:sdql || $y:sdql) => do
+        let xx ← go x; let yy ← go y
+        let recArg ← `(
+          STerm'.constRecord (l := [("_1", _), ("_2", _)])
+            (HList.cons (x := (Prod.mk "_1" _)) (xs := [("_2", _)]) $xx
+              (HList.cons (x := (Prod.mk "_2" _)) (xs := []) $yy HList.nil))
+        )
+        `(STerm'.builtin PartIiProject.SBuiltin.Or $recArg)
+    | `(sdql| $x:sdql == $y:sdql) => do
+        let xx ← go x; let yy ← go y
+        let recArg ← `(
+          STerm'.constRecord (l := [("_1", _), ("_2", _)])
+            (HList.cons (x := (Prod.mk "_1" _)) (xs := [("_2", _)]) $xx
+              (HList.cons (x := (Prod.mk "_2" _)) (xs := []) $yy HList.nil))
+        )
+        `(STerm'.builtin (PartIiProject.SBuiltin.Eq) $recArg)
     | `(sdql| $x:sdql * { int } $y:sdql) => do `(SDQL.mulInt $(← go x) $(← go y))
     | `(sdql| $x:sdql * { bool } $y:sdql) => do `(SDQL.mulBool $(← go x) $(← go y))
     | `(sdql| $d:sdql ( $k:sdql )) => do `(SDQL.lookup $(← go d) $(← go k))
-    | `(sdql| {}_{ $dom:sdqlty, $rng:sdqlty }) => do
-        let domTy ← elabTyP dom
-        let rngTy ← elabTyP rng
-        `((STerm'.emptyDict : STerm' rep fvar (SurfaceTy.dict $domTy $rngTy)))
+    | `(sdql| dom ( $e:sdql )) => do
+        `(STerm'.builtin (PartIiProject.SBuiltin.Dom) $(← go e))
+    | `(sdql| range ( $e:sdql )) => do
+        `(STerm'.builtin PartIiProject.SBuiltin.Range $(← go e))
+    | `(sdql| endsWith ( $x:sdql , $y:sdql )) => do
+        let xx ← go x; let yy ← go y
+        let recArg ← `(
+          STerm'.constRecord (l := [("_1", _), ("_2", _)])
+            (HList.cons (x := (Prod.mk "_1" _)) (xs := [("_2", _)]) $xx
+              (HList.cons (x := (Prod.mk "_2" _)) (xs := []) $yy HList.nil))
+        )
+        `(STerm'.builtin PartIiProject.SBuiltin.StrEndsWith $recArg)
+    -- dot access becomes simple variable access due to earlier let-expansion
+    | `(sdql| $recv:ident . $fname:ident) => do
+        `(STerm'.var $fname)
+    | `(sdql| unique ( $e:sdql )) => do
+        go e
+    -- typed empty dict via raw kind to avoid antiquot parsing issues
+    | `(sdql| {}_{ $domTy:sdqlty, $rngTy:sdqlty}) => do
+        -- if stx.raw.getKind == `PartIiProject.sdqlEmptyDict then
+        --   let args := stx.raw.getArgs
+        --   -- syntax: "{" "}" "_" "{" sdqlty "," sdqlty "}"
+        --   let domStx := args.get! 4
+        --   let rngStx := args.get! 6
+          let d : TSyntax `term ← elabTyP domTy;
+          let r : TSyntax `term ← elabTyP rngTy;
+          -- let t : TSyntax `term ←  elabTyP `(sdqlty|{$domTy -> $rngTy})
+          `((STerm'.emptyDict (domain := $d) (ran := $r) ))
+          -- `((STerm'.emptyDict : STerm' rep fvar (SurfaceTy.dict $d $r)))
+        -- else
+          -- Macro.throwError s!"unrecognized SDQL syntax in program DSL: {stx}"
     | `(sdql| < $a:sdql, $b:sdql >) => do
         `(STerm'.constRecord (l := [("_1", _), ("_2", _)])
           (HList.cons (x := (Prod.mk "_1" _)) (xs := [("_2", _)]) $(← go a)
@@ -171,10 +248,8 @@ private partial def elabSDQLProg
             (HList.cons (x := (Prod.mk "_2" _)) (xs := [("_3", _)]) $(← go b)
               (HList.cons (x := (Prod.mk "_3" _)) (xs := []) $(← go c) HList.nil))))
     | `(sdql| < $[ $n:ident = $e:sdql ],* >) => do
-        -- Use the helper from `SyntaxSDQL.lean` via re-elaboration
         let names : Array (TSyntax `ident) := n
         let exprs : Array (TSyntax `sdql) := e
-        -- Local helper replicating `elabNamedRecord` logic
         let mrec : TSyntax `term ← do
           let l := names.size
           if l != exprs.size then
@@ -183,28 +258,31 @@ private partial def elabSDQLProg
           for i in [:l] do
             pairs := pairs.push ((names[i]!).getId.toString, i)
           let sorted := pairs.qsort (fun a b => a.fst < b.fst)
-          let rec mkH (j : Nat) : MacroM (TSyntax `term) := do
+          let rec mkH1 (j : Nat) : MacroM (TSyntax `term) := do
             if j < sorted.size then
               let (nm, idx) := sorted[j]!
               let sNm := Syntax.mkStrLit nm
               let vi ← go (exprs[idx]!)
-              let tail ← mkH (j+1)
+              let tail ← mkH1 (j+1)
               `(HList.cons (x := (Prod.mk $sNm _)) (xs := _) $vi $tail)
             else `(HList.nil)
-          `((← mkH 0))
+          `((← mkH1 0))
         `(STerm'.constRecord $mrec)
     | `(sdql| { $[$k:sdql -> $v:sdql],* }) => do
         if k.size == 0 then
           Macro.throwError "empty dictionary requires a type annotation: {}_{ Tdom, Trange }"
-        let rec build (i : Nat) : MacroM (TSyntax `term) := do
+        let rec build1 (i : Nat) : MacroM (TSyntax `term) := do
           if i == k.size then `(STerm'.emptyDict)
           else
             let tk ← go (k[i]!)
             let tv ← go (v[i]!)
-            let tail ← build (i+1)
+            let tail ← build1 (i+1)
             `(STerm'.dictInsert $tk $tv $tail)
-        build 0
+        build1 0
+    -- moved some composite forms into the fallback below
     | `(sdql| sum( < $k:ident , $v:ident > in $d:sdql ) $body:sdql) => do
+        `(SDQL.sum $(← go d) (fun $k $v => $(← go body)))
+    | `(sdql| sum( < $k:ident , $v:ident > <- $d:sdql ) $body:sdql) => do
         `(SDQL.sum $(← go d) (fun $k $v => $(← go body)))
     | `(sdql| load[ $ty:sdqlty ] ( $p:str )) => do
         let idx ← findIdx p.getString
