@@ -39,13 +39,14 @@ private unsafe def rustLitHList : {l : List Ty} → HList Ty.denote l → List S
 private unsafe def rustLit : {t : Ty} → t.denote → String
   | .int, n => toString n
   | .bool, b => if b then "true" else "false"
+  | .real, n => toString n
   | .string, s => s!"String::from(\"{s}\")"
   | .record l, r =>
       let parts := rustLitHList r
       "(" ++ String.intercalate ", " parts ++ ")"
-  | .dict dom range, d =>
+  | .dict kTy vTy, d =>
       let start := "std::collections::BTreeMap::new()"
-      d.map.foldl (fun acc k v => s!"map_insert({acc}, {rustLit (t := dom) k}, {rustLit (t := range) v})") start
+      d.map.foldl (fun acc k v => s!"map_insert({acc}, {rustLit (t := kTy) k}, {rustLit (t := vTy) v})") start
 end
 
 unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
