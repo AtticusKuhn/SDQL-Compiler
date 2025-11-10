@@ -21,11 +21,11 @@ Dev environment:
 Key modules:
 
 - `PartIiProject/Term.lean`: core types, semimodule evidence, tensor, PHOAS terms, interpreter, printers, examples.
-- `PartIiProject/SyntaxSDQL.lean`: Lean macros providing an SDQL mini‑DSL via `[SDQL| ... ]` elaborating to surface `STerm'` (from `SurfaceCore`). Includes surface wrapper typeclasses `HasSAdd`/`HasSScale` and helper combinators to infer addition/scaling evidence. Supports named record literals in addition to positional records.
+- `PartIiProject/SyntaxSDQL.lean`: Lean macros providing an SDQL mini‑DSL via `[SDQL| ... ]` elaborating to surface `STerm'` (from `SurfaceCore`). Includes surface wrapper typeclasses `HasSAdd`/`HasSScale` and helper combinators to infer addition/scaling evidence. Supports named record literals in addition to positional records, boolean ops `&&`/`||`/`==`, and builtins `dom`, `range`, `endsWith`.
 - `PartIiProject/Dict.lean`: purely functional dictionary wrapper on `Std.TreeMap` with an embedded comparator.
 - `PartIiProject/HList.lean`: minimal heterogeneous list utilities.
 - `PartIiProject/Rust.lean`: simplified Rust AST and pretty-printer.
-- `PartIiProject/CodegenRust.lean`: core→Rust AST compiler; `renderRust`/`renderRustFn` and `renderRustShown` helpers; embeds `SDQLShow` runtime for printing.
+- `PartIiProject/CodegenRust.lean`: core→Rust AST compiler; `renderRust`/`renderRustFn` and `renderRustShown` helpers; embeds `SDQLShow` runtime for printing. Supports `real` zero/addition and builtin lowering to external helpers (`ext_and`, `ext_or`, `ext_eq`, `ext_str_ends_with`, `ext_dom`, `ext_range`).
 - `PartIiProject/SurfaceCore.lean`: an explicit surface layer with named records and a surface→core translation (`ToCore.tr`) that erases names to positional records. Translation covers `constRecord`, `projByName`, `lookup`, `sum`, `add`, `mul`, and control flow. Surface scaling covers scalars, dictionaries, and records via `SScale.recordS` (typed membership `Mem`). Multiplication on the surface uses a tensor‑shape `stensor` with rewrite lemmas to align with core `tensor` during translation.
 - `PartIiProject.lean`: examples invoking `renderRust` for quick demos.
 - Tests:
@@ -49,7 +49,7 @@ Notes/constraints:
 - Boolean addition is currently XOR by design; aligning with SDQL would switch to OR. Boolean scaling remains AND.
 - Codegen uses placeholder helpers (`sdql_mul`, `dict_add`, `tuple_add`). Execution path for tests relies on embedded runtime shims (`map_insert`, `lookup_or_default`, `SDQLShow`) in the generated program.
 - Rust iteration uses `.into_iter()` in the printed `for` loops to match ownership in helpers.
-- Kinds and scalar promotion are not modeled yet; only `bool` and `int` scalars are implemented.
+- Kinds and scalar promotion are not modeled yet; scalars implemented include `bool`, `int`, and now `real` in the core.
 - The surface layer now emits multiplication and record scaling. It relies on an unsafe `stensor` (termination not proven) and rewrite lemmas (`ty_stensor_eq`, `tyFields_map_stensor`) to align shapes during translation; consider replacing unsafe definitions once proofs are available.
 - Nix caveat: adding new modules (like `PartIiProject/SyntaxSDQL.lean`) can require the flake’s lean4‑nix manifest mapping to include them. Lake builds work; if `nix build` reports a missing module attribute, update manifests/lock or bump to the matching lean manifest (v4.24).
 CI:

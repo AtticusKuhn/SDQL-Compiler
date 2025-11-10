@@ -2,13 +2,13 @@
 
 What works:
 
-- Typed core with interpreter: `bool`, `int`, `string`, `record`, `dict`.
-- Semimodule structure: `AddM` (with zeros) and `ScaleM`; tensor-shaped multiply via `ScaleM.mulDenote`.
-- Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`.
+- Typed core with interpreter: `bool`, `int`, `real`, `string`, `record`, `dict`.
+- Semimodule structure: `AddM` (with zeros) and `ScaleM`; includes `AddM.realA` and `ScaleM.realS`; tensor-shaped multiply via `ScaleM.mulDenote`.
+- Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`, and builtins (`And`, `Or`, `Eq`, `StrEndsWith`, `Dom`, `Range`).
 - Pretty-printing for records/dicts; numerous `#eval` demos.
-- SDQL DSL macros: `[SDQL| ... ]` elaborating to surface `STerm'` with support for literals, records (positional and named literals), dict singleton/lookup, typed empty dicts, `sum`, `let`, `if`, `not`, `+`, and `*{int|bool}`; examples are evaluated via `#eval` after `SurfaceCore.ToCore.tr`.
-- Program EDSL: `[SDQLProg { T }| ... ]` produces an `SProg` by scanning `load[U]("file")` occurrences, mapping each distinct path to a free variable, and elaborating the body to `STerm'` with those free variables. Examples added at the bottom of `PartIiProject/SyntaxSDQLProg.lean`; use `SurfaceCore.ToCore.trProg` and `Term.show` to inspect the lowered core term.
-- Rust codegen: renders expressions, let-blocks, conditionals, dict ops, lookup-with-default, and `sum` as a loop with an accumulator; open-term functions with typed parameters.
+- SDQL DSL macros: `[SDQL| ... ]` elaborating to surface `STerm'` with support for literals, records (positional and named), dict singleton/lookup, `sum`, `let`, `if`, `not`, `+`, `*{int|bool}`, boolean ops `&&`/`||`/`==`, and builtins `dom`, `range`, `endsWith`. Typed empty dict has moved to the program DSL.
+- Program EDSL: `[SDQLProg { T }| ... ]` produces an `SProg` by scanning `load[U]("file")` occurrences, mapping each distinct path to a free variable, and elaborating the body to `STerm'` with those free variables. Adds type sugar `real`, `varchar(n)` (as `string`), `@vec {K->V}` (alias of `{K->V}`) and forms `sum(<k,v> <- d) …`, `e.field`, and typed empty dicts `{}_{ Tdom, Trange }`. See examples in `PartIiProject/SyntaxSDQLProg.lean`. Use `SurfaceCore.ToCore.trProg` and `Term.show` to inspect the lowered core term.
+- Rust codegen: renders expressions, let-blocks, conditionals, dict ops, lookup-with-default, and `sum` as a loop with an accumulator; open-term functions with typed parameters. Supports `real` zeros/addition and maps builtins to external helpers (`ext_and`, `ext_or`, `ext_eq`, `ext_str_ends_with`, `ext_dom`, `ext_range`).
 - Program-level Rust codegen: `renderRustProgShown` compiles a core `Prog` to a standalone Rust program. It embeds a tiny `sdql_runtime` module with helpers (`map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`), a stub `load<T: Default>` for inputs, and `SDQLShow` printing for scalars, maps, and tuples.
 - Testing: Lean test executable `sdql-tests` compiles SDQL→Rust, builds with `rustc`, runs programs, and compares printed strings against Lean’s interpreter (`showValue`).
 - Tests: updated to consume `SProg` programs built via `[SDQLProg { T }| ... ]` and to generate Rust via `renderRustProgShown`. `.sdql-test-out/*.rs` and binaries are regenerated through this path.

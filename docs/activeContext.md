@@ -2,10 +2,18 @@
 
 Current focus:
 
-- Maintain an accurate Memory Bank reflecting the Lean core, Rust codegen, the new Rust-backed test harness with CI, and the new surface→core translator.
+- Maintain an accurate Memory Bank reflecting the Lean core, Rust codegen, the new Rust-backed test harness with CI, and the surface→core translator.
 - Keep guidance aligned with the actual codebase (lookup and sum exist; a surface/named-records layer now exists in `PartIiProject/SurfaceCore.lean`).
-- Introduce a Lean macro-based SDQL mini‑DSL for ergonomic authoring of terms that elaborates to surface `STerm'` (then translated to core).
-- New: Program EDSL `[SDQLProg { T }| … ]` in `PartIiProject/SyntaxSDQLProg.lean` that scans for `load[U]("path.tbl")`, assigns each distinct path to a free-variable index, replaces loads in the term with free variables, and returns an `SProg` with `fvar`/`loadPaths` populated. Deterministic ordering is alphabetical by path.
+- Lean macro-based SDQL mini‑DSL for ergonomic authoring of terms that elaborates to surface `STerm'` (then translated to core).
+- Program EDSL `[SDQLProg { T }| … ]` in `PartIiProject/SyntaxSDQLProg.lean` scans for `load[U]("path.tbl")`, assigns each distinct path to a free-variable index, replaces loads in the term with free variables, and returns an `SProg` with `fvar`/`loadPaths` populated (deterministic ordering is alphabetical by path).
+
+Latest changes:
+
+- Core type system now includes `real` with `AddM.realA` (zero 0.0, +) and `ScaleM.realS` (scalar multiply).
+- New builtin functions available through the surface and core: logical `And`/`Or`, equality `Eq` (for int/real/string), string `StrEndsWith`, dictionary `Dom` (key set), and integer `Range` (0..n-1 as `{ int -> bool }`). Implemented as `Term'.builtin` in core and `SBuiltin`/`STerm'.builtin` in the surface, with interpreter support.
+- Term DSL `[SDQL| … ]` gains: `&&`, `||`, `==`, `dom(e)`, `range(e)`, `endsWith(x,y)`, and a placeholder `unique(e)` that currently elaborates to `e`. Typed empty dictionaries are no longer supported in the term DSL (kept in the program DSL).
+- Program DSL `[SDQLProg { … }| … ]` adds type sugar and forms: `real`, `varchar(n)` (aliased to `string`), `@vec { K -> V }` (alias for `{ K -> V }`), projection `e.field`, `sum(<k,v> <- d) body` sugar, and typed empty dicts `{}_{ Tdom, Trange }`.
+- Rust codegen extended to handle `real` zeros/addition and to map builtins to external helpers (`ext_and`, `ext_or`, `ext_eq`, `ext_str_ends_with`, `ext_dom`, `ext_range`).
 
 Recent changes (captured here):
 
@@ -15,7 +23,7 @@ Recent changes (captured here):
 - Adjusted Rust AST printer to use `map_insert(...)` and `.into_iter()` to match runtime helper semantics; dictionary `show` uses `.iter()` for stable order.
 - Added GitHub Actions workflow to build and run tests on pushes/PRs.
 - Memory Bank correction: removed `Mathlib` as a stated dependency in tech docs; the active core only imports `Std` and local modules.
-- New: `PartIiProject/SyntaxSDQL.lean` implements `[SDQL| ... ]` macros that elaborate to the surface layer (`STerm'`). They cover literals, records (positional and named literals), dict singleton/lookup, typed empty dicts `{}_{T1,T2}`, `sum(<k,v> in d)`, `let`, `if`, `not`, addition, and multiply with scalar tags (`*{int}`, `*{bool}`). Added examples with `#eval` to verify via surface→core translation.
+- Updated: `PartIiProject/SyntaxSDQL.lean` implements `[SDQL| ... ]` macros that elaborate to the surface layer (`STerm'`). It now covers literals, records (positional and named), dict singleton/lookup, `sum(<k,v> in d)`, `let`, `if`, `not`, addition, multiply with scalar tags (`*{int}`, `*{bool}`), boolean ops `&&`/`||`/`==`, and builtins `dom`, `range`, `endsWith`. Typed empty dict has moved to the program DSL.
 
 - New: Program-level Rust codegen from core `Prog` via `renderRustProgShown`. Generated sources embed a small `sdql_runtime` module containing helpers (`map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`), a stub `load<T: Default>` loader, and `SDQLShow` impls for pretty-printing. This shifts codegen from term-level to program-level (inputs are loaded by filename).
 - Tests updated to construct programs using `[SDQLProg { T }| ... ]` and to call `renderRustProgShown` on `ToCore.trProg` results. The test runner now regenerates `.sdql-test-out/*.rs` and `.bin` files using the program pipeline.
@@ -31,7 +39,7 @@ Next steps (proposed):
 - Implement typed file loaders for common inputs (CSVs for dicts with scalar values), driven by surface types inferred from `SProg.fvar`.
 - Extend `SDQLShow` tuple implementations beyond arity 5 as needed for larger records.
 - Scalar promotion: add explicit scalar universes and a `promote` term; extend `ScaleM` to additional semirings.
-- Surface sugar: sets/arrays/range and `dom` via elaboration to the core.
+- Surface sugar: sets/arrays elaboration layered on top of new `dom`/`range` builtins.
 - Grow the test suite: add dict addition, nested records/dicts, `ite`, `letin`, more `sum` patterns, and negative cases.
  - DSL: support multi-entry dictionary literals `{ k1 -> v1, k2 -> v2, ... }`, n-ary records, and named field syntax (later) or use the new surface translator. Align boolean semiring with the paper (OR/AND) when ready.
 - Surface translator: replace `unsafe` pieces (the `stensor` definition and associated lemmas) with total definitions and proven termination; generalize proofs and tidy the translation. Consider integrating named-records at the DSL level or keep the surface→core pass as the front end.
