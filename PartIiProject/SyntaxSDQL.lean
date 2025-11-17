@@ -166,6 +166,8 @@ syntax "{" sepBy(sdql "->" sdql, ",")  "}"        : sdql
 
 -- lookup (postfix-ish)
 syntax:70 sdql:70 "(" sdql ")" : sdql
+-- positional record projection via `e . n`
+syntax:70 sdql:70 "." num : sdql
 
 -- unary
 syntax "not" sdql                     : sdql
@@ -196,16 +198,58 @@ syntax (name := sdqltyInt) "int" : sdqlty
 syntax (name := sdqltyBool) "bool" : sdqlty
 syntax (name := sdqltyString) "string" : sdqlty
 syntax (name := sdqltyReal) "real" : sdqlty
+syntax (name := sdqltyDict) "{" sdqlty "->" sdqlty "}" : sdqlty
+syntax (name := sdqltyVec) "@vec" "{" sdqlty "->" sdqlty "}" : sdqlty
+syntax (name := sdqltyVarchar) "varchar" "(" num ")" : sdqlty
+syntax (name := sdqltyRecord) "<" sepBy(ident ":" sdqlty, ",") ">" : sdqlty
 
-private def elabTy : TSyntax `sdqlty → MacroM (TSyntax `term)
+partial def elabTy : TSyntax `sdqlty → MacroM (TSyntax `term)
   | `(sdqlty| int) => `(SurfaceTy.int)
   | `(sdqlty| bool) => `(SurfaceTy.bool)
   | `(sdqlty| string) => `(SurfaceTy.string)
   | `(sdqlty| real) => `(SurfaceTy.real)
+  | `(sdqlty| varchar($n:num)) => `(SurfaceTy.string)
+  | `(sdqlty| @vec { $k:sdqlty -> $v:sdqlty }) => do
+      let kk ← elabTy k
+      let vv ← elabTy v
+      `(SurfaceTy.dict $kk $vv)
+  | `(sdqlty| { $k:sdqlty -> $v:sdqlty }) => do
+      let kk ← elabTy k
+      let vv ← elabTy v
+      `(SurfaceTy.dict $kk $vv)
+  | `(sdqlty| < $[ $n:ident : $t:sdqlty ],* >) => do
+      -- Build a list of (String × SurfaceTy) from the annotated fields,
+      -- sorting by field name for a canonical schema.
+      let ns : Array (TSyntax `ident) := n
+      let ts : Array (TSyntax `sdqlty) := t
+      if ns.size != ts.size then
+        Macro.throwError "mismatched fields in record type"
+      -- Pair names with original indices and sort names for determinism
+      let mut pairs : Array (String × Nat) := #[]
+      for i in [:ns.size] do
+        pairs := pairs.push ((ns[i]!).getId.toString, i)
+      let sorted := pairs.qsort (fun a b => a.fst < b.fst)
+      let mut elems : Array (TSyntax `term) := #[]
+      for (nm, idx) in sorted do
+        let sNm := Syntax.mkStrLit nm
+        let tt ← elabTy (ts[idx]!)
+        elems := elems.push (← `(Prod.mk $sNm $tt))
+      -- assemble a Lean list literal without using `.reverse`
+      let mut ret : TSyntax `term := (← `(List.nil))
+      let mut i := elems.size
+      while i > 0 do
+        let j := i - 1
+        let e := elems[j]!
+        ret ← `(List.cons $e $ret)
+        i := j
+      `(SurfaceTy.record $ret)
   | stx => Macro.throwErrorAt stx "unsupported SDQL type in this DSL"
 
 -- typed empty dictionary: {}_{ Tdom, Trange }
 syntax "{" "}" "_" "{" sdqlty "," sdqlty "}" : sdql
+
+-- free variable placeholder, used by the program DSL
+syntax (name := sdqlFVar) "fvar" "[" num "]" : sdql
 
 /- Elaboration helpers to build HLists and sdql → term -/
 mutual
@@ -241,6 +285,12 @@ mutual
   -- atoms and parentheses
   | `(sdql| $n:num) => `(STerm'.constInt $n)
   | `(sdql| $s:str) => `(STerm'.constString $s)
+  | `(sdql| fvar[ $i:num ]) => `(STerm'.freeVariable $i)
+  -- positional record projection r.0
+  | `(sdql| $r:sdql . $i:num) => do
+      let rr ← elabSDQL r
+      `(STerm'.projIndex $rr $i)
+  -- dictionary lookup d(k)
   | `(sdql| $d:sdql ( $k:sdql )) => do
       let dd ← elabSDQL d; let kk ← elabSDQL k
       `(SDQL.lookup $dd $kk)
@@ -309,7 +359,11 @@ mutual
       else if stx.raw.getKind == `PartIiProject.sdqlFalse then
         `(STerm'.constBool Bool.false)
       else match stx with
-        -- typed empty dict not supported in this surface DSL right now (handled in program DSL)
+        -- typed empty dict
+        | `(sdql| {}_{ $domTy:sdqlty, $rngTy:sdqlty }) => do
+            let d ← elabTy domTy
+            let r ← elabTy rngTy
+            `((STerm'.emptyDict (domain := $d) (ran := $r)))
         | `(sdql| $x:ident) => `(STerm'.var $x)
         | `(sdql| ( $e:sdql )) => elabSDQL e
         | `(sdql| < $a:sdql, $b:sdql >) => do

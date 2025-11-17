@@ -88,7 +88,7 @@ unsafe def q01_l_h : STerm fvQ01 (SurfaceTy.dict
     STerm'.letin (STerm'.freeVariable (⟨7, by decide⟩)) (fun l_shipdate =>
       -- Body in the SDQL DSL. Guard and FP ops are TODO; we drop the guard for now.
       [SDQL|
-        sum( <i, _> in range_over_size )
+        sum( <i, _v> in range_over_size )
           { < returnflag = l_returnflag(i), linestatus = l_linestatus(i) > ->
              <
                l_quantity_sum = l_quantity(i),
