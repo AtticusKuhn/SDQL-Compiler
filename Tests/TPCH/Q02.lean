@@ -2,6 +2,7 @@ import PartIiProject.SyntaxSDQLProg
 import PartIiProject.SurfaceCore
 
 namespace Tests.TPCH
+open PartIiProject.SurfaceTy
 
 open PartIiProject
 
@@ -79,9 +80,12 @@ unsafe def Q02_stub : SProg := [SDQLProg { int }| 0 ]
 /-
   Simplified Q02: demonstrate loads, range, dom, &&, ==, and endsWith.
   This is not semantically faithful; it exists to exercise the syntax and typing.
+  The attempt below is kept for reference but is no longer elaborated directly; see
+  `Tests/TPCH/Q02RecordNameMismatch.lean` for a minimized reproducer of the record-label issue.
 -/
-unsafe def Q02 : SProg :=
-  [SDQLProg { { < _r : real, _s : string, _s : string, _i : int, _s : string, _s : string, _s : string, _s : string > -> bool } }|
+
+unsafe def Q02_wip : SProg :=
+  [SDQLProg { { < _i : int, _r : real, _s1 : string, _s2 : string, _s3 : string, _s4 : string, _s5 : string, _s6 : string > -> bool } }|
     let part = load[<p_partkey: @vec {int -> int}, p_name: @vec {int -> varchar(55)}, p_mfgr: @vec {int -> varchar(25)}, p_brand: @vec {int -> varchar(10)}, p_type: @vec {int -> varchar(25)}, p_size: @vec {int -> int}, p_container: @vec {int -> varchar(10)}, p_retailprice: @vec {int -> real}, p_comment: @vec {int -> varchar(23)}, size: int>]("datasets/tpch/part.tbl") in
     let supplier = load[<s_suppkey: @vec {int -> int}, s_name: @vec {int -> varchar(25)}, s_address: @vec {int -> varchar(40)}, s_nationkey: @vec {int -> int}, s_phone: @vec {int -> varchar(15)}, s_acctbal: @vec {int -> real}, s_comment: @vec {int -> varchar(101)}, size: int>]("datasets/tpch/supplier.tbl") in
     let partsupp = load[<ps_partkey: @vec {int -> int}, ps_suppkey: @vec {int -> int}, ps_availqty: @vec {int -> real}, ps_supplycost: @vec {int -> real}, ps_comment: @vec {int -> varchar(199)}, size: int>]("datasets/tpch/partsupp.tbl") in
@@ -106,15 +110,15 @@ unsafe def Q02 : SProg :=
           {
             unique(supplier.s_suppkey(i)) ->
             <
-              _v = supplier.s_acctbal(i),
-              _v = supplier.s_name(i),
-              _v = n_h(supplier.s_nationkey(i)),
-              _v = supplier.s_address(i),
-              _v = supplier.s_phone(i),
-              _v = supplier.s_comment(i)
+              _1 = supplier.s_acctbal(i),
+              _2 = supplier.s_name(i),
+              _3 = n_h(supplier.s_nationkey(i)),
+              _4 = supplier.s_address(i),
+              _5 = supplier.s_phone(i),
+              _6 = supplier.s_comment(i)
             >
           }
-        else {}_{ int, < _v : real, _v : string, _v : string, _v : string, _v : string, _v : string > } in
+        else {}_{ int, < _1 : real, _2 : string, _3 : string, _4 : string, _5 : string, _6 : string > } in
 
     let p_h =
       sum(<i,_v> <- range(part.size))
@@ -136,18 +140,20 @@ unsafe def Q02 : SProg :=
         ) then
         {
           unique(<
-            _v = s_h(partsupp.ps_suppkey(i)).0,
-            _v = s_h(partsupp.ps_suppkey(i)).1,
-            _v = s_h(partsupp.ps_suppkey(i)).2,
-            _v = partsupp.ps_partkey(i),
-            _v = p_h(partsupp.ps_partkey(i)).0,
-            _v = s_h(partsupp.ps_suppkey(i)).4,
-            _v = s_h(partsupp.ps_suppkey(i)).3,
-            _v = s_h(partsupp.ps_suppkey(i)).5
+            _r = s_h(partsupp.ps_suppkey(i))._1,
+            _s1 = s_h(partsupp.ps_suppkey(i))._2,
+            _s2 = s_h(partsupp.ps_suppkey(i))._3,
+            _i = partsupp.ps_partkey(i),
+            _s3 = p_h(partsupp.ps_partkey(i))._v,
+            _s4 = s_h(partsupp.ps_suppkey(i))._5,
+            _s5 = s_h(partsupp.ps_suppkey(i))._4,
+            _s6 = s_h(partsupp.ps_suppkey(i))._6
           >) -> true
         }
-      else {}_{ < _v : real, _v : string, _v : string, _v : int, _v : string, _v : string, _v : string, _v : string >, bool }
+      else {}_{ < _i : int, _r : real, _s1 : string, _s2 : string, _s3 : string, _s4 : string, _s5 : string, _s6 : string >, bool }
   ]
+
+unsafe def Q02 : SProg := Q02_wip
 
 #print Q02
 
