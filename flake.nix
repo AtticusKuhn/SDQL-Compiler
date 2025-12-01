@@ -32,6 +32,7 @@
         let
           pkgs = import nixpkgs {
             inherit system;
+            config.allowUnfree = true;
             overlays = [
               (lean4-nix.readToolchainFile ./lean-toolchain)
               (import rust-overlay)
@@ -185,6 +186,8 @@
               ]
               ++ (with pkgs; [
                 git unzip codex uv
+                gemini-cli
+                claude-code
                 # sdql reference prerequisites
                 jdk17 sbt scala_2_13
                 clang clang-tools gcc gnumake gnused
