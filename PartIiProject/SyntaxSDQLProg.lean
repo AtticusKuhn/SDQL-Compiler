@@ -27,8 +27,6 @@ namespace PartIiProject
 /- Extend term grammar with loads and a few extra forms -/
 syntax (name := sdqlLoad) "load" "[" sdqlty "]" "(" str ")" : sdql
 syntax (name := sdqlSumBind) "sum" "(" "<" ident "," ident ">" "<-" sdql ")" sdql : sdql
-syntax:70 sdql:70 "." ident : sdql
-syntax (name := sdqlEmptyDict) "{" "}" "_" "{" sdqlty "," sdqlty "}"  : sdql
 -- External builtin calls as seen in some SDQL samples, e.g.,
 -- ext(`StrEndsWith`, x, y)
 -- syntax (name := sdql) "StrEndsWith("  sdql "," sdql ")" : sdql
@@ -65,8 +63,6 @@ private partial def collectLoads (stx : TSyntax `sdql) : MacroM (Array (LoadKey 
         let acc ← go c acc; let acc ← go t acc; go f acc
     | `(sdql| let $x:ident = $e:sdql in $b:sdql) => do
         let acc ← go e acc; go b acc
-    -- record positional projection r(0): just recurse into receiver
-    | `(sdql| $r:sdql ( $i:num )) => go r acc
     | `(sdql| $d:sdql ( $k:sdql )) => do let acc ← go d acc; go k acc
     | `(sdql| dom ( $e:sdql )) => go e acc
     | `(sdql| range ( $e:sdql )) => go e acc
@@ -122,21 +118,6 @@ private partial def elabSDQLProg
     let lit := Syntax.mkNumLit (toString i)
     `(sdql| fvar[ $lit ])
 
-  -- helper: build nested let-bindings for each field in a loaded record.
-  -- Given a receiver variable `x` and a list of sorted (identifier, index) pairs,
-  -- produce `let name_i = x(i) in ...` nesting at the SDQL level.
-  let rec mkFieldLets (x : TSyntax `ident)
-      (pairs : Array (TSyntax `ident × Nat)) (body : TSyntax `sdql) : MacroM (TSyntax `sdql) := do
-    if pairs.isEmpty then
-      return body
-    else
-      let (sNm, idx) := pairs[0]!
-      let rest := pairs.extract 1 pairs.size
-      let idxLit : TSyntax `num := ⟨Syntax.mkNumLit (toString idx)⟩
-      let proj ← `(sdql| $x:ident . $idxLit:num)
-      let nextBody ← mkFieldLets x rest body
-      `(sdql| let $sNm:ident = $proj in $nextBody)
-
   -- Rewrite SDQL, replacing loads and program-only sugar.
   let rec go : TSyntax `sdql → MacroM (TSyntax `sdql)
     -- literals
@@ -144,31 +125,14 @@ private partial def elabSDQLProg
     | stx@`(sdql| $s:str) => pure stx
     | stx@`(sdql| true)   => pure stx
     | stx@`(sdql| false)  => pure stx
-    -- let with record-typed load: expand into a load of a free variable plus
-    -- projections binding each field name.
+    -- let with record-typed load: just bind the free variable to the record name.
+    -- Field projections like `x.fieldname` will work via hierarchical identifier splitting
+    -- and the SDQL.proj function.
     | `(sdql| let $x:ident = load[ < $[ $n:ident : $t:sdqlty ],* > ] ( $p:str ) in $b:sdql) => do
-        let names : Array (TSyntax `ident) := n
-        let tys   : Array (TSyntax `sdqlty) := t
-        if names.size != tys.size then
-          Macro.throwError "mismatched fields in record type"
-        -- sort names
-        let mut pairs : Array (String × Nat) := #[]
-        for i in [:names.size] do
-          pairs := pairs.push ((names[i]!).getId.toString, i)
-        let sorted := pairs.qsort (fun a b => a.fst < b.fst)
-        -- Compute sorted (identifier, position) where position is index in sorted list
-        let sortedWithIdx : Array (TSyntax `ident × Nat) := Id.run do
-          let mut acc : Array (TSyntax `ident × Nat) := #[]
-          let mut j : Nat := 0
-          for (_, orig) in sorted do
-            acc := acc.push (names[orig]!, j)
-            j := j + 1
-          acc
         let idx ← findIdx p.getString
         let fv  ← mkFVar idx
         let b'  ← go b
-        let withFields ← mkFieldLets x sortedWithIdx b'
-        `(sdql| let $x = $fv in $withFields)
+        `(sdql| let $x = $fv in $b')
     -- generic let
     | `(sdql| let $x:ident = $e:sdql in $b:sdql) => do
         let e' ← go e; let b' ← go b
@@ -255,11 +219,11 @@ private partial def elabSDQLProg
     | `(sdql| load[ $ty:sdqlty ] ( $p:str )) => do
         let idx ← findIdx p.getString
         mkFVar idx
-    -- dot access becomes simple variable access due to earlier let-expansion
-    | `(sdql| $recv:ident . $fname:ident) => do
-        -- dot access desugars to the field variable; load-expansion has
-        -- already introduced lets binding these field names.
-        `(sdql| $fname:ident)
+    -- dot access with explicit dot token
+    -- We rewrite the receiver and keep the projection.
+    | `(sdql| $recv:sdql . $fname:ident) => do
+        let recv' ← go recv
+        `(sdql| $recv' . $fname:ident)
     -- parentheses
     | `(sdql| ( $e:sdql )) => do
         let e' ← go e
