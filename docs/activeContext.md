@@ -9,6 +9,18 @@ Current focus:
 
 Latest changes:
 
+- **Dynamic reference testing for TPCH Q02**: Added a new `TestCase.programRef` variant that compares Lean-generated Rust code output against a reference Rust implementation (sdql-rs). The test runner now:
+  1. Runs the sdql-rs reference binary (`sdql-rs/target/release/tpch_q02_tiny`)
+  2. Compiles and runs the Lean-generated Rust code
+  3. Compares outputs for equality
+  This replaces hardcoded expected strings with dynamic comparison against the reference implementation.
+
+- **Fixed string output formatting**: Updated `SDQLShow` for `String` in `CodegenRust.lean` to wrap strings in quotes (`format!("\"{}\"", self)`) to match the reference implementation's output format.
+
+- **Reordered Q02 record fields**: Adjusted field names in `Tests/TPCH/Q02.lean` to use numeric names (`_1`, `_2`, etc.) ensuring proper alphabetical sorting that matches the reference implementation's field order: `(acctbal, name, nation_name, partkey, mfgr, phone, address, comment)`.
+
+- **Updated flake.nix for nix run**: Added `sdqlTestsWithRef` wrapper that builds the sdql-rs reference binary if needed and runs the tests. Both `lake exe sdql-tests` and `nix run` now work with dynamic reference comparison.
+
 - **Fixed `record.field` parsing in SDQL DSLs**: Resolved parser ambiguity where Lean interpreted `record.field` either as a hierarchical identifier or as dot projection syntax. Added handling for `Lean.choiceKind` in `elabSDQL` to prefer the simpler identifier interpretation when ambiguous. Simplified `SDQLProg` load handling to bind records directly without intermediate field let-bindings. Field projections now work correctly both as hierarchical identifiers (`r.fieldname`) and after expressions (`lookup(d)._1`). This fix enables `Tests/TPCH/Q02.lean` to typecheck successfully.
 
 - Core type system now includes `real` with `AddM.realA` (zero 0.0, +) and `ScaleM.realS` (scalar multiply).
