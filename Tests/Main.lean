@@ -6,11 +6,19 @@ import Lean
 open PartIiProject
 open System
 
+inductive TestKind where
+  | compileOnly
+  | expectOutput
+  | expectRefMatch
+  deriving Inhabited
+
 structure TestResult where
   name : String
-  expected : String
-  got : Option String
-  stderr : Option String := none
+  kind : TestKind
+  expected? : Option String := none
+  got? : Option String := none
+  stderr? : Option String := none
+  refBin? : Option String := none  -- Path to reference binary (for expectRefMatch)
   deriving Inhabited
 
 def outDir : FilePath := FilePath.mk ".sdql-test-out"
@@ -29,6 +37,16 @@ def compileRust (rsPath binPath : FilePath) : IO (Nat × String) := do
 
 def runBinary (binPath : FilePath) : IO (Nat × String × String) := do
   runProc binPath.toString #[]
+
+def runBinaryWithEnv (binPath : FilePath) (envVars : List (String × String)) : IO (Nat × String × String) := do
+  -- Build environment array from envVars list
+  let envArray := envVars.map (fun (k, v) => s!"{k}={v}")
+  -- Use sh -c to set environment variables and run the binary
+  let envPrefix := String.intercalate " " envArray
+  let cmd := if envVars.isEmpty then binPath.toString else s!"{envPrefix} {binPath.toString}"
+  let out ← IO.Process.output { cmd := "sh", args := #["-c", cmd] }
+  let code := out.exitCode.toNat
+  return (code, out.stdout, out.stderr)
 
 /- Render Rust literals for runtime arguments -/
 mutual
@@ -51,32 +69,97 @@ end
 
 unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
   IO.FS.createDirAll outDir
+  let compileProgram (name : String) (sp : PartIiProject.SProg) :
+      IO (Except String FilePath) := do
+        let cp := PartIiProject.ToCore.trProg sp
+        let rs := PartIiProject.renderRustProgShown cp
+        let rsPath := outDir / s!"{name}.rs"
+        let binPath := outDir / s!"{name}.bin"
+        writeFile rsPath rs
+        let (ccode, cerr) ← compileRust rsPath binPath
+        if ccode != 0 then
+          return .error cerr
+        return .ok binPath
   match c with
-  | .program name sp expected =>
-      -- Lower to core program and render via program-level codegen
-      let cp := PartIiProject.ToCore.trProg sp
-      let rs := PartIiProject.renderRustProgShown cp
-      let rsPath := outDir / s!"{name}.rs"
-      let binPath := outDir / s!"{name}.bin"
-      writeFile rsPath rs
-      let (ccode, cerr) ← compileRust rsPath binPath
-      if ccode != 0 then
-        return { name, expected, got := none, stderr := some cerr }
-      let (rcode, rout, rerr) ← runBinary binPath
-      if rcode != 0 then
-        return { name, expected, got := none, stderr := some rerr }
-      let outStr := rout.trim
-      return { name, expected, got := some outStr }
+  | .program name sp expected => do
+      match ← compileProgram name sp with
+      | .error err =>
+          return { name, kind := .expectOutput, expected? := some expected, stderr? := some err }
+      | .ok binPath =>
+          let (rcode, rout, rerr) ← runBinary binPath
+          if rcode != 0 then
+            return { name, kind := .expectOutput, expected? := some expected, stderr? := some rerr }
+          let outStr := rout.trim
+          return { name, kind := .expectOutput, expected? := some expected, got? := some outStr }
+  | .compileOnly name sp => do
+      match ← compileProgram name sp with
+      | .error err =>
+          return { name, kind := .compileOnly, stderr? := some err }
+      | .ok _ =>
+          return { name, kind := .compileOnly }
+  | .programRef name sp refBinPath envVars => do
+      -- First, run the reference binary to get expected output
+      let (refCode, refOut, refErr) ← runBinaryWithEnv (FilePath.mk refBinPath) envVars
+      if refCode != 0 then
+        return { name, kind := .expectRefMatch, refBin? := some refBinPath,
+                 stderr? := some s!"Reference binary failed: {refErr}" }
+      let expected := refOut.trim
+      -- Then compile and run our generated code
+      match ← compileProgram name sp with
+      | .error err =>
+          return { name, kind := .expectRefMatch, expected? := some expected,
+                   refBin? := some refBinPath, stderr? := some err }
+      | .ok binPath =>
+          let (rcode, rout, rerr) ← runBinary binPath
+          if rcode != 0 then
+            return { name, kind := .expectRefMatch, expected? := some expected,
+                     refBin? := some refBinPath, stderr? := some rerr }
+          let outStr := rout.trim
+          return { name, kind := .expectRefMatch, expected? := some expected,
+                   got? := some outStr, refBin? := some refBinPath }
 
 def formatResult (r : TestResult) : String :=
-  match r.got with
-  | some s => if s == r.expected then s!"[PASS] {r.name}" else s!"[FAIL] {r.name}: expected {r.expected}, got {s}"
-  | none => s!"[ERROR] {r.name}: {r.stderr.getD "unknown error"}"
+  match r.stderr? with
+  | some err => s!"[ERROR] {r.name}: {err}"
+  | none =>
+      match r.kind with
+      | .compileOnly => s!"[PASS] {r.name} (compiled)"
+      | .expectOutput =>
+          match r.expected?, r.got? with
+          | some expected, some got =>
+              if got == expected then
+                s!"[PASS] {r.name}"
+              else
+                s!"[FAIL] {r.name}: expected {expected}, got {got}"
+          | _, _ => s!"[ERROR] {r.name}: missing output"
+      | .expectRefMatch =>
+          match r.expected?, r.got?, r.refBin? with
+          | some expected, some got, some refBin =>
+              if got == expected then
+                s!"[PASS] {r.name} (matches {refBin})"
+              else
+                s!"[FAIL] {r.name}: expected (from {refBin}):\n  {expected}\ngot:\n  {got}"
+          | _, _, _ => s!"[ERROR] {r.name}: missing output"
 
 def anyFailures (rs : List TestResult) : Bool :=
-  rs.any (fun r => match r.got with
-                   | some s => s != r.expected
-                   | none => Bool.true)
+  rs.any (fun r =>
+    match r.kind with
+    | .compileOnly =>
+        r.stderr?.isSome
+    | .expectOutput =>
+        match r.stderr? with
+        | some _ => Bool.true
+        | none =>
+            match r.expected?, r.got? with
+            | some expected, some got => got != expected
+            | _, _ => Bool.true
+    | .expectRefMatch =>
+        match r.stderr? with
+        | some _ => Bool.true
+        | none =>
+            match r.expected?, r.got? with
+            | some expected, some got => got != expected
+            | _, _ => Bool.true)
 
 unsafe def main (_args : List String) : IO UInt32 := do
   let mut results : List TestResult := []

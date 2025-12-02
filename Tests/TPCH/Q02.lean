@@ -85,12 +85,14 @@ unsafe def Q02_stub : SProg := [SDQLProg { int }| 0 ]
 -/
 
 unsafe def Q02_wip : SProg :=
-  [SDQLProg { { < _i : int, _r : real, _s1 : string, _s2 : string, _s3 : string, _s4 : string, _s5 : string, _s6 : string > -> bool } }|
-    let part = load[<p_partkey: @vec {int -> int}, p_name: @vec {int -> varchar(55)}, p_mfgr: @vec {int -> varchar(25)}, p_brand: @vec {int -> varchar(10)}, p_type: @vec {int -> varchar(25)}, p_size: @vec {int -> int}, p_container: @vec {int -> varchar(10)}, p_retailprice: @vec {int -> real}, p_comment: @vec {int -> varchar(23)}, size: int>]("datasets/tpch/part.tbl") in
-    let supplier = load[<s_suppkey: @vec {int -> int}, s_name: @vec {int -> varchar(25)}, s_address: @vec {int -> varchar(40)}, s_nationkey: @vec {int -> int}, s_phone: @vec {int -> varchar(15)}, s_acctbal: @vec {int -> real}, s_comment: @vec {int -> varchar(101)}, size: int>]("datasets/tpch/supplier.tbl") in
-    let partsupp = load[<ps_partkey: @vec {int -> int}, ps_suppkey: @vec {int -> int}, ps_availqty: @vec {int -> real}, ps_supplycost: @vec {int -> real}, ps_comment: @vec {int -> varchar(199)}, size: int>]("datasets/tpch/partsupp.tbl") in
-    let nation = load[<n_nationkey: @vec {int -> int}, n_name: @vec {int -> varchar(25)}, n_regionkey: @vec {int -> int}, n_comment: @vec {int -> varchar(152)}, size: int>]("datasets/tpch/nation.tbl") in
-    let region = load[<r_regionkey: @vec {int -> int}, r_name: @vec {int -> varchar(25)}, r_comment: @vec {int -> varchar(152)}, size: int>]("datasets/tpch/region.tbl") in
+  -- Result type: (acctbal, name, nation_name, partkey, mfgr, phone, address, comment)
+  -- Fields sorted by name: _1 < _2 < _3 < _4 < _5 < _6 < _7 < _8
+  [SDQLProg { { < _1 : real, _2 : string, _3 : string, _4 : int, _5 : string, _6 : string, _7 : string, _8 : string > -> bool } }|
+    let part = load[<p_partkey: @vec {int -> int}, p_name: @vec {int -> varchar(55)}, p_mfgr: @vec {int -> varchar(25)}, p_brand: @vec {int -> varchar(10)}, p_type: @vec {int -> varchar(25)}, p_size: @vec {int -> int}, p_container: @vec {int -> varchar(10)}, p_retailprice: @vec {int -> real}, p_comment: @vec {int -> varchar(23)}, size: int>]("datasets/tpch-tiny/part.tbl") in
+    let supplier = load[<s_suppkey: @vec {int -> int}, s_name: @vec {int -> varchar(25)}, s_address: @vec {int -> varchar(40)}, s_nationkey: @vec {int -> int}, s_phone: @vec {int -> varchar(15)}, s_acctbal: @vec {int -> real}, s_comment: @vec {int -> varchar(101)}, size: int>]("datasets/tpch-tiny/supplier.tbl") in
+    let partsupp = load[<ps_partkey: @vec {int -> int}, ps_suppkey: @vec {int -> int}, ps_availqty: @vec {int -> real}, ps_supplycost: @vec {int -> real}, ps_comment: @vec {int -> varchar(199)}, size: int>]("datasets/tpch-tiny/partsupp.tbl") in
+    let nation = load[<n_nationkey: @vec {int -> int}, n_name: @vec {int -> varchar(25)}, n_regionkey: @vec {int -> int}, n_comment: @vec {int -> varchar(152)}, size: int>]("datasets/tpch-tiny/nation.tbl") in
+    let region = load[<r_regionkey: @vec {int -> int}, r_name: @vec {int -> varchar(25)}, r_comment: @vec {int -> varchar(152)}, size: int>]("datasets/tpch-tiny/region.tbl") in
 
     let l_h =
       sum(<i,_v> <- range(region.size))
@@ -104,6 +106,8 @@ unsafe def Q02_wip : SProg :=
           { unique(nation.n_nationkey(i)) -> nation.n_name(i) }
         else {}_{ int, string } in
 
+    -- s_h: suppkey -> (acctbal, name, nation_name, address, phone, comment)
+    -- Fields: _1=acctbal, _2=name, _3=nation_name, _4=address, _5=phone, _6=comment
     let s_h =
       sum(<i,_v> <- range(supplier.size))
         if(dom(n_h)(supplier.s_nationkey(i))) then
@@ -132,6 +136,7 @@ unsafe def Q02_wip : SProg :=
           { partsupp.ps_partkey(i) -> partsupp.ps_supplycost(i) }
         else {}_{ int, real } in
 
+    -- Final result: (acctbal, name, nation_name, partkey, mfgr, phone, address, comment)
     sum(<i,_v> <- range(partsupp.size))
       if(
           (dom(ps_h)(partsupp.ps_partkey(i)))
@@ -140,17 +145,17 @@ unsafe def Q02_wip : SProg :=
         ) then
         {
           unique(<
-            _r = s_h(partsupp.ps_suppkey(i))._1,
-            _s1 = s_h(partsupp.ps_suppkey(i))._2,
-            _s2 = s_h(partsupp.ps_suppkey(i))._3,
-            _i = partsupp.ps_partkey(i),
-            _s3 = p_h(partsupp.ps_partkey(i))._v,
-            _s4 = s_h(partsupp.ps_suppkey(i))._5,
-            _s5 = s_h(partsupp.ps_suppkey(i))._4,
-            _s6 = s_h(partsupp.ps_suppkey(i))._6
+            _1 = s_h(partsupp.ps_suppkey(i))._1,
+            _2 = s_h(partsupp.ps_suppkey(i))._2,
+            _3 = s_h(partsupp.ps_suppkey(i))._3,
+            _4 = partsupp.ps_partkey(i),
+            _5 = p_h(partsupp.ps_partkey(i))._v,
+            _6 = s_h(partsupp.ps_suppkey(i))._5,
+            _7 = s_h(partsupp.ps_suppkey(i))._4,
+            _8 = s_h(partsupp.ps_suppkey(i))._6
           >) -> true
         }
-      else {}_{ < _i : int, _r : real, _s1 : string, _s2 : string, _s3 : string, _s4 : string, _s5 : string, _s6 : string >, bool }
+      else {}_{ < _1 : real, _2 : string, _3 : string, _4 : int, _5 : string, _6 : string, _7 : string, _8 : string >, bool }
   ]
 
 unsafe def Q02 : SProg := Q02_wip

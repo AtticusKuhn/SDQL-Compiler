@@ -39,6 +39,10 @@
             ];
           };
           lake = (lean4-nix.lake { inherit pkgs; });
+
+          # Rust toolchain for sdql-rs
+          rustToolchain = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
+
           # Build the test executable via lake-manifest integration
           sdqlTests = (lake.mkPackage {
             src = ./.;
@@ -50,6 +54,37 @@
               "Tests.Main"
             ];
           }).executable;
+
+          # Wrapper script that sets up sdql-rs binaries and datasets for tests
+          # This expects to be run from the project root with sdql-rs already built
+          sdqlTestsWithRef = pkgs.writeShellApplication {
+            name = "sdql-tests-with-ref";
+            runtimeInputs = [ pkgs.rustc rustToolchain ];
+            text = ''
+              set -euo pipefail
+
+              # Ensure we're in the project root or can find sdql-rs
+              if [ ! -d "sdql-rs" ]; then
+                echo "Error: must be run from the project root directory (sdql-rs/ not found)" >&2
+                exit 1
+              fi
+
+              # Build sdql-rs reference binary if needed
+              if [ ! -f "sdql-rs/target/release/tpch_q02_tiny" ]; then
+                echo "Building sdql-rs reference binary..."
+                (cd sdql-rs && cargo build --release --bin tpch_q02_tiny)
+              fi
+
+              # Ensure datasets exist
+              if [ ! -d "datasets/tpch-tiny" ]; then
+                echo "Error: datasets/tpch-tiny not found" >&2
+                exit 1
+              fi
+
+              # Run tests from the current directory
+              exec ${sdqlTests}/bin/part_ii_project "$@"
+            '';
+          };
           # Runtime tools shared by sdql reference test runners
           sdqlRefRuntimeInputs = with pkgs; [
             # JVM + Scala toolchain
@@ -140,8 +175,9 @@
         in
         {
           packages = {
-            default = sdqlTests;
-            sdql-tests = sdqlTests;
+            default = sdqlTestsWithRef;
+            sdql-tests = sdqlTestsWithRef;
+            sdql-tests-bare = sdqlTests;
             sdql-reference-tests = sdqlRefTestRunner;
             sdql-reference-tpch-0_01 = sdqlRefTPCH001;
             sdql-reference-tpch-1 = sdqlRefTPCH1;
@@ -150,14 +186,18 @@
           # The executable name defaults to the lowercased manifest name
           # (see lean4-nix buildLeanPackage), which for this repo is
           # "part_ii_project".
-          apps = let exePath = "${sdqlTests}/bin/part_ii_project"; in {
+          apps = {
             default = {
               type = "app";
-              program = exePath;
+              program = "${sdqlTestsWithRef}/bin/sdql-tests-with-ref";
             };
             sdql-tests = {
               type = "app";
-              program = exePath;
+              program = "${sdqlTestsWithRef}/bin/sdql-tests-with-ref";
+            };
+            sdql-tests-bare = {
+              type = "app";
+              program = "${sdqlTests}/bin/part_ii_project";
             };
             sdql-ref-tests = {
               type = "app";

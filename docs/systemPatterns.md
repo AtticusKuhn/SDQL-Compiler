@@ -42,12 +42,15 @@ Surface layer with named records:
 Testing infrastructure:
 
 - Lean test runner:
-- `Tests/Cases.lean`: defines SDQL terms and computes expected results using the Lean evaluator’s pretty-printer (`showValue`).
-  - `Tests/Main.lean`: compiles each term to a standalone Rust program via `renderRustMeasured`, writes sources to `.sdql-test-out/`, builds with `rustc`, runs binaries, and compares integer outputs.
-  - Lake executable target `sdql-tests` drives execution: `lake build sdql-tests` and `lake exe sdql-tests`.
+  - `Tests/Cases.lean`: defines SDQL test cases with two variants:
+    - `TestCase.program`: compares output against a hardcoded expected string
+    - `TestCase.programRef`: dynamically compares against a reference binary (sdql-rs)
+  - `Tests/Main.lean`: compiles each term to a standalone Rust program via `renderRustProgShown`, writes sources to `.sdql-test-out/`, builds with `rustc`, runs binaries, and compares outputs. For `programRef` tests, first runs the reference binary to get expected output.
+  - Lake executable target `sdql-tests` drives execution: `lake build sdql-tests && lake exe sdql-tests`.
+  - Nix wrapper `sdql-tests-with-ref` builds sdql-rs reference binary if needed and runs tests: `nix run`.
 
 - Rust runtime shims (embedded in generated sources):
-- `map_insert`, `lookup_or_default` helpers for maps; `SDQLShow` trait for ints, bools, strings, tuples (limited arities), and `BTreeMap`.
+  - `map_insert`, `lookup_or_default` helpers for maps; `SDQLShow` trait for ints, bools, strings (quoted), tuples (limited arities), and `BTreeMap`.
   - The Rust AST printer emits `map_insert(...)` and iterates maps with `.into_iter()` to match the shim.
 
 Code generation integration:
