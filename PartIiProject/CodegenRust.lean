@@ -11,6 +11,7 @@ open Rust
 def coreTyToRustTy : _root_.Ty → Rust.Ty
   | .bool => .bool
   | .real => .real
+  | .date => .date
   | .int => .i64
   | .string => .str
   | .dict k v => .map (coreTyToRustTy k) (coreTyToRustTy v)
@@ -25,6 +26,7 @@ mutual
   def zeroOfAddM : {t : _root_.Ty} → _root_.AddM t → Rust.Expr
     | .bool, .boolA => .litBool false
     | .real, .realA => .litReal 0.0
+    | .date, .dateA => .litDate 10101  -- dummy date (0001-01-01)
     | .int, .intA => .litInt 0
     | .string, .stringA => .litString ""
     | .dict _ _, @_root_.AddM.dictA _ _ _ => .mapEmpty
@@ -44,6 +46,7 @@ mutual
   | .var v => (.var v, fresh)
   | .freeVariable i => (.var (nameEnv i), fresh)
   | .constInt n => (.litInt n, fresh)
+  | .constReal r => (.litReal r, fresh)
   | .constBool b => (.litBool b, fresh)
   | .constString s => (.litString s, fresh)
   | .constRecord fields =>
@@ -77,6 +80,7 @@ mutual
         match a with
         | .boolA => .binop .bitXor lhs rhs
         | .realA => .binop .add lhs rhs
+        | .dateA => rhs  -- date "addition" just takes rhs (overwrite)
         | .intA => .binop .add lhs rhs
         | .stringA => .binop .add lhs rhs
         | @_root_.AddM.dictA dom range aRange => .call "dict_add" [lhs, rhs]
@@ -110,6 +114,7 @@ mutual
         match a with
         | .boolA => .binop .bitXor (.var accName) bodyExpr
         | .realA => .binop .add (.var accName) bodyExpr
+        | .dateA => bodyExpr  -- date "addition" just takes rhs (overwrite)
         | .intA => .binop .add (.var accName) bodyExpr
         | .stringA => .binop .add (.var accName) bodyExpr
         | @_root_.AddM.dictA dom range aRange => .call "dict_add" [.var accName, bodyExpr]
@@ -131,9 +136,12 @@ mutual
         | .And => .call "ext_and" [argExpr]
         | .Or => .call "ext_or" [argExpr]
         | .Eq _ => .call "ext_eq" [argExpr]
+        | .Leq _ => .call "ext_leq" [argExpr]
+        | .Sub _ => .call "ext_sub" [argExpr]
         | .StrEndsWith => .call "ext_str_ends_with" [argExpr]
         | .Dom => .call "ext_dom" [Rust.Expr.borrow argExpr]
         | .Range => .call "ext_range" [argExpr]
+        | .DateLit yyyymmdd => .litDate yyyymmdd
       (expr, fresh')
 
   /- Compile a record literal represented as an HList of sub-terms. -/
@@ -198,10 +206,20 @@ def rustRuntimeHeader : String :=
   , "        }"
   , "    }"
   , "    impl Add for Real { type Output = Self; fn add(self, rhs: Self) -> Self { Real(self.0 + rhs.0) } }"
+  , "\n    // SDQL Date type: stored as YYYYMMDD integer for ordering"
+  , "    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]"
+  , "    pub struct Date(pub i64);"
+  , "    impl Date { pub fn new(yyyymmdd: i64) -> Self { Date(yyyymmdd) } }"
+  , "    impl Add for Date { type Output = Self; fn add(self, rhs: Self) -> Self { rhs } }"
+  , "    #[macro_export]"
+  , "    macro_rules! date {"
+  , "        ($yyyymmdd:literal) => {{ Date::new($yyyymmdd) }};"
+  , "    }"
   , "\n    pub trait SdqlAdd { fn sdql_add(&self, other: &Self) -> Self; }"
   , "    impl SdqlAdd for bool { fn sdql_add(&self, other: &Self) -> Self { *self ^ *other } }"
   , "    impl SdqlAdd for i64 { fn sdql_add(&self, other: &Self) -> Self { *self + *other } }"
   , "    impl SdqlAdd for Real { fn sdql_add(&self, other: &Self) -> Self { Real(self.0 + other.0) } }"
+  , "    impl SdqlAdd for Date { fn sdql_add(&self, other: &Self) -> Self { *other } }"
   , "    impl SdqlAdd for String {"
   , "        fn sdql_add(&self, other: &Self) -> Self {"
   , "            let mut s = self.clone();"
@@ -256,6 +274,8 @@ def rustRuntimeHeader : String :=
   , "\n    pub fn ext_and(args: (bool, bool)) -> bool { args.0 && args.1 }"
   , "    pub fn ext_or(args: (bool, bool)) -> bool { args.0 || args.1 }"
   , "    pub fn ext_eq<T: PartialEq>(args: (T, T)) -> bool { args.0 == args.1 }"
+  , "    pub fn ext_leq<T: PartialOrd>(args: (T, T)) -> bool { args.0 <= args.1 }"
+  , "    pub fn ext_sub<T: std::ops::Sub<Output = T>>(args: (T, T)) -> T { args.0 - args.1 }"
   , "    pub fn ext_str_ends_with(args: (String, String)) -> bool {"
   , "        let (s, suf) = args;"
   , "        s.ends_with(&suf)"
@@ -302,6 +322,22 @@ def rustRuntimeHeader : String :=
   , "        fn from_tbl_field(s: &str) -> Self { s == \"true\" || s == \"1\" }"
   , "    }"
   , ""
+  , "    impl FromTblField for Date {"
+  , "        fn from_tbl_field(s: &str) -> Self {"
+  , "            // Parse date in format YYYY-MM-DD to YYYYMMDD"
+  , "            let parts: Vec<&str> = s.split('-').collect();"
+  , "            if parts.len() == 3 {"
+  , "                let y: i64 = parts[0].parse().unwrap_or(0);"
+  , "                let m: i64 = parts[1].parse().unwrap_or(0);"
+  , "                let d: i64 = parts[2].parse().unwrap_or(0);"
+  , "                Date::new(y * 10000 + m * 100 + d)"
+  , "            } else {"
+  , "                // Try parsing as YYYYMMDD directly"
+  , "                Date::new(s.parse().unwrap_or(0))"
+  , "            }"
+  , "        }"
+  , "    }"
+  , ""
   , "    /// Parses a TBL file into rows of string fields."
   , "    fn parse_tbl_lines(path: &str) -> Vec<Vec<String>> {"
   , "        let file = File::open(path).unwrap_or_else(|_| panic!(\"Failed to open {}\", path));"
@@ -337,6 +373,7 @@ def rustRuntimeHeader : String :=
   , "    pub trait SDQLShow { fn show(&self) -> String; }"
   , "    impl SDQLShow for i64 { fn show(&self) -> String { self.to_string() } }"
   , "    impl SDQLShow for Real { fn show(&self) -> String { self.0.to_string() } }"
+  , "    impl SDQLShow for Date { fn show(&self) -> String { format!(\"date({})\", self.0) } }"
   , "    impl SDQLShow for bool { fn show(&self) -> String { self.to_string() } }"
   , "    impl SDQLShow for String { fn show(&self) -> String { format!(\"\\\"{}\\\"\", self) } }"
   , "    impl<K: Ord + SDQLShow, V: SDQLShow> SDQLShow for BTreeMap<K, V> {"

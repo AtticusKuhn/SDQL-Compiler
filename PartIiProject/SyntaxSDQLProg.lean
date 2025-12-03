@@ -56,9 +56,14 @@ private partial def collectLoads (stx : TSyntax `sdql) : MacroM (Array (LoadKey 
     | `(sdql| $x:sdql + $y:sdql) => do let acc ← go x acc; go y acc
     | `(sdql| $x:sdql * { int } $y:sdql) => do let acc ← go x acc; go y acc
     | `(sdql| $x:sdql * { bool } $y:sdql) => do let acc ← go x acc; go y acc
+    | `(sdql| $x:sdql * { real } $y:sdql) => do let acc ← go x acc; go y acc
     | `(sdql| $x:sdql && $y:sdql) => do let acc ← go x acc; go y acc
     | `(sdql| $x:sdql || $y:sdql) => do let acc ← go x acc; go y acc
     | `(sdql| $x:sdql == $y:sdql) => do let acc ← go x acc; go y acc
+    | `(sdql| $x:sdql <= $y:sdql) => do let acc ← go x acc; go y acc
+    | `(sdql| $x:sdql - $y:sdql) => do let acc ← go x acc; go y acc
+    | `(sdql| date ( $_:num )) => return acc  -- date literal has no subterms
+    | `(sdql| $_:scientific) => return acc  -- scientific (real) literal has no subterms
     | `(sdql| not $x:sdql) => go x acc
     | `(sdql| if $c:sdql then $t:sdql else $f:sdql) => do
         let acc ← go c acc; let acc ← go t acc; go f acc
@@ -157,6 +162,19 @@ private partial def elabSDQLProg
     | `(sdql| $x:sdql * { bool } $y:sdql) => do
         let x' ← go x; let y' ← go y
         `(sdql| $x' * { bool } $y')
+    | `(sdql| $x:sdql * { real } $y:sdql) => do
+        let x' ← go x; let y' ← go y
+        `(sdql| $x' * { real } $y')
+    | `(sdql| $x:sdql <= $y:sdql) => do
+        let x' ← go x; let y' ← go y
+        `(sdql| $x' <= $y')
+    | `(sdql| $x:sdql - $y:sdql) => do
+        let x' ← go x; let y' ← go y
+        `(sdql| $x' - $y')
+    -- date literal - pass through
+    | stx@`(sdql| date ( $_:num )) => pure stx
+    -- scientific (real) literals
+    | stx@`(sdql| $_:scientific) => pure stx
     -- unary
     | `(sdql| not $e:sdql) => do
         let e' ← go e

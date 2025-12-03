@@ -12,22 +12,28 @@ namespace Rust
 inductive Ty : Type where
   | bool : Ty
   | i64 : Ty
+  | real : Ty  -- SDQL real, maps to an Ord-capable f64 wrapper
+  | date : Ty  -- SDQL date, represented as YYYYMMDD integer
   | str : Ty
   | tuple : List Ty → Ty
   | map : Ty → Ty → Ty
   deriving Inhabited, BEq, Repr
 
 inductive BinOp : Type where
-  | add | sub | mul | div | bitXor | bitAnd | bitOr | eq | lt | gt
+  | add | sub | mul | div | bitXor | bitAnd | bitOr | eq | lt | gt | leq
   deriving Inhabited, BEq, Repr
 
 mutual
   inductive Expr : Type where
     | var : String → Expr
     | litInt : Int → Expr
+    | litReal : Float → Expr  -- produces Real::new(value)
+    | litDate : Int → Expr    -- produces date!(YYYYMMDD)
     | litBool : Bool → Expr
     | litString : String → Expr
     | tuple : List Expr → Expr
+    | tupleProj : Expr → Nat → Expr
+    | borrow : Expr → Expr
     | mapEmpty : Expr
     | mapInsert : Expr → Expr → Expr → Expr
     | binop : BinOp → Expr → Expr → Expr
@@ -67,14 +73,18 @@ def showBinOp : BinOp → String
   | .eq => "=="
   | .lt => "<"
   | .gt => ">"
+  | .leq => "<="
 
 partial def showTy : Ty → String
   | .bool => "bool"
   | .i64 => "i64"
+  | .real => "Real"  -- Uses our Ord-capable f64 wrapper
+  | .date => "Date"  -- SDQL Date wrapper
   | .str => "String"
   | .tuple ts =>
       match ts with
       | [] => "()"
+      | [t] => s!"({showTy t},)"
       | _  => paren <| String.intercalate ", " (ts.map showTy)
   | .map k v => s!"std::collections::BTreeMap<{showTy k}, {showTy v}>"
 
@@ -83,9 +93,17 @@ mutual
     match e with
     | .var s => s
     | .litInt n => toString n
+    | .litReal f => s!"Real::new({f})"
+    | .litDate d => s!"date!({d})"
     | .litBool b => if b then "true" else "false"
     | .litString s => s!"String::from(\"{s}\")"
-    | .tuple es => paren <| String.intercalate ", " (es.map (fun e => showExpr e indent))
+    | .tuple es =>
+        match es with
+        | [] => "()"
+        | [e] => s!"({showExpr e indent},)"
+        | _ => paren <| String.intercalate ", " (es.map (fun e => showExpr e indent))
+    | .tupleProj e idx => s!"({showExpr e indent}.clone()).{idx}"
+    | .borrow e => s!"&{paren (showExpr e indent)}"
     | .mapEmpty => "std::collections::BTreeMap::new()"
     | .mapInsert m k v => s!"map_insert({showExpr m indent}, {showExpr k indent}, {showExpr v indent})"
     | .binop op a b => s!"{showExpr a indent} {showBinOp op} {showExpr b indent}"
@@ -106,7 +124,7 @@ mutual
         let body := String.intercalate "\n" (ss.map (fun s => showStmt s (indent+1)))
         let ri := showExpr result (indent+1)
         "{" ++ "\n" ++ body ++ "\n" ++ indentStr (indent+1) ++ ri ++ "\n" ++ indentStr indent ++ "}"
-    | .lookupOrDefault m k d => s!"lookup_or_default({showExpr m indent}, {showExpr k indent}, {showExpr d indent})"
+    | .lookupOrDefault m k d => s!"lookup_or_default(&{showExpr m indent}, {showExpr k indent}, {showExpr d indent})"
 
   partial def showStmt : Stmt → Nat → String
     | .letDecl isMut n initOpt, indent =>
