@@ -2,6 +2,7 @@ import PartIiProject.Term
 import PartIiProject.CodegenRust
 import PartIiProject.SyntaxSDQLProg
 import PartIiProject.SurfaceCore
+import Tests.TPCH.Q01
 import Tests.TPCH.Q02
 
 namespace Tests
@@ -54,7 +55,8 @@ unsafe def smallCases : List TestCase :=
    compiled to Rust, executed against the tiny TPCH dataset, and their outputs
    compared against the reference implementation results. -/
 unsafe def tpchCases : List TestCase :=
-  [ TestCase.programRef "tpch_q02" TPCH.Q02 "sdql-rs/target/release/tpch_q02_tiny"
+  [ TestCase.compileOnly "tpch_q01" TPCH.Q01
+  , TestCase.programRef "tpch_q02" TPCH.Q02 "sdql-rs/target/release/tpch_q02_tiny"
       [("TPCH_DATASET_PATH", "datasets/tpch-tiny")] ]
 
 unsafe def cases : List TestCase :=
