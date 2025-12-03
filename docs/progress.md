@@ -16,12 +16,19 @@ What works:
   - `TestCase.programRef`: dynamically compares against a reference Rust binary (e.g., sdql-rs)
 - Tests: updated to consume `SProg` programs built via `[SDQLProg { T }| ... ]` and to generate Rust via `renderRustProgShown`. `.sdql-test-out/*.rs` and binaries are regenerated through this path.
 - TPCH Q02: now tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q02_tiny`) using dynamic output comparison.
+- TPCH Q01: simplified version compiles and passes (compile-only test). Full version requires `concat` builtin for string concatenation.
+- Date type: added `Ty.date` primitive with `SDQLDate` wrapper (YYYYMMDD integer), `DateLit` builtin constructor, and `Leq` comparison. Rust codegen uses a simple `Date` struct.
+- Real number literals: added `constReal` for floating-point constants in the DSL.
+- Subtraction: added `Sub` builtin for arithmetic subtraction on int/real types.
 - CI: GitHub Actions workflow builds the project and runs the test executable on pushes/PRs.
 - `nix run` support: wrapper script builds sdql-rs reference binary if needed and runs tests with proper environment setup.
 - Surface layer: `PartIiProject/SurfaceCore.lean` implements a named-record surface representation and a surface→core translation. Supports named `constRecord`, `projByName`, dictionary `lookup`, `sum`, `add`, `mul`, `let`, `if`, and `not`. Surface scaling includes scalars, dictionaries, and records (`SScale.recordS`). The translation uses membership proofs `Mem` for record scaling, `HasField.index_getD_ty` for named projection, and `stensor` shape lemmas (`ty_stensor_eq`, `tyFields_map_stensor`) to emit core `mul`.
 
-What’s left to build:
+What's left to build:
 
+- **TPCH benchmark completion**:
+  - Q01: needs `concat` builtin to concatenate strings for full implementation; simplified version (grouping by returnflag/linestatus, summing quantities) works.
+  - Q03-Q22: not yet implemented; will require additional builtins and potentially more complex aggregation patterns.
 - Boolean semiring OR (instead of XOR) to match SDQL; update examples.
 - Promotion and additional scalar semirings beyond `bool`/`int`.
 - Replace unsafe `stensor` and rewrite lemmas with total, proven definitions (or otherwise structure recursion so Lean accepts termination), and clean up any remaining `unsafe` markers.
@@ -31,7 +38,7 @@ What’s left to build:
 - ~~Real file loaders for program inputs~~ (DONE: generic TBL loaders with type-directed parsing).
 - Optional: factor the inlined Rust runtime out into a standalone crate and build program binaries with `cargo`.
 - Optional: centralize Rust runtime into a crate and drive testing via `cargo` if needed.
- - DSL niceties: multi-entry dict literals, n-ary records beyond 3 fields, named fields at the surface level.
+- DSL niceties: multi-entry dict literals, n-ary records beyond 3 fields, named fields at the surface level.
 
 Known issues / caveats:
 
