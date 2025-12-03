@@ -24,10 +24,21 @@ pub mod sdql_runtime {
     }
     impl Add for Real { type Output = Self; fn add(self, rhs: Self) -> Self { Real(self.0 + rhs.0) } }
 
+    // SDQL Date type: stored as YYYYMMDD integer for ordering
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
+    pub struct Date(pub i64);
+    impl Date { pub fn new(yyyymmdd: i64) -> Self { Date(yyyymmdd) } }
+    impl Add for Date { type Output = Self; fn add(self, rhs: Self) -> Self { rhs } }
+    #[macro_export]
+    macro_rules! date {
+        ($yyyymmdd:literal) => {{ Date::new($yyyymmdd) }};
+    }
+
     pub trait SdqlAdd { fn sdql_add(&self, other: &Self) -> Self; }
     impl SdqlAdd for bool { fn sdql_add(&self, other: &Self) -> Self { *self ^ *other } }
     impl SdqlAdd for i64 { fn sdql_add(&self, other: &Self) -> Self { *self + *other } }
     impl SdqlAdd for Real { fn sdql_add(&self, other: &Self) -> Self { Real(self.0 + other.0) } }
+    impl SdqlAdd for Date { fn sdql_add(&self, other: &Self) -> Self { *other } }
     impl SdqlAdd for String {
         fn sdql_add(&self, other: &Self) -> Self {
             let mut s = self.clone();
@@ -87,6 +98,8 @@ pub mod sdql_runtime {
     pub fn ext_and(args: (bool, bool)) -> bool { args.0 && args.1 }
     pub fn ext_or(args: (bool, bool)) -> bool { args.0 || args.1 }
     pub fn ext_eq<T: PartialEq>(args: (T, T)) -> bool { args.0 == args.1 }
+    pub fn ext_leq<T: PartialOrd>(args: (T, T)) -> bool { args.0 <= args.1 }
+    pub fn ext_sub<T: std::ops::Sub<Output = T>>(args: (T, T)) -> T { args.0 - args.1 }
     pub fn ext_str_ends_with(args: (String, String)) -> bool {
         let (s, suf) = args;
         s.ends_with(&suf)
@@ -134,6 +147,22 @@ pub mod sdql_runtime {
         fn from_tbl_field(s: &str) -> Self { s == "true" || s == "1" }
     }
 
+    impl FromTblField for Date {
+        fn from_tbl_field(s: &str) -> Self {
+            // Parse date in format YYYY-MM-DD to YYYYMMDD
+            let parts: Vec<&str> = s.split('-').collect();
+            if parts.len() == 3 {
+                let y: i64 = parts[0].parse().unwrap_or(0);
+                let m: i64 = parts[1].parse().unwrap_or(0);
+                let d: i64 = parts[2].parse().unwrap_or(0);
+                Date::new(y * 10000 + m * 100 + d)
+            } else {
+                // Try parsing as YYYYMMDD directly
+                Date::new(s.parse().unwrap_or(0))
+            }
+        }
+    }
+
     /// Parses a TBL file into rows of string fields.
     fn parse_tbl_lines(path: &str) -> Vec<Vec<String>> {
         let file = File::open(path).unwrap_or_else(|_| panic!("Failed to open {}", path));
@@ -170,6 +199,7 @@ pub mod sdql_runtime {
     pub trait SDQLShow { fn show(&self) -> String; }
     impl SDQLShow for i64 { fn show(&self) -> String { self.to_string() } }
     impl SDQLShow for Real { fn show(&self) -> String { self.0.to_string() } }
+    impl SDQLShow for Date { fn show(&self) -> String { format!("date({})", self.0) } }
     impl SDQLShow for bool { fn show(&self) -> String { self.to_string() } }
     impl SDQLShow for String { fn show(&self) -> String { format!("\"{}\"", self) } }
     impl<K: Ord + SDQLShow, V: SDQLShow> SDQLShow for BTreeMap<K, V> {
