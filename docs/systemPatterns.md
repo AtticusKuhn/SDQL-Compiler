@@ -29,6 +29,7 @@ Surface syntax (mini‑DSL):
   - Algebra: `e1 + e2`, `e1 *{int} e2`, `e1 *{bool} e2`; `if`, `not`, `let x = e1 in e2`.
   - Boolean/builtin ops: `x && y`, `x || y`, `x == y`, `dom(e)`, `range(e)`, `endsWith(x,y)`.
 - The DSL uses surface wrapper typeclasses `HasSAdd`/`HasSScale` and helpers `SDQL.add`, `SDQL.mulInt/Bool`, `SDQL.lookup`, `SDQL.sum` to infer `SAdd`/`SScale` evidence (ints, bools, dictionaries, and records via recursive builders).
+- Type elaboration: `elabTy` sorts record fields alphabetically for canonical type representation. `elabTyPreserveOrder` preserves declaration order for load schemas, ensuring field positions match TBL column indices.
 - To run or print, use `SurfaceCore.ToCore.tr` to translate `STerm'` to core `Term'`.
 
 Surface layer with named records:
@@ -51,7 +52,9 @@ Testing infrastructure:
 
 - Rust runtime shims (embedded in generated sources):
   - `map_insert`, `lookup_or_default` helpers for maps; `SDQLShow` trait for ints, bools, strings (quoted), tuples (limited arities), and `BTreeMap`.
+  - Generic TBL loaders: `FromTblField` trait for type-directed parsing (i64, String, Real, bool), `build_col<T>` for extracting typed columns, `load_tbl` for parsing pipe-delimited TBL files.
   - The Rust AST printer emits `map_insert(...)` and iterates maps with `.into_iter()` to match the shim.
+  - Table loading: `genTableLoader` generates inline loader code for each table parameter, using `load_tbl` and `build_col` with column indices derived from the table schema type.
 
 Code generation integration:
 

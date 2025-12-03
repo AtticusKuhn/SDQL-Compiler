@@ -25,7 +25,7 @@ Key modules:
 - `PartIiProject/Dict.lean`: purely functional dictionary wrapper on `Std.TreeMap` with an embedded comparator.
 - `PartIiProject/HList.lean`: minimal heterogeneous list utilities.
 - `PartIiProject/Rust.lean`: simplified Rust AST and pretty-printer.
-- `PartIiProject/CodegenRust.lean`: core→Rust AST compiler; `renderRust`/`renderRustFn` and `renderRustShown` helpers; embeds `SDQLShow` runtime for printing. Supports `real` zero/addition and builtin lowering to external helpers (`ext_and`, `ext_or`, `ext_eq`, `ext_str_ends_with`, `ext_dom`, `ext_range`).
+- `PartIiProject/CodegenRust.lean`: core→Rust AST compiler; `renderRust`/`renderRustFn` and `renderRustShown` helpers; embeds `SDQLShow` runtime for printing. Includes generic TBL loaders (`FromTblField` trait, `build_col<T>`, `load_tbl`) and `genTableLoader` for generating inline table loading code. Supports `real` zero/addition and builtin lowering to external helpers (`ext_and`, `ext_or`, `ext_eq`, `ext_str_ends_with`, `ext_dom`, `ext_range`).
 - `PartIiProject/SurfaceCore.lean`: an explicit surface layer with named records and a surface→core translation (`ToCore.tr`) that erases names to positional records. Translation covers `constRecord`, `projByName`, `lookup`, `sum`, `add`, `mul`, and control flow. Surface scaling covers scalars, dictionaries, and records via `SScale.recordS` (typed membership `Mem`). Multiplication on the surface uses a tensor‑shape `stensor` with rewrite lemmas to align with core `tensor` during translation.
 - `PartIiProject.lean`: examples invoking `renderRust` for quick demos.
 - Tests:

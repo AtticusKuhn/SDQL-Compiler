@@ -222,6 +222,34 @@ syntax (name := sdqltyVec) "@vec" "{" sdqlty "->" sdqlty "}" : sdqlty
 syntax (name := sdqltyVarchar) "varchar" "(" num ")" : sdqlty
 syntax (name := sdqltyRecord) "<" sepBy(ident ":" sdqlty, ",") ">" : sdqlty
 
+/-- Helper to elaborate a record type with a given field ordering. -/
+partial def elabRecordTy (stx : TSyntax `sdqlty) (ns : Array (TSyntax `ident)) (ts : Array (TSyntax `sdqlty))
+    (sortFields : Bool) (elabField : TSyntax `sdqlty → MacroM (TSyntax `term)) : MacroM (TSyntax `term) := do
+  if ns.size != ts.size then
+    Macro.throwErrorAt stx "mismatched fields in record type"
+  -- Build pairs of (name, original_index)
+  let mut pairs : Array (String × Nat) := #[]
+  for i in [:ns.size] do
+    pairs := pairs.push ((ns[i]!).getId.toString, i)
+  -- Sort if requested
+  let orderedPairs := if sortFields then pairs.qsort (fun a b => a.fst < b.fst) else pairs
+  -- Build the list of (name, type) pairs
+  let mut elems : Array (TSyntax `term) := #[]
+  for (nm, idx) in orderedPairs do
+    let sNm := Syntax.mkStrLit nm
+    let tt ← elabField (ts[idx]!)
+    elems := elems.push (← `(Prod.mk $sNm $tt))
+  -- Assemble a Lean list literal
+  let mut ret : TSyntax `term := (← `(List.nil))
+  let mut i := elems.size
+  while i > 0 do
+    let j := i - 1
+    let e := elems[j]!
+    ret ← `(List.cons $e $ret)
+    i := j
+  `(SurfaceTy.record $ret)
+
+/-- Elaborate an SDQL type to a SurfaceTy term (with alphabetically sorted record fields). -/
 partial def elabTy : TSyntax `sdqlty → MacroM (TSyntax `term)
   | `(sdqlty| int) => `(SurfaceTy.int)
   | `(sdqlty| bool) => `(SurfaceTy.bool)
@@ -236,32 +264,28 @@ partial def elabTy : TSyntax `sdqlty → MacroM (TSyntax `term)
       let kk ← elabTy k
       let vv ← elabTy v
       `(SurfaceTy.dict $kk $vv)
-  | stx@`(sdqlty| < $[ $n:ident : $t:sdqlty ],* >) => do
-      -- Build a list of (String × SurfaceTy) from the annotated fields,
-      -- sorting by field name for a canonical schema.
-      let ns : Array (TSyntax `ident) := n
-      let ts : Array (TSyntax `sdqlty) := t
-      if ns.size != ts.size then
-        Macro.throwErrorAt stx "mismatched fields in record type"
-      -- Pair names with original indices and sort names for determinism
-      let mut pairs : Array (String × Nat) := #[]
-      for i in [:ns.size] do
-        pairs := pairs.push ((ns[i]!).getId.toString, i)
-      let sorted := pairs.qsort (fun a b => a.fst < b.fst)
-      let mut elems : Array (TSyntax `term) := #[]
-      for (nm, idx) in sorted do
-        let sNm := Syntax.mkStrLit nm
-        let tt ← elabTy (ts[idx]!)
-        elems := elems.push (← `(Prod.mk $sNm $tt))
-      -- assemble a Lean list literal without using `.reverse`
-      let mut ret : TSyntax `term := (← `(List.nil))
-      let mut i := elems.size
-      while i > 0 do
-        let j := i - 1
-        let e := elems[j]!
-        ret ← `(List.cons $e $ret)
-        i := j
-      `(SurfaceTy.record $ret)
+  | stx@`(sdqlty| < $[ $n:ident : $t:sdqlty ],* >) =>
+      elabRecordTy stx n t Bool.true elabTy
+  | stx => Macro.throwErrorAt stx "unsupported SDQL type in this DSL"
+
+/-- Elaborate an SDQL type preserving declaration order for record fields.
+    Used for table load schemas where field order must match TBL column order. -/
+partial def elabTyPreserveOrder : TSyntax `sdqlty → MacroM (TSyntax `term)
+  | `(sdqlty| int) => `(SurfaceTy.int)
+  | `(sdqlty| bool) => `(SurfaceTy.bool)
+  | `(sdqlty| string) => `(SurfaceTy.string)
+  | `(sdqlty| real) => `(SurfaceTy.real)
+  | `(sdqlty| varchar($n:num)) => `(SurfaceTy.string)
+  | `(sdqlty| @vec { $k:sdqlty -> $v:sdqlty }) => do
+      let kk ← elabTyPreserveOrder k
+      let vv ← elabTyPreserveOrder v
+      `(SurfaceTy.dict $kk $vv)
+  | `(sdqlty| { $k:sdqlty -> $v:sdqlty }) => do
+      let kk ← elabTyPreserveOrder k
+      let vv ← elabTyPreserveOrder v
+      `(SurfaceTy.dict $kk $vv)
+  | stx@`(sdqlty| < $[ $n:ident : $t:sdqlty ],* >) =>
+      elabRecordTy stx n t Bool.false elabTyPreserveOrder
   | stx => Macro.throwErrorAt stx "unsupported SDQL type in this DSL"
 
 -- typed empty dictionary: {}_{ Tdom, Trange }

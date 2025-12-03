@@ -276,13 +276,35 @@ def rustRuntimeHeader : String :=
   , "        }"
   , "        out"
   , "    }"
-  , "\n    // TBL file loader for TPCH columnar tables"
+  , "\n    // Generic TBL file loader for columnar tables"
   , "    // Parses pipe-delimited files and builds columnar BTreeMaps"
   , "    use std::io::{BufRead, BufReader};"
   , "    use std::fs::File;"
   , ""
+  , "    /// Trait for parsing a TBL field string into a typed value."
+  , "    pub trait FromTblField: Sized + Default {"
+  , "        fn from_tbl_field(s: &str) -> Self;"
+  , "    }"
+  , ""
+  , "    impl FromTblField for i64 {"
+  , "        fn from_tbl_field(s: &str) -> Self { s.parse().unwrap_or(0) }"
+  , "    }"
+  , ""
+  , "    impl FromTblField for String {"
+  , "        fn from_tbl_field(s: &str) -> Self { s.to_string() }"
+  , "    }"
+  , ""
+  , "    impl FromTblField for Real {"
+  , "        fn from_tbl_field(s: &str) -> Self { Real::new(s.parse().unwrap_or(0.0)) }"
+  , "    }"
+  , ""
+  , "    impl FromTblField for bool {"
+  , "        fn from_tbl_field(s: &str) -> Self { s == \"true\" || s == \"1\" }"
+  , "    }"
+  , ""
+  , "    /// Parses a TBL file into rows of string fields."
   , "    fn parse_tbl_lines(path: &str) -> Vec<Vec<String>> {"
-  , "        let file = File::open(path).expect(&format!(\"Failed to open {}\", path));"
+  , "        let file = File::open(path).unwrap_or_else(|_| panic!(\"Failed to open {}\", path));"
   , "        let reader = BufReader::new(file);"
   , "        let mut rows = Vec::new();"
   , "        for line in reader.lines() {"
@@ -294,101 +316,22 @@ def rustRuntimeHeader : String :=
   , "        rows"
   , "    }"
   , ""
-  , "    // Helper to build columnar maps from rows"
-  , "    fn build_string_col(rows: &[Vec<String>], col: usize) -> BTreeMap<i64, String> {"
+  , "    /// Generic column builder: parses column `col` from each row into a BTreeMap<i64, T>."
+  , "    pub fn build_col<T: FromTblField>(rows: &[Vec<String>], col: usize) -> BTreeMap<i64, T> {"
   , "        let mut m = BTreeMap::new();"
   , "        for (i, row) in rows.iter().enumerate() {"
-  , "            m.insert(i as i64, row.get(col).cloned().unwrap_or_default());"
-  , "        }"
-  , "        m"
-  , "    }"
-  , ""
-  , "    fn build_int_col(rows: &[Vec<String>], col: usize) -> BTreeMap<i64, i64> {"
-  , "        let mut m = BTreeMap::new();"
-  , "        for (i, row) in rows.iter().enumerate() {"
-  , "            let v = row.get(col).and_then(|s| s.parse::<i64>().ok()).unwrap_or(0);"
+  , "            let v = row.get(col).map(|s| T::from_tbl_field(s)).unwrap_or_default();"
   , "            m.insert(i as i64, v);"
   , "        }"
   , "        m"
   , "    }"
   , ""
-  , "    fn build_real_col(rows: &[Vec<String>], col: usize) -> BTreeMap<i64, Real> {"
-  , "        let mut m = BTreeMap::new();"
-  , "        for (i, row) in rows.iter().enumerate() {"
-  , "            let v = row.get(col).and_then(|s| s.parse::<f64>().ok()).unwrap_or(0.0);"
-  , "            m.insert(i as i64, Real::new(v));"
-  , "        }"
-  , "        m"
-  , "    }"
-  , ""
-  , "    // TPCH table loaders - fields are sorted alphabetically by field name!"
-  , "    // nation: n_comment, n_name, n_nationkey, n_regionkey, size"
-  , "    // TBL columns: 0=nationkey, 1=name, 2=regionkey, 3=comment"
-  , "    pub type NationTable = (BTreeMap<i64, String>, BTreeMap<i64, String>, BTreeMap<i64, i64>, BTreeMap<i64, i64>, i64);"
-  , "    fn load_nation(path: &str) -> NationTable {"
+  , "    /// Generic TBL loader: parses a TBL file and returns (rows, size)."
+  , "    /// Callers use build_col to extract typed columns."
+  , "    pub fn load_tbl(path: &str) -> (Vec<Vec<String>>, i64) {"
   , "        let rows = parse_tbl_lines(path);"
   , "        let size = rows.len() as i64;"
-  , "        (build_string_col(&rows, 3), build_string_col(&rows, 1), build_int_col(&rows, 0), build_int_col(&rows, 2), size)"
-  , "    }"
-  , ""
-  , "    // part: p_brand, p_comment, p_container, p_mfgr, p_name, p_partkey, p_retailprice, p_size, p_type, size"
-  , "    // TBL columns: 0=partkey, 1=name, 2=mfgr, 3=brand, 4=type, 5=size, 6=container, 7=retailprice, 8=comment"
-  , "    pub type PartTable = (BTreeMap<i64, String>, BTreeMap<i64, String>, BTreeMap<i64, String>, BTreeMap<i64, String>, BTreeMap<i64, String>, BTreeMap<i64, i64>, BTreeMap<i64, Real>, BTreeMap<i64, i64>, BTreeMap<i64, String>, i64);"
-  , "    fn load_part(path: &str) -> PartTable {"
-  , "        let rows = parse_tbl_lines(path);"
-  , "        let size = rows.len() as i64;"
-  , "        (build_string_col(&rows, 3), build_string_col(&rows, 8), build_string_col(&rows, 6), build_string_col(&rows, 2), build_string_col(&rows, 1), build_int_col(&rows, 0), build_real_col(&rows, 7), build_int_col(&rows, 5), build_string_col(&rows, 4), size)"
-  , "    }"
-  , ""
-  , "    // partsupp: ps_availqty, ps_comment, ps_partkey, ps_suppkey, ps_supplycost, size"
-  , "    // TBL columns: 0=partkey, 1=suppkey, 2=availqty, 3=supplycost, 4=comment"
-  , "    pub type PartsuppTable = (BTreeMap<i64, Real>, BTreeMap<i64, String>, BTreeMap<i64, i64>, BTreeMap<i64, i64>, BTreeMap<i64, Real>, i64);"
-  , "    fn load_partsupp(path: &str) -> PartsuppTable {"
-  , "        let rows = parse_tbl_lines(path);"
-  , "        let size = rows.len() as i64;"
-  , "        (build_real_col(&rows, 2), build_string_col(&rows, 4), build_int_col(&rows, 0), build_int_col(&rows, 1), build_real_col(&rows, 3), size)"
-  , "    }"
-  , ""
-  , "    // region: r_comment, r_name, r_regionkey, size"
-  , "    // TBL columns: 0=regionkey, 1=name, 2=comment"
-  , "    pub type RegionTable = (BTreeMap<i64, String>, BTreeMap<i64, String>, BTreeMap<i64, i64>, i64);"
-  , "    fn load_region(path: &str) -> RegionTable {"
-  , "        let rows = parse_tbl_lines(path);"
-  , "        let size = rows.len() as i64;"
-  , "        (build_string_col(&rows, 2), build_string_col(&rows, 1), build_int_col(&rows, 0), size)"
-  , "    }"
-  , ""
-  , "    // supplier: s_acctbal, s_address, s_comment, s_name, s_nationkey, s_phone, s_suppkey, size"
-  , "    // TBL columns: 0=suppkey, 1=name, 2=address, 3=nationkey, 4=phone, 5=acctbal, 6=comment"
-  , "    pub type SupplierTable = (BTreeMap<i64, Real>, BTreeMap<i64, String>, BTreeMap<i64, String>, BTreeMap<i64, String>, BTreeMap<i64, i64>, BTreeMap<i64, String>, BTreeMap<i64, i64>, i64);"
-  , "    fn load_supplier(path: &str) -> SupplierTable {"
-  , "        let rows = parse_tbl_lines(path);"
-  , "        let size = rows.len() as i64;"
-  , "        (build_real_col(&rows, 5), build_string_col(&rows, 2), build_string_col(&rows, 6), build_string_col(&rows, 1), build_int_col(&rows, 3), build_string_col(&rows, 4), build_int_col(&rows, 0), size)"
-  , "    }"
-  , ""
-  , "    // Generic load interface - dispatches based on type_name"
-  , "    // Uses a trait-based approach to avoid unsafe transmutes"
-  , "    pub trait LoadTable: Sized { fn load_from(path: &str) -> Self; }"
-  , ""
-  , "    impl LoadTable for NationTable {"
-  , "        fn load_from(path: &str) -> Self { load_nation(path) }"
-  , "    }"
-  , "    impl LoadTable for PartTable {"
-  , "        fn load_from(path: &str) -> Self { load_part(path) }"
-  , "    }"
-  , "    impl LoadTable for PartsuppTable {"
-  , "        fn load_from(path: &str) -> Self { load_partsupp(path) }"
-  , "    }"
-  , "    impl LoadTable for RegionTable {"
-  , "        fn load_from(path: &str) -> Self { load_region(path) }"
-  , "    }"
-  , "    impl LoadTable for SupplierTable {"
-  , "        fn load_from(path: &str) -> Self { load_supplier(path) }"
-  , "    }"
-  , ""
-  , "    pub fn load<T: LoadTable>(path: &str) -> T {"
-  , "        T::load_from(path)"
+  , "        (rows, size)"
   , "    }"
   , "\n    // Pretty-printing for SDQL values (mirrors Lean showValue)"
   , "    pub trait SDQLShow { fn show(&self) -> String; }"
@@ -457,24 +400,72 @@ def renderRustFn {n : Nat} {fvar : Fin n → _root_.Ty} {ty : _root_.Ty}
 
 /- Program-level codegen ------------------------------------------------- -/
 
+/- Table loader generation:
+   A table type is expected to be a record (tuple) where:
+   - Most fields are `dict int T` (columnar vectors), compiled to `BTreeMap<i64, T>`
+   - The last field is typically `int` (size), compiled to `i64`
+
+   For each `dict int T` field at position i, we emit:
+     `sdql_runtime::build_col::<RustTy>(&rows, i)`
+   For `int` fields (typically the size), we emit:
+     `size`
+-/
+
+/-- Generate the Rust expression for a single field in a table loader. -/
+def genFieldLoader (fieldTy : _root_.Ty) (colIdx : Nat) : String :=
+  match fieldTy with
+  | .dict .int valTy =>
+    -- Columnar vector: build_col with the value type
+    let valRustTy := Rust.showTy (coreTyToRustTy valTy)
+    s!"sdql_runtime::build_col::<{valRustTy}>(&rows, {colIdx})"
+  | .int =>
+    -- Size field: use the size variable directly
+    "size"
+  | other =>
+    -- Fallback for other types (shouldn't happen in well-formed table schemas)
+    let rustTy := Rust.showTy (coreTyToRustTy other)
+    s!"/* unsupported field type {rustTy} */ Default::default()"
+
+/-- Generate indexed field loader expressions for a list of field types. -/
+def genFieldLoaders (fields : List _root_.Ty) : List String :=
+  let rec go (fs : List _root_.Ty) (idx : Nat) : List String :=
+    match fs with
+    | [] => []
+    | f :: rest => genFieldLoader f idx :: go rest (idx + 1)
+  go fields 0
+
+def genTableLoader (ty : _root_.Ty) (path : String) : String :=
+  let lit := path.replace "\\" "\\\\" |>.replace "\"" "\\\""
+  match ty with
+  | .record fields =>
+    -- Generate build_col calls for each field
+    let colExprs := genFieldLoaders fields
+    -- Wrap in a block that loads the TBL file
+    let tupleBody := String.intercalate ", " colExprs
+    "{\n      let (rows, size) = sdql_runtime::load_tbl(\"" ++ lit ++ "\");\n      (" ++ tupleBody ++ ")\n    }"
+  | _ =>
+    -- Non-record types: fall back to a placeholder (shouldn't happen for tables)
+    let rustTy := Rust.showTy (coreTyToRustTy ty)
+    s!"/* cannot load non-record type {rustTy} */ Default::default()"
+
 /-- Render a Rust program from a `Prog`. The generated program:
     - defines and re-exports a tiny runtime library (`sdql_runtime`),
-    - loads each free variable from the provided file path via a stub `load`,
+    - loads each free variable from the provided file path using generic loaders,
     - evaluates the compiled term, and
     - prints the pretty-printed result. -/
 def renderRustProgShown (p : _root_.Prog) : String :=
   let header := rustRuntimeHeader
   -- Parameter names for free variables
   let paramName : (i : Fin p.n) → String := fun i => s!"arg{i.val}"
-  -- Emit `let arg<i> : <Ty> = sdql_runtime::load::<Ty>("path");`
+  -- Generate inline loaders for each table parameter
   let idxs := (List.finRange p.n)
   let paramDecls : List String := idxs.map (fun i =>
-    let tyStr := Rust.showTy (coreTyToRustTy (p.fvar i))
+    let ty := p.fvar i
+    let tyStr := Rust.showTy (coreTyToRustTy ty)
     let nm := paramName i
-    -- escape Rust string literal – here we assume paths are well-formed; add minimal escaping
-    let path := (p.loadPaths i)
-    let lit := path.replace "\\" "\\\\" |>.replace "\"" "\\\""
-    s!"let {nm}: {tyStr} = sdql_runtime::load::<{tyStr}>(\"{lit}\");"
+    let path := p.loadPaths i
+    let loaderExpr := genTableLoader ty path
+    s!"let {nm}: {tyStr} = {loaderExpr};"
   )
   -- Compile the open term with the chosen names
   let expr := compileOpenToRustExpr paramName (p.term (rep := fun _ => String))
