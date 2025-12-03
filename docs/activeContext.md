@@ -9,6 +9,18 @@ Current focus:
 
 Latest changes:
 
+- **TPCH Q01 implementation**: Added a simplified Q01 query that groups lineitem rows by (returnflag, linestatus) and sums quantities. The full Q01 requires `concat` builtin for string concatenation which is not yet implemented. Q01 is currently a compile-only test.
+
+- **Date type and comparison**: Added `Ty.date` as a new primitive type with:
+  - `SDQLDate` wrapper struct around an YYYYMMDD integer for proper ordering
+  - `DateLit` builtin constructor: `date ( 19980902 )` syntax (note: spaces required due to parser ambiguity)
+  - `Leq` builtin for `<=` comparison returning bool
+  - Rust codegen generates a `Date` struct with `Ord` implementation
+
+- **Real number literals**: Added `Term'.constReal` for floating-point constants, with DSL support for scientific notation literals.
+
+- **Subtraction operator**: Added `Sub` builtin for arithmetic subtraction on int/real types, with `-` syntax in the DSL.
+
 - **Generic TBL file loader framework**: Replaced hardcoded table-specific loaders with a generic, type-parametrized loading system inspired by sdql-rs. Key changes:
   - `rustRuntimeHeader` now includes `FromTblField` trait for type-directed parsing, `build_col<T>` for generic column extraction, and `load_tbl` for parsing TBL files.
   - `genTableLoader` in `CodegenRust.lean` generates inline loader code based on the table schema type.
@@ -53,6 +65,11 @@ Recent changes (captured here):
 
 Next steps (proposed):
 
+- **TPCH benchmark progress**:
+  - Q02: fully working with dynamic reference comparison against sdql-rs
+  - Q01: simplified version works (compile-only); full version needs `concat` builtin for string concatenation
+  - Q03-Q22: not yet implemented
+  - Add `concat` builtin to enable full Q01 and potentially other queries
 - Boolean semiring alignment: switch `AddM.boolA` from XOR to OR; update examples and, if needed, Rust helpers.
 - Expand Rust runtime and codegen to cover multiplication (`sdql_mul`) with full tensor-shape behavior and broaden tuple support.
 - Replace the inlined runtime with a shared Rust crate when switching to `cargo` builds; keep the small embedded module for simple `rustc` paths and tests.
@@ -61,9 +78,9 @@ Next steps (proposed):
 - Scalar promotion: add explicit scalar universes and a `promote` term; extend `ScaleM` to additional semirings.
 - Surface sugar: sets/arrays elaboration layered on top of new `dom`/`range` builtins.
 - Grow the test suite: add dict addition, nested records/dicts, `ite`, `letin`, more `sum` patterns, and negative cases.
- - DSL: support multi-entry dictionary literals `{ k1 -> v1, k2 -> v2, ... }`, n-ary records, and named field syntax (later) or use the new surface translator. Align boolean semiring with the paper (OR/AND) when ready.
+- DSL: support multi-entry dictionary literals `{ k1 -> v1, k2 -> v2, ... }`, n-ary records, and named field syntax (later) or use the new surface translator. Align boolean semiring with the paper (OR/AND) when ready.
 - Surface translator: replace `unsafe` pieces (the `stensor` definition and associated lemmas) with total definitions and proven termination; generalize proofs and tidy the translation. Consider integrating named-records at the DSL level or keep the surface→core pass as the front end.
- - Program EDSL: optional dedup policy (“first occurrence” vs alphabetical), and stricter duplicate-type checking for repeated `load` of the same path.
+- Program EDSL: optional dedup policy ("first occurrence" vs alphabetical), and stricter duplicate-type checking for repeated `load` of the same path.
 
 Quick usage examples (Lean):
 
