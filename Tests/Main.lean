@@ -58,6 +58,7 @@ private unsafe def rustLit : {t : Ty} → t.denote → String
   | .int, n => toString n
   | .bool, b => if b then "true" else "false"
   | .real, n => toString n
+  | .date, d => s!"Date::new({d.yyyymmdd})"
   | .string, s => s!"String::from(\"{s}\")"
   | .record l, r =>
       let parts := rustLitHList r
