@@ -15,6 +15,7 @@ inductive SurfaceTy : Type where
   | bool : SurfaceTy
   | int : SurfaceTy
   | real : SurfaceTy
+  | date : SurfaceTy
   | string : SurfaceTy
   | dict : SurfaceTy → SurfaceTy → SurfaceTy
   -- | record : Std.TreeMap.Raw String SurfaceTy → SurfaceTy
@@ -36,10 +37,12 @@ def HasField.index : {σ : Schema} → {n : String} → {t : SurfaceTy} → HasF
 -- Surface terms (PHOAS) with named records only
 -- Surface-level semimodule evidence (mirrors core AddM/ScaleM)
 inductive SAdd : SurfaceTy → Type where
-  | boolA : SAdd .bool
-  | intA  : SAdd .int
-  | realA : SAdd .real
-  | dictA {k v : SurfaceTy} (av : SAdd v) : SAdd (.dict k v)
+  | boolA   : SAdd .bool
+  | intA    : SAdd .int
+  | realA   : SAdd .real
+  | dateA   : SAdd .date
+  | stringA : SAdd .string
+  | dictA   {k v : SurfaceTy} (av : SAdd v) : SAdd (.dict k v)
   | recordA {σ : Schema} : (HList (fun (_, t) => SAdd t) σ ) →  SAdd (.record σ)
 
 inductive SScale : SurfaceTy → SurfaceTy → Type where
@@ -73,14 +76,18 @@ inductive SBuiltin : SurfaceTy → SurfaceTy → Type where
   | And : SBuiltin (.record [("_1", .bool), ("_2", .bool)]) .bool
   | Or  : SBuiltin (.record [("_1", .bool), ("_2", .bool)]) .bool
   | Eq {t : SurfaceTy} : SBuiltin (.record [("_1", t), ("_2", t)]) .bool
+  | Leq {t : SurfaceTy} : SBuiltin (.record [("_1", t), ("_2", t)]) .bool  -- <=
+  | Sub {t : SurfaceTy} : SBuiltin (.record [("_1", t), ("_2", t)]) t      -- subtraction
   | StrEndsWith : SBuiltin (.record [("_1", .string), ("_2", .string)]) .bool
   | Dom {dom range : SurfaceTy} : SBuiltin (.dict dom range) (.dict dom .bool)
   | Range : SBuiltin .int (.dict .int .bool)
+  | DateLit (yyyymmdd : Int) : SBuiltin (.record []) .date  -- date(YYYYMMDD)
 
 unsafe inductive STerm' (rep : SurfaceTy → Type) {n : Nat} (fvar : Fin n → SurfaceTy) : SurfaceTy → Type where
   | var   : {ty : SurfaceTy} → rep ty → STerm' rep fvar ty
   | freeVariable : (f : Fin n) → STerm' rep fvar (fvar f)
   | constInt : Int → STerm' rep fvar SurfaceTy.int
+  | constReal : Float → STerm' rep fvar SurfaceTy.real
   | constBool : Bool → STerm' rep fvar SurfaceTy.bool
   | constString : String → STerm' rep fvar SurfaceTy.string
   | not : STerm' rep fvar SurfaceTy.bool → STerm' rep fvar SurfaceTy.bool
@@ -130,6 +137,7 @@ mutual
     | .bool => .bool
     | .int => .int
     | .real => .real
+    | .date => .date
     | .string => .string
     | .dict k v => .dict (ty k) (ty v)
     | .record σ => .record (tyFields σ)
@@ -141,9 +149,11 @@ end
 
 -- Translate surface semimodule evidence to core
  def toCoreAdd : {t : SurfaceTy} → SAdd t → AddM (ty t)
-  | _, SAdd.boolA => AddM.boolA
-  | _, SAdd.intA => AddM.intA
-  | _, SAdd.realA => AddM.realA
+  | _, SAdd.boolA   => AddM.boolA
+  | _, SAdd.intA    => AddM.intA
+  | _, SAdd.realA   => AddM.realA
+  | _, SAdd.dateA   => AddM.dateA
+  | _, SAdd.stringA => AddM.stringA
   | _, @SAdd.dictA dom range aRange => AddM.dictA (toCoreAdd aRange)
   | _, @SAdd.recordA σ fields =>
     let rec trFields
@@ -222,6 +232,7 @@ mutual
     | .bool, b => rfl
     | .int, b => rfl
     | .real, b => rfl
+    | .date, b => rfl
     | .string, b => rfl
     | .dict dom range, b => by
         rw [ty]
@@ -263,6 +274,7 @@ mutual
     | STerm'.var v => Term'.var v
     | STerm'.freeVariable i => Term'.freeVariable i
     | STerm'.constInt i => Term'.constInt i
+    | STerm'.constReal r => Term'.constReal r
     | STerm'.constBool b => Term'.constBool b
     | STerm'.constString s => Term'.constString s
     | STerm'.not e => Term'.not (tr e)
@@ -302,9 +314,14 @@ mutual
         | SBuiltin.Or  => Term'.builtin BuiltinFn.Or (tr a)
         | @SBuiltin.Eq (t := t) =>
             Term'.builtin (BuiltinFn.Eq (ty t)) (tr a)
+        | @SBuiltin.Leq (t := t) =>
+            Term'.builtin (BuiltinFn.Leq (ty t)) (tr a)
+        | @SBuiltin.Sub (t := t) =>
+            Term'.builtin (BuiltinFn.Sub (ty t)) (tr a)
         | SBuiltin.StrEndsWith => Term'.builtin BuiltinFn.StrEndsWith (tr a)
         | @SBuiltin.Dom dom range => Term'.builtin (BuiltinFn.Dom (dom := ty dom) (range := ty range)) (tr a)
         | SBuiltin.Range => Term'.builtin BuiltinFn.Range (tr a)
+        | SBuiltin.DateLit yyyymmdd => Term'.builtin (BuiltinFn.DateLit yyyymmdd) (tr a)
 
 end
 
@@ -321,7 +338,6 @@ unsafe def ex2 : STerm f0 .string := .projByName (HasField.here) ex1
 #eval Term.show (tr ex1)
 #eval Term.show (tr ex2)
 #eval Term'.denote (fun (x : Fin 0) => nomatch x) (tr ex2)
-
 
 end ToCore
 

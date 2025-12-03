@@ -60,6 +60,7 @@ namespace HasSAdd
 instance : HasSAdd SurfaceTy.int := ⟨SAdd.intA⟩
 instance : HasSAdd SurfaceTy.bool := ⟨SAdd.boolA⟩
 instance : HasSAdd SurfaceTy.real := ⟨SAdd.realA⟩
+instance : HasSAdd SurfaceTy.date := ⟨SAdd.dateA⟩
 instance : HasSAdd SurfaceTy.string := ⟨SAdd.stringA⟩
 instance instDict {dom range : SurfaceTy} [h : HasSAdd range] : HasSAdd (SurfaceTy.dict dom range) :=
   ⟨SAdd.dictA h.inst⟩
@@ -84,6 +85,7 @@ namespace HasSScale
 
 instance : HasSScale SurfaceTy.int SurfaceTy.int := ⟨SScale.intS⟩
 instance : HasSScale SurfaceTy.bool SurfaceTy.bool := ⟨SScale.boolS⟩
+instance : HasSScale SurfaceTy.real SurfaceTy.real := ⟨SScale.realS⟩
 instance instDict {sc dom range : SurfaceTy} [h : HasSScale sc range] : HasSScale sc (SurfaceTy.dict dom range) :=
   ⟨SScale.dictS h.inst⟩
 
@@ -137,6 +139,12 @@ unsafe def mulBool {rep : SurfaceTy → Type} {n : Nat} {fvar : Fin n → Surfac
     : STerm' rep fvar (stensor t1 t2) :=
   STerm'.mul (i1.inst) (i2.inst) x y
 
+unsafe def mulReal {rep : SurfaceTy → Type} {n : Nat} {fvar : Fin n → SurfaceTy}
+    {t1 t2 : SurfaceTy} [i1 : HasSScale SurfaceTy.real t1] [i2 : HasSScale SurfaceTy.real t2]
+    (x : STerm' rep fvar t1) (y : STerm' rep fvar t2)
+    : STerm' rep fvar (stensor t1 t2) :=
+  STerm'.mul (i1.inst) (i2.inst) x y
+
 unsafe def emptyDict {rep : SurfaceTy → Type} {n : Nat} {fvar : Fin n → SurfaceTy}
     {dom range : SurfaceTy} : STerm' rep fvar (.dict dom range) :=
   STerm'.emptyDict
@@ -172,6 +180,7 @@ declare_syntax_cat sdql
 
 -- atoms
 syntax num                             : sdql
+syntax scientific                      : sdql  -- floating point literals like 1.0
 syntax str                             : sdql
 syntax ident                          : sdql
 syntax (name := sdqlTrue) "true"      : sdql
@@ -195,17 +204,21 @@ syntax "let" ident "=" sdql "in" sdql : sdql
 
 -- binary ops (left-assoc precedence)
 syntax:60 sdql:60 "+" sdql:61          : sdql
+syntax:60 sdql:60 "-" sdql:61          : sdql  -- subtraction
 syntax:55 sdql:55 "*" "{" "int" "}" sdql:56  : sdql -- scaled multiply
 syntax:55 sdql:55 "*" "{" "bool" "}" sdql:56 : sdql
+syntax:55 sdql:55 "*" "{" "real" "}" sdql:56 : sdql
 syntax:58 sdql:58 "&&" sdql:59           : sdql
 syntax:57 sdql:57 "||" sdql:58           : sdql
 syntax:59 sdql:59 "==" sdql:60           : sdql
+syntax:59 sdql:59 "<=" sdql:60           : sdql  -- less-than-or-equal
 
 -- builtins/functions
 syntax "dom" "(" sdql ")"               : sdql
 syntax "range" "(" sdql ")"             : sdql
 syntax "endsWith" "(" sdql "," sdql ")" : sdql
 syntax "unique" "(" sdql ")"            : sdql
+syntax "date" "(" num ")"              : sdql  -- date literal, e.g. date(19980902)
 
 -- summation over dictionaries
 syntax "sum" "(" "<" ident "," ident ">" "in" sdql ")" sdql : sdql
@@ -217,6 +230,7 @@ syntax (name := sdqltyInt) "int" : sdqlty
 syntax (name := sdqltyBool) "bool" : sdqlty
 syntax (name := sdqltyString) "string" : sdqlty
 syntax (name := sdqltyReal) "real" : sdqlty
+syntax (name := sdqltyDate) "date" : sdqlty
 syntax (name := sdqltyDict) "{" sdqlty "->" sdqlty "}" : sdqlty
 syntax (name := sdqltyVec) "@vec" "{" sdqlty "->" sdqlty "}" : sdqlty
 syntax (name := sdqltyVarchar) "varchar" "(" num ")" : sdqlty
@@ -255,6 +269,7 @@ partial def elabTy : TSyntax `sdqlty → MacroM (TSyntax `term)
   | `(sdqlty| bool) => `(SurfaceTy.bool)
   | `(sdqlty| string) => `(SurfaceTy.string)
   | `(sdqlty| real) => `(SurfaceTy.real)
+  | `(sdqlty| date) => `(SurfaceTy.date)
   | `(sdqlty| varchar($n:num)) => `(SurfaceTy.string)
   | `(sdqlty| @vec { $k:sdqlty -> $v:sdqlty }) => do
       let kk ← elabTy k
@@ -275,6 +290,7 @@ partial def elabTyPreserveOrder : TSyntax `sdqlty → MacroM (TSyntax `term)
   | `(sdqlty| bool) => `(SurfaceTy.bool)
   | `(sdqlty| string) => `(SurfaceTy.string)
   | `(sdqlty| real) => `(SurfaceTy.real)
+  | `(sdqlty| date) => `(SurfaceTy.date)
   | `(sdqlty| varchar($n:num)) => `(SurfaceTy.string)
   | `(sdqlty| @vec { $k:sdqlty -> $v:sdqlty }) => do
       let kk ← elabTyPreserveOrder k
@@ -331,6 +347,7 @@ mutual
       match stx with
       -- atoms and parentheses
       | `(sdql| $n:num) => `(STerm'.constInt $n)
+      | `(sdql| $r:scientific) => `(STerm'.constReal $r)
       | `(sdql| $s:str) => `(STerm'.constString $s)
       | `(sdql| fvar[ $i:num ]) => `(STerm'.freeVariable $i)
       -- explicit dot projection: `r . fieldname` or `expr(args).fieldname`
@@ -354,6 +371,14 @@ mutual
       | `(sdql| $x:sdql + $y:sdql) => do
           let xx ← elabSDQL x; let yy ← elabSDQL y
           `(SDQL.add $xx $yy)
+      | `(sdql| $x:sdql - $y:sdql) => do
+          let xx ← elabSDQL x; let yy ← elabSDQL y
+          let recArg ← `(
+            STerm'.constRecord (l := [("_1", _), ("_2", _)])
+              (HList.cons (x := (Prod.mk "_1" _)) (xs := [("_2", _)]) $xx
+                (HList.cons (x := (Prod.mk "_2" _)) (xs := []) $yy HList.nil))
+          )
+          `(STerm'.builtin (PartIiProject.SBuiltin.Sub) $recArg)
       | `(sdql| $x:sdql && $y:sdql) => do
           let xx ← elabSDQL x; let yy ← elabSDQL y
           let recArg ← `(
@@ -378,16 +403,31 @@ mutual
                 (HList.cons (x := (Prod.mk "_2" _)) (xs := []) $yy HList.nil))
           )
           `(STerm'.builtin (PartIiProject.SBuiltin.Eq) $recArg)
+      | `(sdql| $x:sdql <= $y:sdql) => do
+          let xx ← elabSDQL x; let yy ← elabSDQL y
+          let recArg ← `(
+            STerm'.constRecord (l := [("_1", _), ("_2", _)])
+              (HList.cons (x := (Prod.mk "_1" _)) (xs := [("_2", _)]) $xx
+                (HList.cons (x := (Prod.mk "_2" _)) (xs := []) $yy HList.nil))
+          )
+          `(STerm'.builtin (PartIiProject.SBuiltin.Leq) $recArg)
       | `(sdql| $x:sdql * { int } $y:sdql) => do
           let xx ← elabSDQL x; let yy ← elabSDQL y
           `(SDQL.mulInt $xx $yy)
       | `(sdql| $x:sdql * { bool } $y:sdql) => do
           let xx ← elabSDQL x; let yy ← elabSDQL y
           `(SDQL.mulBool $xx $yy)
+      | `(sdql| $x:sdql * { real } $y:sdql) => do
+          let xx ← elabSDQL x; let yy ← elabSDQL y
+          `(SDQL.mulReal $xx $yy)
       | `(sdql| dom ( $e:sdql )) => do
           `(STerm'.builtin (PartIiProject.SBuiltin.Dom) $(← elabSDQL e))
       | `(sdql| range ( $e:sdql )) => do
           `(STerm'.builtin PartIiProject.SBuiltin.Range $(← elabSDQL e))
+      | `(sdql| date ( $n:num )) => do
+          -- DateLit takes an empty record as argument, produces a date
+          let emptyRec ← `(STerm'.constRecord (l := []) HList.nil)
+          `(STerm'.builtin (PartIiProject.SBuiltin.DateLit $n) $emptyRec)
       | `(sdql| endsWith ( $x:sdql , $y:sdql )) => do
           let xx ← elabSDQL x; let yy ← elabSDQL y
           let recArg ← `(

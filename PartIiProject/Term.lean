@@ -9,11 +9,24 @@ set_option linter.unusedVariables false
 inductive Ty : Type where
   | bool : Ty
   | real : Ty
+  | date : Ty
   | dict : Ty → Ty → Ty
   | record : (List (Ty)) → Ty
   | string : Ty
   | int :  Ty
   deriving Inhabited
+
+-- Date type: represented as YYYYMMDD integer (e.g., 19980902)
+-- This matches sdql-rs's date representation
+structure SDQLDate where
+  yyyymmdd : Int
+  deriving Inhabited, BEq, Repr
+
+instance : Ord SDQLDate where
+  compare a b := compare a.yyyymmdd b.yyyymmdd
+
+instance : ToString SDQLDate where
+  toString d := s!"date({d.yyyymmdd})"
 
 
 
@@ -23,6 +36,7 @@ unsafe def Ty.denote (t : Ty) : Type :=
   match t with
   | .bool => Bool
   | .real => Float
+  | .date => SDQLDate
   | .int => Int
   | .string => String
   | .record l => HList Ty.denote l
@@ -45,16 +59,19 @@ unsafe def showDict {dom range : Ty} (d : Dict dom.denote range.denote) : String
 unsafe def showValue : {t : Ty} → t.denote → String
   | .bool, b => toString b
   | .real, n => toString n
+  | .date, d => toString d
   | .int, n => toString n
   | .string, s => s
   | .record l, r => "<" ++ showHList r ++ ">"
   | .dict dom range, d => showDict (dom := dom) (range := range) d
 end
 inductive AddM : Ty → Type where
-  | boolA : AddM Ty.bool
-  | realA : AddM Ty.real
-  | intA : AddM Ty.int
-  | dictA {dom range : Ty} (aRange : AddM range) : AddM (Ty.dict dom range)
+  | boolA   : AddM Ty.bool
+  | realA   : AddM Ty.real
+  | dateA   : AddM Ty.date
+  | intA    : AddM Ty.int
+  | stringA : AddM Ty.string
+  | dictA   {dom range : Ty} (aRange : AddM range) : AddM (Ty.dict dom range)
   | recordA {l : List Ty} : HList AddM l → AddM (Ty.record l)
 
 instance instOrdUnit : Ord Unit where
@@ -79,10 +96,28 @@ unsafe def Ty.ord (t : Ty) : Ord t.denote :=
   match t with
     | .bool => inferInstance
     | .real => inferInstance
+    | .date => inferInstance
     | .int => inferInstance
     | .string => inferInstance
     | .dict a b => instOrdDict a.denote b.denote
     | .record l => HListOrd (dmap l Ty.ord)
+
+-- Default/inhabited values for types (used for fallbacks)
+mutual
+unsafe def Ty.inhabited (t : Ty) : t.denote :=
+  match t with
+  | .bool => false
+  | .real => 0.0
+  | .date => SDQLDate.mk 0
+  | .int => 0
+  | .string => ""
+  | .record l => Ty.inhabitedHList l
+  | .dict dom _ => Dict.empty (Ty.ord dom)
+
+unsafe def Ty.inhabitedHList : (l : List Ty) → HList Ty.denote l
+  | [] => HList.nil
+  | t :: ts => HList.cons (Ty.inhabited t) (Ty.inhabitedHList ts)
+end
 
 -- Additive identities for AddM types
 mutual
@@ -93,7 +128,9 @@ unsafe def zeroHList {l : List Ty} : HList AddM l → HList Ty.denote l
 unsafe def AddM.zero {t : Ty} : AddM t → t.denote
   | .boolA => false
   | .realA => (0.0 : Float)
+  | .dateA => SDQLDate.mk 10101  -- dummy date like sdql-rs (0001-01-01)
   | .intA => 0
+  | .stringA => ""
   | @AddM.dictA dom range aRange => Dict.empty (Ty.ord dom)
   | @AddM.recordA l fields => zeroHList fields
 end
@@ -130,7 +167,9 @@ unsafe def addHList {l : List Ty} (fields : HList AddM l)
 unsafe def AddM.denote {t : Ty} : AddM t → t.denote → t.denote → t.denote
   | .boolA, x, y => Bool.xor x y
   | .realA, x, y => x + y
+  | .dateA, _x, y => y  -- date "addition" overwrites (like sdql-rs AddAssign)
   | .intA, x, y => Int.add x y
+  | .stringA, x, y => x ++ y
   | @AddM.dictA dom range aRange, x, y =>
     let inner := AddM.denote aRange
     -- Merge y into x using inner on values
@@ -222,14 +261,18 @@ inductive BuiltinFn : Ty → Ty → Type
   | Or : BuiltinFn (Ty.record [.bool, .bool]) Ty.bool
   | And : BuiltinFn (Ty.record [.bool, .bool]) Ty.bool
   | Eq (t : Ty) : BuiltinFn (Ty.record [t, t]) Ty.bool
+  | Leq (t : Ty) : BuiltinFn (Ty.record [t, t]) Ty.bool  -- <= comparison
+  | Sub (t : Ty) : BuiltinFn (Ty.record [t, t]) t        -- subtraction
   | StrEndsWith : BuiltinFn (Ty.record [.string, .string]) Ty.bool
   | Dom : {dom range : Ty} →  BuiltinFn (.dict dom range) (.dict dom Ty.bool)
   | Range : BuiltinFn Ty.int (Ty.dict Ty.int Ty.bool)
+  | DateLit (yyyymmdd : Int) : BuiltinFn (Ty.record []) Ty.date  -- date(YYYYMMDD)
 
 -- Core terms (PHOAS) with typed addition/multiplication evidence
 inductive Term' (rep : Ty → Type) {n : Nat} (fvar : Fin n → Ty) : Ty → Type
   | var   : {ty : Ty} → rep ty → Term' rep fvar ty
   | constInt : Int → Term' rep fvar Ty.int
+  | constReal : Float → Term' rep fvar Ty.real
   | constBool : Bool → Term' rep fvar Ty.bool
   | constString : String → Term' rep fvar Ty.string
   | constRecord : {l : List Ty} → HList (Term' rep fvar) l  → Term' rep fvar (.record l)
@@ -265,6 +308,7 @@ unsafe def Term'.denote  {n : Nat} {fvar : Fin n → Ty} {ty : Ty}
   | Term'.var v => v
   | Term'.freeVariable s => env s
   | Term'.constInt n => n
+  | Term'.constReal r => r
   | Term'.constBool b => b
   | Term'.constString s => s
   | Term'.add a t1 t2 =>
@@ -325,11 +369,25 @@ unsafe def Term'.denote  {n : Nat} {fvar : Fin n → Ty} {ty : Ty}
             build (i + 1) (Dict.insert acc i true)
           else acc
         (build 0 (Dict.empty inferInstance))
+    | BuiltinFn.Leq t =>
+        match t, denote env arg with
+        | .int, HList.cons a (HList.cons b HList.nil) => a <= b
+        | .real, HList.cons a (HList.cons b HList.nil) => a <= b
+        | .date, HList.cons a (HList.cons b HList.nil) => a.yyyymmdd <= b.yyyymmdd
+        | _, _ => false
+    | BuiltinFn.Sub t =>
+        match h : t, denote env arg with
+        | .int, HList.cons a (HList.cons b HList.nil) => a - b
+        | .real, HList.cons a (HList.cons b HList.nil) => a - b
+        | t', _ => h ▸ Ty.inhabited t'  -- fallback for unsupported types
+    | BuiltinFn.DateLit yyyymmdd =>
+        SDQLDate.mk yyyymmdd
 
 def Term'.show {n : Nat} {fvar : Fin n → Ty} {ty : Ty} : Term' (fun _ => String) fvar ty → String
   | .var v           => v
   | .freeVariable s  => s!"fv_{toString s}"
   | .constInt n      => toString n
+  | .constReal r     => toString r
   | .constBool b     => toString b
   | .constString s   => s
   | .add _ t1 t2     => s!"{t1.show} + {t2.show}"  -- note: ignore the Add evidence
