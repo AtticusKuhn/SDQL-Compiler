@@ -46,7 +46,8 @@ private partial def collectLoads (stx : TSyntax `sdql) : MacroM (Array (LoadKey 
     -- Recognize load[...] and recur through other forms
     match e with
     | `(sdql| load[ $ty:sdqlty ] ( $p:str )) => do
-        let tyTerm ← elabTy ty
+        -- Use elabTyPreserveOrder for load schemas to match TBL column order
+        let tyTerm ← elabTyPreserveOrder ty
         let key := p.getString
         -- Simply record the occurrence; dedup and consistency checks happen later
         return acc.push (key, { ty := tyTerm })

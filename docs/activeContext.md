@@ -9,6 +9,12 @@ Current focus:
 
 Latest changes:
 
+- **Generic TBL file loader framework**: Replaced hardcoded table-specific loaders with a generic, type-parametrized loading system inspired by sdql-rs. Key changes:
+  - `rustRuntimeHeader` now includes `FromTblField` trait for type-directed parsing, `build_col<T>` for generic column extraction, and `load_tbl` for parsing TBL files.
+  - `genTableLoader` in `CodegenRust.lean` generates inline loader code based on the table schema type.
+  - Added `elabTyPreserveOrder` in `SyntaxSDQL.lean` that preserves field declaration order (for load schemas matching TBL column order) while keeping `elabTy` for alphabetically sorted fields (for type checking).
+  - `SyntaxSDQLProg.lean` now uses `elabTyPreserveOrder` for load schemas, ensuring the type field order matches TBL column order.
+
 - **Dynamic reference testing for TPCH Q02**: Added a new `TestCase.programRef` variant that compares Lean-generated Rust code output against a reference Rust implementation (sdql-rs). The test runner now:
   1. Runs the sdql-rs reference binary (`sdql-rs/target/release/tpch_q02_tiny`)
   2. Compiles and runs the Lean-generated Rust code
@@ -39,9 +45,9 @@ Recent changes (captured here):
 - Memory Bank correction: removed `Mathlib` as a stated dependency in tech docs; the active core only imports `Std` and local modules.
 - Updated: `PartIiProject/SyntaxSDQL.lean` implements `[SDQL| ... ]` macros that elaborate to the surface layer (`STerm'`). It now covers literals, records (positional and named), dict singleton/lookup, `sum(<k,v> in d)`, `let`, `if`, `not`, addition, multiply with scalar tags (`*{int}`, `*{bool}`), boolean ops `&&`/`||`/`==`, and builtins `dom`, `range`, `endsWith`. It also provides the shared SDQL type grammar (`sdqlty`) and type elaborator `elabTy`, including support for `real`, `varchar(n)` (as `string`), `@vec {K -> V}`, `{K -> V}`, and record schemas `< name : Ty, … >`. Typed empty dicts `{}_{Tdom,Trange}` and `fvar[i]` placeholders are elaborated here so both the term DSL and the program EDSL use exactly the same elaboration pipeline.
 
-- New: Program-level Rust codegen from core `Prog` via `renderRustProgShown`. Generated sources embed a small `sdql_runtime` module containing helpers (`map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`), a stub `load<T: Default>` loader, and `SDQLShow` impls for pretty-printing. This shifts codegen from term-level to program-level (inputs are loaded by filename).
+- New: Program-level Rust codegen from core `Prog` via `renderRustProgShown`. Generated sources embed a small `sdql_runtime` module containing helpers (`map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`), generic TBL loaders (`FromTblField` trait, `build_col<T>`, `load_tbl`), and `SDQLShow` impls for pretty-printing. This shifts codegen from term-level to program-level (inputs are loaded by filename).
 - Tests updated to construct programs using `[SDQLProg { T }| ... ]` and to call `renderRustProgShown` on `ToCore.trProg` results. The test runner now regenerates `.sdql-test-out/*.rs` and `.bin` files using the program pipeline.
-- The stub loader returns `Default::default()`; real parsing is deferred.
+- Table loading: For each table parameter, codegen generates inline loader code using `load_tbl` and `build_col` with the correct column types and indices, derived from the table schema type.
 
 - New: `PartIiProject/SurfaceCore.lean` adds an explicit surface layer with named records and field selection by name, plus a surface→core translation (`ToCore.tr`). Translation erases names to positional records, supports `constRecord`, `projByName`, `lookup`, `sum`, `add`, `mul`, `let`, `if`, and `not`. Surface-side scaling evidence covers scalars, dictionaries, and records (`SScale.recordS` with typed membership `Mem`). Multiplication uses a surface tensor `stensor` and rewrite lemmas (`ty_stensor_eq`, `tyFields_map_stensor`) to align result types with core `tensor`. Named projection uses `HasField.index_getD_ty` to coerce the projected field to the expected core type.
 
@@ -50,7 +56,7 @@ Next steps (proposed):
 - Boolean semiring alignment: switch `AddM.boolA` from XOR to OR; update examples and, if needed, Rust helpers.
 - Expand Rust runtime and codegen to cover multiplication (`sdql_mul`) with full tensor-shape behavior and broaden tuple support.
 - Replace the inlined runtime with a shared Rust crate when switching to `cargo` builds; keep the small embedded module for simple `rustc` paths and tests.
-- Implement typed file loaders for common inputs (CSVs for dicts with scalar values), driven by surface types inferred from `SProg.fvar`.
+- ~~Implement typed file loaders for common inputs~~ (DONE: generic TBL loaders using `FromTblField` trait).
 - Extend `SDQLShow` tuple implementations beyond arity 5 as needed for larger records.
 - Scalar promotion: add explicit scalar universes and a `promote` term; extend `ScaleM` to additional semirings.
 - Surface sugar: sets/arrays elaboration layered on top of new `dom`/`range` builtins.
