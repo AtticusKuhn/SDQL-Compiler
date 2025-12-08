@@ -50,11 +50,17 @@ Testing infrastructure:
   - Lake executable target `sdql-tests` drives execution: `lake build sdql-tests && lake exe sdql-tests`.
   - Nix wrapper `sdql-tests-with-ref` builds sdql-rs reference binary if needed and runs tests: `nix run`.
 
-- Rust runtime shims (embedded in generated sources):
-  - `map_insert`, `lookup_or_default` helpers for maps; `SDQLShow` trait for ints, bools, strings (quoted), tuples (limited arities), and `BTreeMap`.
-  - Generic TBL loaders: `FromTblField` trait for type-directed parsing (i64, String, Real, bool), `build_col<T>` for extracting typed columns, `load_tbl` for parsing pipe-delimited TBL files.
-  - The Rust AST printer emits `map_insert(...)` and iterates maps with `.into_iter()` to match the shim.
-  - Table loading: `genTableLoader` generates inline loader code for each table parameter, using `load_tbl` and `build_col` with column indices derived from the table schema type.
+- Rust runtime (`sdql_runtime.rs`):
+  - Standalone file imported via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`
+  - Core types: `Real` (Ord-capable f64 wrapper), `Date` (YYYYMMDD integer)
+  - Semimodule trait: `SdqlAdd` with implementations for bool (XOR), i64, Real, Date, String, BTreeMap, and tuples up to arity 8
+  - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`
+  - Extension functions: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_sub`, `ext_str_ends_with`, `ext_dom`, `ext_range`
+  - TBL loaders: `FromTblField` trait for type-directed parsing (i64, String, Real, bool, Date), `build_col<T>` for extracting typed columns, `load_tbl` for parsing pipe-delimited TBL files
+  - Printing: `SDQLShow` trait for ints, bools, strings (quoted), tuples (up to arity 8), and `BTreeMap`
+  - The Rust AST printer emits `map_insert(...)` and iterates maps with `.into_iter()` to match the runtime helpers
+  - Table loading: `genTableLoader` generates inline loader code for each table parameter, using `load_tbl` and `build_col` with column indices derived from the table schema type
+  - Test runner copies `sdql_runtime.rs` to the output directory (`.sdql-test-out/`) before compiling
 
 Code generation integration:
 

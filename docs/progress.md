@@ -9,7 +9,12 @@ What works:
 - SDQL DSL macros: `[SDQL| ... ]` elaborating to surface `STerm'` with support for literals, records (positional and named), dict singleton/lookup, `sum`, `let`, `if`, `not`, `+`, `*{int|bool}`, boolean ops `&&`/`||`/`==`, and builtins `dom`, `range`, `endsWith`. Typed empty dict has moved to the program DSL. Parser ambiguity between hierarchical identifiers (`r.field`) and dot projection syntax is handled by preferring the identifier interpretation when Lean produces a choice node.
 - Program EDSL: `[SDQLProg { T }| ... ]` produces an `SProg` by scanning `load[U]("file")` occurrences, mapping each distinct path to a free-variable index (alphabetically by path), rewriting the SDQL program body by replacing each `load[...]` with a `fvar[i]` placeholder, and then delegating expression elaboration to the shared `[SDQL| … ]` machinery in `SyntaxSDQL.lean`. Field projections on loaded records (e.g., `region.size`) work via hierarchical identifier splitting in `elabSDQL`. This EDSL adds type sugar `real`, `varchar(n)` (as `string`), `@vec {K->V}` (alias of `{K->V}`) and forms `sum(<k,v> <- d) …`, `e.field`, and typed empty dicts `{}_{ Tdom, Trange }`. See examples in `PartIiProject/SyntaxSDQLProg.lean`. Use `SurfaceCore.ToCore.trProg` and `Term.show` to inspect the lowered core term.
 - Rust codegen: renders expressions, let-blocks, conditionals, dict ops, lookup-with-default, and `sum` as a loop with an accumulator; open-term functions with typed parameters. Supports `real` zeros/addition and maps builtins to external helpers (`ext_and`, `ext_or`, `ext_eq`, `ext_str_ends_with`, `ext_dom`, `ext_range`).
-- Program-level Rust codegen: `renderRustProgShown` compiles a core `Prog` to a standalone Rust program. It embeds a tiny `sdql_runtime` module with helpers (`map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`), generic TBL loaders (`FromTblField` trait, `build_col<T>`, `load_tbl`), and `SDQLShow` printing for scalars, maps, and tuples.
+- Program-level Rust codegen: `renderRustProgShown` compiles a core `Prog` to a standalone Rust program. Generated programs import `sdql_runtime.rs` (a standalone file with helpers, loaders, and printing) via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`. The runtime includes:
+  - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`
+  - Core types: `Real` (Ord-capable f64), `Date` (YYYYMMDD integer)
+  - Traits: `SdqlAdd` for semimodule addition, `FromTblField` for TBL parsing, `SDQLShow` for printing
+  - TBL loaders: `build_col<T>`, `load_tbl`
+  - Extension functions: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_sub`, `ext_str_ends_with`, `ext_dom`, `ext_range`
 - Generic table loading: For each table parameter, `genTableLoader` generates inline Rust code that uses `load_tbl` to parse the TBL file and `build_col<T>` to extract typed columns. The `elabTyPreserveOrder` function in the DSL preserves field declaration order for load schemas, ensuring column indices match TBL file order.
 - Testing: Lean test executable `sdql-tests` compiles SDQL→Rust, builds with `rustc`, runs programs, and compares outputs. Supports two modes:
   - `TestCase.program`: compares against hardcoded expected strings
@@ -36,8 +41,8 @@ What's left to build:
 - Program EDSL polish: configurable load-variable assignment policy (first occurrence vs alphabetical), duplicate-path type consistency checks, and integration hooks for codegen inputs.
 - Codegen/runtime completeness for multiply (`sdql_mul`) with tensor-shape behavior (outer product for dicts, fieldwise for records), and extend tuple helpers beyond arity 5 as needed.
 - ~~Real file loaders for program inputs~~ (DONE: generic TBL loaders with type-directed parsing).
-- Optional: factor the inlined Rust runtime out into a standalone crate and build program binaries with `cargo`.
-- Optional: centralize Rust runtime into a crate and drive testing via `cargo` if needed.
+- ~~Optional: factor the inlined Rust runtime out into a standalone crate and build program binaries with `cargo`.~~ (DONE: runtime extracted to `sdql_runtime.rs`; further migration to a cargo crate is optional)
+- ~~Optional: centralize Rust runtime into a crate and drive testing via `cargo` if needed.~~ (DONE: centralized in `sdql_runtime.rs`)
 - DSL niceties: multi-entry dict literals, n-ary records beyond 3 fields, named fields at the surface level.
 
 Known issues / caveats:
