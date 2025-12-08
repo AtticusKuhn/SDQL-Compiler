@@ -1,9 +1,11 @@
 import PartIiProject.CodegenRust
+import PartIiProject.Rust
 import Tests.Cases
 import PartIiProject.SurfaceCore
 import Lean
 
 open PartIiProject
+open PartIiProject.Rust (withLocComments)
 open System
 
 inductive TestKind where
@@ -23,8 +25,16 @@ structure TestResult where
 
 def outDir : FilePath := FilePath.mk ".sdql-test-out"
 
+/-- Path to the shared SDQL runtime file. -/
+def runtimeSrc : FilePath := FilePath.mk "sdql_runtime.rs"
+
 def writeFile (p : FilePath) (s : String) : IO Unit :=
   IO.FS.writeFile p s
+
+/-- Copy a file from src to dst. -/
+def copyFile (src dst : FilePath) : IO Unit := do
+  let contents ← IO.FS.readFile src
+  IO.FS.writeFile dst contents
 
 def runProc (cmd : String) (args : Array String) (cwd? : Option FilePath := none) : IO (Nat × String × String) := do
   let out ← IO.Process.output { cmd := cmd, args := args, cwd := cwd? }
@@ -70,10 +80,13 @@ end
 
 unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
   IO.FS.createDirAll outDir
+  -- Copy the shared runtime file to the output directory
+  copyFile runtimeSrc (outDir / "sdql_runtime.rs")
   let compileProgram (name : String) (sp : PartIiProject.SProg) :
       IO (Except String FilePath) := do
         let cp := PartIiProject.ToCore.trProg sp
-        let rs := PartIiProject.renderRustProgShown cp
+        -- Generate Rust code with source location comments for debugging
+        let rs := PartIiProject.renderRustProgShown cp withLocComments
         let rsPath := outDir / s!"{name}.rs"
         let binPath := outDir / s!"{name}.bin"
         writeFile rsPath rs
