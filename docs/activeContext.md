@@ -9,6 +9,13 @@ Current focus:
 
 Latest changes:
 
+- **Standalone Rust runtime file**: Extracted the embedded `sdql_runtime` module (~220 lines) from `CodegenRust.lean` into a standalone `sdql_runtime.rs` file (~418 lines, well-documented). Generated SDQL programs now import this file via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`. Benefits:
+  - Generated `.rs` files are much smaller and easier to read (e.g., `add_int.rs`: 11 lines vs 236 lines previously)
+  - Runtime code is now properly formatted Rust with documentation
+  - Single source of truth for the runtime implementation
+  - Easier to test and modify the runtime independently
+  - Test runner (`Tests/Main.lean`) copies `sdql_runtime.rs` to the output directory before compiling tests
+
 - **TPCH Q01 implementation**: Added a simplified Q01 query that groups lineitem rows by (returnflag, linestatus) and sums quantities. The full Q01 requires `concat` builtin for string concatenation which is not yet implemented. Q01 is currently a compile-only test.
 
 - **Date type and comparison**: Added `Ty.date` as a new primitive type with:
@@ -72,7 +79,7 @@ Next steps (proposed):
   - Add `concat` builtin to enable full Q01 and potentially other queries
 - Boolean semiring alignment: switch `AddM.boolA` from XOR to OR; update examples and, if needed, Rust helpers.
 - Expand Rust runtime and codegen to cover multiplication (`sdql_mul`) with full tensor-shape behavior and broaden tuple support.
-- Replace the inlined runtime with a shared Rust crate when switching to `cargo` builds; keep the small embedded module for simple `rustc` paths and tests.
+- ~~Replace the inlined runtime with a shared Rust crate when switching to `cargo` builds; keep the small embedded module for simple `rustc` paths and tests.~~ (DONE: runtime is now in standalone `sdql_runtime.rs` file, imported via `#[path = ...]`)
 - ~~Implement typed file loaders for common inputs~~ (DONE: generic TBL loaders using `FromTblField` trait).
 - Extend `SDQLShow` tuple implementations beyond arity 5 as needed for larger records.
 - Scalar promotion: add explicit scalar universes and a `promote` term; extend `ScaleM` to additional semirings.
@@ -94,5 +101,5 @@ Open questions:
 
 - How strictly to follow the paper’s boolean semiring in the core vs. keep XOR for debugging convenience?
 - Preferred path for named records (core vs. surface translation) given current goals; current direction is a surface→core translator.
-- Whether to use `cargo` and a shared Rust crate for runtime helpers vs. embedding helpers in generated sources (current approach embeds a tiny `sdql_runtime` module).
+- ~~Whether to use `cargo` and a shared Rust crate for runtime helpers vs. embedding helpers in generated sources~~ (resolved: standalone `sdql_runtime.rs` file is used, imported via `#[path = ...]`; optionally could migrate to a cargo crate later).
  - How to wire lean4‑nix manifests so `nix build` recognizes newly added modules (lake build already works).
