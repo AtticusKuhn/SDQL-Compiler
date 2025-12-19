@@ -1,6 +1,10 @@
 /.lake
 old
 AGENTS.md
+CLAUDE.md
+task.md
+.claude/
 .sdql-test-out/*.bin
 .sdql-test-out/*
+datasets/.sdql-test-out/
 result
