@@ -1,7 +1,7 @@
 import PartIiProject.CodegenRust
 import PartIiProject.Rust
+import PartIiProject.Term2
 import Tests.Cases
-import PartIiProject.SurfaceCore
 import Lean
 
 open PartIiProject
@@ -82,11 +82,11 @@ unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
   IO.FS.createDirAll outDir
   -- Copy the shared runtime file to the output directory
   copyFile runtimeSrc (outDir / "sdql_runtime.rs")
-  let compileProgram (name : String) (sp : PartIiProject.SProg) :
+  let compileProgram (name : String) (sp : SProg2) :
       IO (Except String FilePath) := do
-        let cp := PartIiProject.ToCore.trProg sp
+        let cp := ToCore2.trProg2 sp
         -- Generate Rust code with source location comments for debugging
-        let rs := PartIiProject.renderRustProgShown cp withLocComments
+        let rs := PartIiProject.renderRustProg2Shown cp withLocComments
         let rsPath := outDir / s!"{name}.rs"
         let binPath := outDir / s!"{name}.bin"
         writeFile rsPath rs
@@ -124,7 +124,7 @@ unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
           return { name, kind := .expectRefMatch, expected? := some expected,
                    refBin? := some refBinPath, stderr? := some err }
       | .ok binPath =>
-          let (rcode, rout, rerr) ← runBinary binPath
+          let (rcode, rout, rerr) ← runBinaryWithEnv binPath envVars
           if rcode != 0 then
             return { name, kind := .expectRefMatch, expected? := some expected,
                      refBin? := some refBinPath, stderr? := some rerr }

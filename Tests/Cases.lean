@@ -1,7 +1,6 @@
-import PartIiProject.Term
+import PartIiProject.Term2
 import PartIiProject.CodegenRust
 import PartIiProject.SyntaxSDQLProg
-import PartIiProject.SurfaceCore
 import Tests.TPCH.Q01
 import Tests.TPCH.Q02
 
@@ -16,32 +15,31 @@ open PartIiProject
 /- Sample test cases ported from inline demos. -/
 /- Test cases support both closed terms and open terms with runtime parameters. -/
 unsafe inductive TestCase where
-  | program (name : String) (p : PartIiProject.SProg) (expected : String) : TestCase
-  | programRef (name : String) (p : PartIiProject.SProg) (refBinPath : String) (envVars : List (String × String)) : TestCase
-  | compileOnly (name : String) (p : PartIiProject.SProg) : TestCase
+  | program (name : String) (p : SProg2) (expected : String) : TestCase
+  | programRef (name : String) (p : SProg2) (refBinPath : String) (envVars : List (String × String)) : TestCase
+  | compileOnly (name : String) (p : SProg2) : TestCase
 
 open TestCase
-open PartIiProject.ToCore
 
 -- Build sample programs using the SDQL program DSL (no loads)
-unsafe def p_add_int : PartIiProject.SProg :=
-  [SDQLProg { int }| 3 + 5 ]
+unsafe def p_add_int : SProg2 :=
+  [SDQLProg2 { int }| 3 + 5 ]
 
 
-unsafe def p_dict_is : PartIiProject.SProg :=
-  [SDQLProg { { int -> string } }| { 1 -> "one" } ]
+unsafe def p_dict_is : SProg2 :=
+  [SDQLProg2 { { int -> string } }| { 1 -> "one" } ]
 
-unsafe def p_dict_ii : PartIiProject.SProg :=
-  [SDQLProg { { int -> int } }| { 1 -> 2, 3 -> 4 } ]
+unsafe def p_dict_ii : SProg2 :=
+  [SDQLProg2 { { int -> int } }| { 1 -> 2, 3 -> 4 } ]
 
-unsafe def p_lookup_hit : PartIiProject.SProg :=
-  [SDQLProg { int }| { 1 -> 2, 3 -> 4 } (1) ]
+unsafe def p_lookup_hit : SProg2 :=
+  [SDQLProg2 { int }| { 1 -> 2, 3 -> 4 } (1) ]
 
-unsafe def p_lookup_miss : PartIiProject.SProg :=
-  [SDQLProg { int }| { 1 -> 2, 3 -> 4 } (0) ]
+unsafe def p_lookup_miss : SProg2 :=
+  [SDQLProg2 { int }| { 1 -> 2, 3 -> 4 } (0) ]
 
-unsafe def p_sum_vals : PartIiProject.SProg :=
-  [SDQLProg { int }| sum( <k, v> in { 3 -> 4, 5 -> 6 } ) v ]
+unsafe def p_sum_vals : SProg2 :=
+  [SDQLProg2 { int }| sum( <k, v> in { 3 -> 4, 5 -> 6 } ) v ]
 
 unsafe def smallCases : List TestCase :=
   [ TestCase.program "add_int" p_add_int "8"

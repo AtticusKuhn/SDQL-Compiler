@@ -1,5 +1,7 @@
 import PartIiProject.SyntaxSDQLProg
 import PartIiProject.SurfaceCore
+import PartIiProject.CodegenRust
+import PartIiProject.Term2
 
 namespace Tests.TPCH
 open PartIiProject.SurfaceTy
@@ -73,8 +75,8 @@ Source: sdql-rs/progs/tpch/2.sdql
 --     }
 -- END SDQL
 
--- Stub SProg to keep module usable
-unsafe def Q02_stub : SProg := [SDQLProg { int }| 0 ]
+-- Stub SProg2 to keep module usable (DeBruijn pipeline)
+unsafe def Q02_stub : SProg2 := [SDQLProg2 { int }| 0 ]
 
 -- Attempted port (placeholder; unsupported syntax likely)
 /-
@@ -84,10 +86,10 @@ unsafe def Q02_stub : SProg := [SDQLProg { int }| 0 ]
   `Tests/TPCH/Q02RecordNameMismatch.lean` for a minimized reproducer of the record-label issue.
 -/
 
-unsafe def Q02_wip : SProg :=
+unsafe def Q02_wip : SProg2 :=
   -- Result type: (acctbal, name, nation_name, partkey, mfgr, phone, address, comment)
   -- Fields sorted by name: _1 < _2 < _3 < _4 < _5 < _6 < _7 < _8
-  [SDQLProg { { < _1 : real, _2 : string, _3 : string, _4 : int, _5 : string, _6 : string, _7 : string, _8 : string > -> bool } }|
+  [SDQLProg2 { { < _1 : real, _2 : string, _3 : string, _4 : int, _5 : string, _6 : string, _7 : string, _8 : string > -> bool } }|
     let part = load[<p_partkey: @vec {int -> int}, p_name: @vec {int -> varchar(55)}, p_mfgr: @vec {int -> varchar(25)}, p_brand: @vec {int -> varchar(10)}, p_type: @vec {int -> varchar(25)}, p_size: @vec {int -> int}, p_container: @vec {int -> varchar(10)}, p_retailprice: @vec {int -> real}, p_comment: @vec {int -> varchar(23)}, size: int>]("datasets/tpch-tiny/part.tbl") in
     let supplier = load[<s_suppkey: @vec {int -> int}, s_name: @vec {int -> varchar(25)}, s_address: @vec {int -> varchar(40)}, s_nationkey: @vec {int -> int}, s_phone: @vec {int -> varchar(15)}, s_acctbal: @vec {int -> real}, s_comment: @vec {int -> varchar(101)}, size: int>]("datasets/tpch-tiny/supplier.tbl") in
     let partsupp = load[<ps_partkey: @vec {int -> int}, ps_suppkey: @vec {int -> int}, ps_availqty: @vec {int -> real}, ps_supplycost: @vec {int -> real}, ps_comment: @vec {int -> varchar(199)}, size: int>]("datasets/tpch-tiny/partsupp.tbl") in
@@ -158,7 +160,15 @@ unsafe def Q02_wip : SProg :=
       else {}_{ < _1 : real, _2 : string, _3 : string, _4 : int, _5 : string, _6 : string, _7 : string, _8 : string >, bool }
   ]
 
-unsafe def Q02 : SProg := Q02_wip
+unsafe def Q02 : SProg2 := Q02_wip
+#print Q02_wip
+-- Generate Rust code from the DeBruijn pipeline
+open ToCore2 in
+#eval! IO.println (renderRustProg2Shown (trProg2 Q02_stub))
+
+-- Generate Rust code for the full Q02 query
+open ToCore2 in
+#eval! IO.println (renderRustProg2Shown (trProg2 Q02))
 
 #print Q02
 
