@@ -2,12 +2,17 @@
 
 Current focus:
 
-- Maintain an accurate Memory Bank reflecting the Lean core, Rust codegen, the new Rust-backed test harness with CI, and the surface→core translator.
+- Maintain an accurate Memory Bank reflecting the Lean core, Rust codegen, the Rust-backed test harness, and the active front-end pipeline refactor.
 - Keep guidance aligned with the actual codebase (lookup and sum exist; a surface/named-records layer now exists in `PartIiProject/SurfaceCore.lean`).
 - Lean macro-based SDQL mini‑DSL for ergonomic authoring of terms that elaborates to surface `STerm'` (then translated to core).
-- Program EDSL `[SDQLProg { T }| … ]` in `PartIiProject/SyntaxSDQLProg.lean` now delegates all expression parsing to `SyntaxSDQL.lean`. It scans for `load[U]("path.tbl")`, assigns each distinct path to a free-variable index (alphabetically by path), rewrites the SDQL surface term by replacing each `load[...]` with a `fvar[i]` placeholder, and then calls the shared `[SDQL| … ]` elaborator to obtain an `STerm'`. Field projections on loaded records work via hierarchical identifier splitting in the SDQL elaborator. The resulting `SProg` packages the result type, free-variable typing function `fvar`, surface term, and `loadPaths`.
+- New program pipeline (DeBruijn): `[SDQLProg2 { T }| … ]` parses SDQL into a `LoadTermLoc`, extracts loads into an untyped DeBruijn term (`UntypedTermLoc`), type-infers to typed DeBruijn surface terms (`STermLoc2`), then lowers to DeBruijn core terms (`Prog2`) for Rust codegen.
 
 Latest changes:
+
+- **DeBruijn front-end refactor + pipeline**:
+  - New files: `PartIiProject/untyped.lean`, `PartIiProject/SurfaceCore2.lean`, `PartIiProject/Term2.lean`
+  - Parser now has an explicit untyped intermediate (`LoadTermLoc`) with `SourceLocation` for better error reporting during type inference
+  - The active end-to-end path is now: `LoadTermLoc → UntypedTermLoc → SProg2 → Prog2 → Rust`
 
 - **Standalone Rust runtime file**: Extracted the embedded `sdql_runtime` module (~220 lines) from `CodegenRust.lean` into a standalone `sdql_runtime.rs` file (~418 lines, well-documented). Generated SDQL programs now import this file via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`. Benefits:
   - Generated `.rs` files are much smaller and easier to read (e.g., `add_int.rs`: 11 lines vs 236 lines previously)
@@ -91,11 +96,11 @@ Next steps (proposed):
 
 Quick usage examples (Lean):
 
-- Build an `SProg` for a closed arithmetic term:
-  - `[SDQLProg { int }| 3 + 5 ]`
-- Build an `SProg` referencing an input dictionary file:
-  - `[SDQLProg { { int -> int } }| { 3 -> 7 } + load[{ int -> int }]("data.tbl") ]`
-  - Use `SurfaceCore.ToCore.trProg` and `Term.show` to pretty-print the lowered core term for debugging.
+- Build an `SProg2` for a closed arithmetic term:
+  - `[SDQLProg2 { int }| 3 + 5 ]`
+- Build an `SProg2` referencing an input dictionary file:
+  - `[SDQLProg2 { { int -> int } }| { 3 -> 7 } + load[{ int -> int }]("data.tbl") ]`
+  - Use `ToCore2.trProg2` and `Term2.showTermLoc2` to inspect the lowered core term.
 
 Open questions:
 
