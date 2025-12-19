@@ -7,4 +7,5 @@ task.md
 .sdql-test-out/*.bin
 .sdql-test-out/*
 datasets/.sdql-test-out/
+datasets/tpch
 result
