@@ -228,6 +228,7 @@
                 git unzip codex uv
                 gemini-cli
                 claude-code
+                sshpass
                 # sdql reference prerequisites
                 jdk17 sbt scala_2_13
                 clang clang-tools gcc gnumake gnused
