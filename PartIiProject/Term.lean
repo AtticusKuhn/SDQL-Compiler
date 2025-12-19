@@ -6,6 +6,31 @@ import PartIiProject.Mem
 -- set_option linter.style.longLine false
 set_option linter.unusedVariables false
 
+/-
+Source location information for core terms.
+This tracks positions from the original SDQL source code.
+-/
+structure SourceLocation where
+  /-- Start position (byte offset) in the source file -/
+  startPos : Nat
+  /-- End position (byte offset) in the source file -/
+  endPos : Nat
+  substring: String := ""
+  deriving Inhabited, Repr, BEq
+
+namespace SourceLocation
+
+/-- A default/unknown location -/
+def unknown : SourceLocation := ⟨0, 0, ""⟩
+
+/-- Pretty print a source location -/
+def toString (loc : SourceLocation) : String :=
+  s!"substring {loc.substring}: [{loc.startPos}..{loc.endPos}]"
+
+instance : ToString SourceLocation := ⟨SourceLocation.toString ⟩
+
+end SourceLocation
+
 inductive Ty : Type where
   | bool : Ty
   | real : Ty
@@ -267,27 +292,62 @@ inductive BuiltinFn : Ty → Ty → Type
   | Dom : {dom range : Ty} →  BuiltinFn (.dict dom range) (.dict dom Ty.bool)
   | Range : BuiltinFn Ty.int (Ty.dict Ty.int Ty.bool)
   | DateLit (yyyymmdd : Int) : BuiltinFn (Ty.record []) Ty.date  -- date(YYYYMMDD)
+  | Concat (l1 l2 : List Ty) : BuiltinFn (Ty.record [.record l1, .record l2]) (Ty.record (l1 ++ l2))  -- concat two records
 
--- Core terms (PHOAS) with typed addition/multiplication evidence
-inductive Term' (rep : Ty → Type) {n : Nat} (fvar : Fin n → Ty) : Ty → Type
-  | var   : {ty : Ty} → rep ty → Term' rep fvar ty
-  | constInt : Int → Term' rep fvar Ty.int
-  | constReal : Float → Term' rep fvar Ty.real
-  | constBool : Bool → Term' rep fvar Ty.bool
-  | constString : String → Term' rep fvar Ty.string
-  | constRecord : {l : List Ty} → HList (Term' rep fvar) l  → Term' rep fvar (.record l)
-  | freeVariable : (f : Fin n) → Term' rep fvar (fvar f)
-  | emptyDict: {dom  : Ty} →  {range : Ty} → Term' rep fvar (.dict dom range)
-  | dictInsert : {dom  : Ty} →  {range : Ty} → (Term' rep fvar dom) → (Term' rep fvar range) →  Term' rep fvar (.dict dom range) → Term' rep  fvar (.dict dom range)
-  | lookup : {dom range : Ty} → (aRange : AddM range) → Term' rep fvar (.dict dom range) → Term' rep fvar dom → Term' rep fvar range
-  | not : Term' rep fvar Ty.bool → Term' rep fvar Ty.bool
-  | ite : {ty : Ty} → Term' rep fvar Ty.bool → Term' rep fvar ty → Term' rep fvar ty → Term' rep fvar ty
-  | letin : {ty₁ ty₂ : Ty} → Term' rep fvar ty₁ → (rep ty₁ → Term' rep fvar ty₂) → Term' rep fvar ty₂
-  | add : {ty : Ty} → (a : AddM ty) → Term' rep fvar ty → Term' rep fvar ty → Term' rep fvar ty
-  | mul : { sc t1 t2 : Ty} → (_s1 : ScaleM sc t1) →  (_s2 : ScaleM sc t2) → Term' rep fvar t1 → Term' rep fvar t2 → Term' rep fvar (tensor t1 t2)
-  | sum : {dom range ty : Ty} → (a : AddM ty) → Term' rep fvar (.dict dom range) → (rep dom → rep range → Term' rep fvar ty) → Term' rep fvar ty
-  | proj : (l : List Ty) → Term' rep fvar (.record l) → (i : Nat) → Term' rep fvar (l.getD i Ty.int)
-  | builtin : {a b : Ty} → BuiltinFn a b → Term' rep fvar a → Term' rep fvar b
+/-
+Core terms (PHOAS) with typed addition/multiplication evidence and source location tracking.
+
+`TermLoc'` pairs a term with its source location from the original SDQL code.
+`Term'` is the underlying term structure.
+
+These are mutually inductive: `TermLoc'` wraps `Term'`, and `Term'`
+recursively contains `TermLoc'` in its sub-expressions.
+-/
+mutual
+  /-- A term paired with its source location -/
+  inductive TermLoc' (rep : Ty → Type) {n : Nat} (fvar : Fin n → Ty) : Ty → Type where
+    | mk : {ty : Ty} → (loc : SourceLocation) → Term' rep fvar ty → TermLoc' rep fvar ty
+
+  /-- Core term constructors -/
+  inductive Term' (rep : Ty → Type) {n : Nat} (fvar : Fin n → Ty) : Ty → Type where
+    | var   : {ty : Ty} → rep ty → Term' rep fvar ty
+    | constInt : Int → Term' rep fvar Ty.int
+    | constReal : Float → Term' rep fvar Ty.real
+    | constBool : Bool → Term' rep fvar Ty.bool
+    | constString : String → Term' rep fvar Ty.string
+    | constRecord : {l : List Ty} → HList (TermLoc' rep fvar) l → Term' rep fvar (.record l)
+    | freeVariable : (f : Fin n) → Term' rep fvar (fvar f)
+    | emptyDict: {dom : Ty} → {range : Ty} → Term' rep fvar (.dict dom range)
+    | dictInsert : {dom : Ty} → {range : Ty} → TermLoc' rep fvar dom → TermLoc' rep fvar range → TermLoc' rep fvar (.dict dom range) → Term' rep fvar (.dict dom range)
+    | lookup : {dom range : Ty} → (aRange : AddM range) → TermLoc' rep fvar (.dict dom range) → TermLoc' rep fvar dom → Term' rep fvar range
+    | not : TermLoc' rep fvar Ty.bool → Term' rep fvar Ty.bool
+    | ite : {ty : Ty} → TermLoc' rep fvar Ty.bool → TermLoc' rep fvar ty → TermLoc' rep fvar ty → Term' rep fvar ty
+    | letin : {ty₁ ty₂ : Ty} → TermLoc' rep fvar ty₁ → (rep ty₁ → TermLoc' rep fvar ty₂) → Term' rep fvar ty₂
+    | add : {ty : Ty} → (a : AddM ty) → TermLoc' rep fvar ty → TermLoc' rep fvar ty → Term' rep fvar ty
+    | mul : {sc t1 t2 : Ty} → (_s1 : ScaleM sc t1) → (_s2 : ScaleM sc t2) → TermLoc' rep fvar t1 → TermLoc' rep fvar t2 → Term' rep fvar (tensor t1 t2)
+    | sum : {dom range ty : Ty} → (a : AddM ty) → TermLoc' rep fvar (.dict dom range) → (rep dom → rep range → TermLoc' rep fvar ty) → Term' rep fvar ty
+    | proj : (l : List Ty) → TermLoc' rep fvar (.record l) → (i : Nat) → Term' rep fvar (l.getD i Ty.int)
+    | builtin : {a b : Ty} → BuiltinFn a b → TermLoc' rep fvar a → Term' rep fvar b
+end
+
+namespace TermLoc'
+  /-- Extract the source location from a located term -/
+  def loc {rep : Ty → Type} {n : Nat} {fvar : Fin n → Ty} {ty : Ty}
+      (e : TermLoc' rep fvar ty) : SourceLocation :=
+    match e with
+    | mk l _ => l
+
+  /-- Extract the underlying term from a located term -/
+  def term {rep : Ty → Type} {n : Nat} {fvar : Fin n → Ty} {ty : Ty}
+      (e : TermLoc' rep fvar ty) : Term' rep fvar ty :=
+    match e with
+    | mk _ t => t
+
+  /-- Create a located term with an unknown location -/
+  def withUnknownLoc {rep : Ty → Type} {n : Nat} {fvar : Fin n → Ty} {ty : Ty}
+      (t : Term' rep fvar ty) : TermLoc' rep fvar ty :=
+    mk SourceLocation.unknown t
+end TermLoc'
 
 
 
@@ -302,133 +362,167 @@ private unsafe def getProj {l : List Ty}
       not_false_eq_true, getElem?_neg, Option.getD_none, Ty.denote]
     exact 0
 
-unsafe def Term'.denote  {n : Nat} {fvar : Fin n → Ty} {ty : Ty}
-    (env : (s : Fin n) → (fvar s).denote) :
-    Term' Ty.denote fvar ty → ty.denote
-  | Term'.var v => v
-  | Term'.freeVariable s => env s
-  | Term'.constInt n => n
-  | Term'.constReal r => r
-  | Term'.constBool b => b
-  | Term'.constString s => s
-  | Term'.add a t1 t2 =>
-    let add := AddM.denote a
-    add (denote env t1) (denote env t2)
-  | .not t => Bool.not (denote env t)
-  | .ite c t1 t2 => match (denote env c) with
-    | true => (denote env t1)
-    | false => (denote env t2)
-  | .letin t1 f => denote env (f (denote env t1))
-  | .lookup aRange d k =>
-    let dv := denote env d
-    let kv := denote env k
-    match Dict.find? dv kv with
-    | some v => v
-    | none => AddM.zero aRange
-  | .proj l record index =>
-    let dr := denote env record
-    getProj dr index
-  | .constRecord fields => hmap (denote env) fields
-  | @Term'.emptyDict _ _ _ dom _ => Dict.empty (Ty.ord dom)
-  | .dictInsert key val dict => Dict.insert (denote env dict) (denote env key) (denote env val)
-  | .sum a d f =>
-    let dv := denote env d
-    let add := AddM.denote a
-    let zero := AddM.zero a
-    dv.map.foldl
-      (fun acc k v =>
-        add acc (denote env (f k v))
-      )
-      zero
-  | .mul s1 s2 t1e t2e =>
-    ScaleM.mulDenote s1 s2 (denote env t1e) (denote env t2e)
-  | .builtin fn arg =>
-    match fn with
-    | BuiltinFn.Or =>
-        match denote env arg with
-        | HList.cons a (HList.cons b HList.nil) => Bool.or a b
-    | BuiltinFn.And =>
-        match denote env arg with
-        | HList.cons a (HList.cons b HList.nil) => Bool.and a b
-    | BuiltinFn.Eq t =>
-        match t, denote env arg with
-        | .int, HList.cons a (HList.cons b HList.nil) => a == b
-        | .string, HList.cons a (HList.cons b HList.nil) => decide (a = b)
-        | .real, HList.cons a (HList.cons b HList.nil) => a == b
-        | _, _ => false
-    | BuiltinFn.StrEndsWith =>
-        match denote env arg with
-        | HList.cons s (HList.cons suf HList.nil) => s.endsWith suf
-    | @BuiltinFn.Dom dom range =>
-        let d := denote env arg
-        d.map.foldl (fun acc k _v => Dict.insert acc k true) (Dict.empty (Ty.ord dom))
-    | BuiltinFn.Range =>
-        let n := denote env arg
-        let rec build (i : Int) (acc : Dict Int Bool) : Dict Int Bool :=
-          if i < n then
-            build (i + 1) (Dict.insert acc i true)
-          else acc
-        (build 0 (Dict.empty inferInstance))
-    | BuiltinFn.Leq t =>
-        match t, denote env arg with
-        | .int, HList.cons a (HList.cons b HList.nil) => a <= b
-        | .real, HList.cons a (HList.cons b HList.nil) => a <= b
-        | .date, HList.cons a (HList.cons b HList.nil) => a.yyyymmdd <= b.yyyymmdd
-        | _, _ => false
-    | BuiltinFn.Sub t =>
-        match h : t, denote env arg with
-        | .int, HList.cons a (HList.cons b HList.nil) => a - b
-        | .real, HList.cons a (HList.cons b HList.nil) => a - b
-        | t', _ => h ▸ Ty.inhabited t'  -- fallback for unsupported types
-    | BuiltinFn.DateLit yyyymmdd =>
-        SDQLDate.mk yyyymmdd
+mutual
+  /-- Denote a located term by extracting and denoting the inner term -/
+  unsafe def TermLoc'.denote {n : Nat} {fvar : Fin n → Ty} {ty : Ty}
+      (env : (s : Fin n) → (fvar s).denote) :
+      TermLoc' Ty.denote fvar ty → ty.denote
+    | TermLoc'.mk _ inner => Term'.denote env inner
 
-def Term'.show {n : Nat} {fvar : Fin n → Ty} {ty : Ty} : Term' (fun _ => String) fvar ty → String
-  | .var v           => v
-  | .freeVariable s  => s!"fv_{toString s}"
-  | .constInt n      => toString n
-  | .constReal r     => toString r
-  | .constBool b     => toString b
-  | .constString s   => s
-  | .add _ t1 t2     => s!"{t1.show} + {t2.show}"  -- note: ignore the Add evidence
-  | .lookup _ d k    => s!"{d.show}({k.show})"
-  | (proj _ b c) => s!"{b.show}.{c}"
-  | (mul _ _ b c)=> s!"{b.show} * {c.show}"
-  | (letin  a b)=> s!"let x = {a.show} in {(b "x").show}"
-  | (sum _ d f) => s!"sum(x in {d.show}) {(f "k" "v").show}"
-  |(ite c t f)=> s!"if {c.show} then {t.show} else {f.show}"
-  | (not e)=> s!"not {e.show}"
-  |(dictInsert a b c)=> s!"\{{a.show} -> {b.show}} ++ {c.show}"
-  | (emptyDict)=> "{}"
-  | (constRecord r)=>
-    let rec show_r {n : Nat} {fvar : Fin n → Ty} {l : List Ty} (r : HList (Term' (fun _ ↦ String) fvar) l) : String :=
-      match r with
-        | .nil => ""
-        | .cons h t =>
-          let hStr := (Term'.show h)
-          let tStr := show_r t
-          if tStr = "" then hStr else s!"{hStr}, {tStr}"
-    "<" ++ show_r r ++ ">"
-  | (builtin _ a) => s!"builtin({a.show})"
+  /-- Denote the HList of located record fields -/
+  unsafe def denoteRecordFields {n : Nat} {fvar : Fin n → Ty}
+      (env : (s : Fin n) → (fvar s).denote) :
+      {l : List Ty} → HList (TermLoc' Ty.denote fvar) l → HList Ty.denote l
+    | [], .nil => .nil
+    | _ :: _, .cons h t => .cons (TermLoc'.denote env h) (denoteRecordFields env t)
 
+  unsafe def Term'.denote {n : Nat} {fvar : Fin n → Ty} {ty : Ty}
+      (env : (s : Fin n) → (fvar s).denote) :
+      Term' Ty.denote fvar ty → ty.denote
+    | Term'.var v => v
+    | Term'.freeVariable s => env s
+    | Term'.constInt n => n
+    | Term'.constReal r => r
+    | Term'.constBool b => b
+    | Term'.constString s => s
+    | Term'.add a t1 t2 =>
+      let add := AddM.denote a
+      add (TermLoc'.denote env t1) (TermLoc'.denote env t2)
+    | .not t => Bool.not (TermLoc'.denote env t)
+    | .ite c t1 t2 => match (TermLoc'.denote env c) with
+      | true => (TermLoc'.denote env t1)
+      | false => (TermLoc'.denote env t2)
+    | .letin t1 f => TermLoc'.denote env (f (TermLoc'.denote env t1))
+    | .lookup aRange d k =>
+      let dv := TermLoc'.denote env d
+      let kv := TermLoc'.denote env k
+      match Dict.find? dv kv with
+      | some v => v
+      | none => AddM.zero aRange
+    | .proj l record index =>
+      let dr := TermLoc'.denote env record
+      getProj dr index
+    | .constRecord fields => denoteRecordFields env fields
+    | @Term'.emptyDict _ _ _ dom _ => Dict.empty (Ty.ord dom)
+    | .dictInsert key val dict => Dict.insert (TermLoc'.denote env dict) (TermLoc'.denote env key) (TermLoc'.denote env val)
+    | .sum a d f =>
+      let dv := TermLoc'.denote env d
+      let add := AddM.denote a
+      let zero := AddM.zero a
+      dv.map.foldl
+        (fun acc k v =>
+          add acc (TermLoc'.denote env (f k v))
+        )
+        zero
+    | .mul s1 s2 t1e t2e =>
+      ScaleM.mulDenote s1 s2 (TermLoc'.denote env t1e) (TermLoc'.denote env t2e)
+    | .builtin fn arg =>
+      match fn with
+      | BuiltinFn.Or =>
+          match TermLoc'.denote env arg with
+          | HList.cons a (HList.cons b HList.nil) => Bool.or a b
+      | BuiltinFn.And =>
+          match TermLoc'.denote env arg with
+          | HList.cons a (HList.cons b HList.nil) => Bool.and a b
+      | BuiltinFn.Eq t =>
+          match t, TermLoc'.denote env arg with
+          | .int, HList.cons a (HList.cons b HList.nil) => a == b
+          | .string, HList.cons a (HList.cons b HList.nil) => decide (a = b)
+          | .real, HList.cons a (HList.cons b HList.nil) => a == b
+          | _, _ => false
+      | BuiltinFn.StrEndsWith =>
+          match TermLoc'.denote env arg with
+          | HList.cons s (HList.cons suf HList.nil) => s.endsWith suf
+      | @BuiltinFn.Dom dom range =>
+          let d := TermLoc'.denote env arg
+          d.map.foldl (fun acc k _v => Dict.insert acc k true) (Dict.empty (Ty.ord dom))
+      | BuiltinFn.Range =>
+          let n := TermLoc'.denote env arg
+          let rec build (i : Int) (acc : Dict Int Bool) : Dict Int Bool :=
+            if i < n then
+              build (i + 1) (Dict.insert acc i true)
+            else acc
+          (build 0 (Dict.empty inferInstance))
+      | BuiltinFn.Leq t =>
+          match t, TermLoc'.denote env arg with
+          | .int, HList.cons a (HList.cons b HList.nil) => a <= b
+          | .real, HList.cons a (HList.cons b HList.nil) => a <= b
+          | .date, HList.cons a (HList.cons b HList.nil) => a.yyyymmdd <= b.yyyymmdd
+          | _, _ => false
+      | BuiltinFn.Sub t =>
+          match h : t, TermLoc'.denote env arg with
+          | .int, HList.cons a (HList.cons b HList.nil) => a - b
+          | .real, HList.cons a (HList.cons b HList.nil) => a - b
+          | t', _ => h ▸ Ty.inhabited t'  -- fallback for unsupported types
+      | BuiltinFn.DateLit yyyymmdd =>
+          SDQLDate.mk yyyymmdd
+      | BuiltinFn.Concat l1 l2 =>
+          match TermLoc'.denote env arg with
+          | HList.cons r1 (HList.cons r2 HList.nil) =>
+              hAppend r1 r2
+end
 
-def Term {n : Nat} (fvar : Fin n → Ty) (ty : Ty) := {rep : Ty → Type}  → Term' rep fvar ty
+mutual
+  /-- Show a located term -/
+  def TermLoc'.show {n : Nat} {fvar : Fin n → Ty} {ty : Ty}
+      : TermLoc' (fun _ => String) fvar ty → String
+    | TermLoc'.mk _ inner => Term'.show inner
+
+  /-- Show the HList of located record fields -/
+  def showRecordFields {n : Nat} {fvar : Fin n → Ty}
+      : {l : List Ty} → HList (TermLoc' (fun _ => String) fvar) l → String
+    | [], .nil => ""
+    | _, .cons h t =>
+        let hStr := TermLoc'.show h
+        let tStr := showRecordFields t
+        if tStr = "" then hStr else s!"{hStr}, {tStr}"
+
+  def Term'.show {n : Nat} {fvar : Fin n → Ty} {ty : Ty} : Term' (fun _ => String) fvar ty → String
+    | .var v           => v
+    | .freeVariable s  => s!"fv_{toString s}"
+    | .constInt n      => toString n
+    | .constReal r     => toString r
+    | .constBool b     => toString b
+    | .constString s   => s
+    | .add _ t1 t2     => s!"{TermLoc'.show t1} + {TermLoc'.show t2}"
+    | .lookup _ d k    => s!"{TermLoc'.show d}({TermLoc'.show k})"
+    | .proj _ b c      => s!"{TermLoc'.show b}.{c}"
+    | .mul _ _ b c     => s!"{TermLoc'.show b} * {TermLoc'.show c}"
+    | .letin a b       => s!"let x = {TermLoc'.show a} in {TermLoc'.show (b "x")}"
+    | .sum _ d f       => s!"sum(x in {TermLoc'.show d}) {TermLoc'.show (f "k" "v")}"
+    | .ite c t f       => s!"if {TermLoc'.show c} then {TermLoc'.show t} else {TermLoc'.show f}"
+    | .not e           => s!"not {TermLoc'.show e}"
+    | .dictInsert a b c => s!"\{{TermLoc'.show a} -> {TermLoc'.show b}} ++ {TermLoc'.show c}"
+    | .emptyDict       => "{}"
+    | .constRecord r   => "<" ++ showRecordFields r ++ ">"
+    | .builtin _ a     => s!"builtin({TermLoc'.show a})"
+end
+
+/-- A closed term (no free representation variables) -/
+def Term {n : Nat} (fvar : Fin n → Ty) (ty : Ty) := {rep : Ty → Type} → Term' rep fvar ty
+
+/-- A closed located term -/
+def TermLoc {n : Nat} (fvar : Fin n → Ty) (ty : Ty) := {rep : Ty → Type} → TermLoc' rep fvar ty
+
 def f0 (f : Fin 0) : Ty := nomatch f
 
 /-
 Prog has no semantic meaning, it's just used for code
-generation.
+generation. Now uses TermLoc' to carry source locations.
 -/
-structure Prog  : Type 1 where
+structure Prog : Type 1 where
   t : Ty
   n : Nat
   fvar : Fin n → Ty
-  term : Term fvar t
+  term : {rep : Ty → Type} → TermLoc' rep fvar t
   loadPaths : Fin n → String
 
 
 def Term.show {ty : Ty} {n : Nat} {f : Fin n → Ty} (t : Term f ty) : String :=
   Term'.show (t (rep := (fun _ => String)))
+
+def TermLoc.show {ty : Ty} {n : Nat} {f : Fin n → Ty} (t : TermLoc f ty) : String :=
+  TermLoc'.show (t (rep := (fun _ => String)))
 -- set_option pp.explicit true
 
 -- Quick checks

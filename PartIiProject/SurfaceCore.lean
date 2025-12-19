@@ -5,6 +5,9 @@ import Std
 
 namespace PartIiProject
 
+-- Re-export SourceLocation from Term.lean for convenience
+-- (SourceLocation is now defined in Term.lean for sharing with core terms)
+
 /-
 Surface layer with named products (records) and field selection by name.
 We keep terms minimal and focus on named records/projection, plus a
@@ -20,7 +23,7 @@ inductive SurfaceTy : Type where
   | dict : SurfaceTy → SurfaceTy → SurfaceTy
   -- | record : Std.TreeMap.Raw String SurfaceTy → SurfaceTy
   | record : (List (String × SurfaceTy)) → SurfaceTy
-  deriving Inhabited
+  deriving Inhabited, Repr
 
 abbrev Schema := List (String × SurfaceTy)
 -- abbrev Schema := Std.TreeMap.Raw String SurfaceTy
@@ -61,16 +64,17 @@ inductive SScale : SurfaceTy → SurfaceTy → Type where
 --     | t :: ts => HList.cons (f t (by simp only [List.mem_cons, true_or])) (toHList (fun t' => f t' ∘ List.mem_cons_of_mem t))
 
 -- Surface tensor shape (matches core `tensor` on erased types)
+-- This function computes the type of (e1 * e2) where e1 : a and e2 : b
 -- marked unsafe because the termination checker cannot prove that stensor terminates
-
 
 @[simp, reducible]
 unsafe def stensor (a b : SurfaceTy) : SurfaceTy :=
   match a with
   | .dict dom range => .dict dom (stensor range b)
-  | .record σ => .record (σ.map (fun (n,t) =>  (n, stensor t b)))
+  | .record σ => .record (σ.map (fun (n,t) => (n, stensor t b)))
   | _ => b
--- Note: unsafe def, so we do not prove termination here.
+
+unsafe def stensor_real_real : stensor .real .real = .real := rfl
 
 inductive SBuiltin : SurfaceTy → SurfaceTy → Type where
   | And : SBuiltin (.record [("_1", .bool), ("_2", .bool)]) .bool
@@ -82,42 +86,84 @@ inductive SBuiltin : SurfaceTy → SurfaceTy → Type where
   | Dom {dom range : SurfaceTy} : SBuiltin (.dict dom range) (.dict dom .bool)
   | Range : SBuiltin .int (.dict .int .bool)
   | DateLit (yyyymmdd : Int) : SBuiltin (.record []) .date  -- date(YYYYMMDD)
+  | Concat (σ1 σ2 : Schema) : SBuiltin (.record [("_1", .record σ1), ("_2", .record σ2)]) (.record (σ1 ++ σ2))  -- concat two records
 
-unsafe inductive STerm' (rep : SurfaceTy → Type) {n : Nat} (fvar : Fin n → SurfaceTy) : SurfaceTy → Type where
-  | var   : {ty : SurfaceTy} → rep ty → STerm' rep fvar ty
-  | freeVariable : (f : Fin n) → STerm' rep fvar (fvar f)
-  | constInt : Int → STerm' rep fvar SurfaceTy.int
-  | constReal : Float → STerm' rep fvar SurfaceTy.real
-  | constBool : Bool → STerm' rep fvar SurfaceTy.bool
-  | constString : String → STerm' rep fvar SurfaceTy.string
-  | not : STerm' rep fvar SurfaceTy.bool → STerm' rep fvar SurfaceTy.bool
-  | ite : {ty : SurfaceTy} → STerm' rep fvar SurfaceTy.bool → STerm' rep fvar ty → STerm' rep fvar ty → STerm' rep fvar ty
-  | letin : {ty₁ ty₂ : SurfaceTy} → STerm' rep fvar ty₁ → (rep ty₁ → STerm' rep fvar ty₂) → STerm' rep fvar ty₂
-  | add : {ty : SurfaceTy} → (a : SAdd ty) → STerm' rep fvar ty → STerm' rep fvar ty → STerm' rep fvar ty
-  | mul : {sc t1 t2 : SurfaceTy} → (s1 : SScale sc t1) → (s2 : SScale sc t2)
-      → STerm' rep fvar t1 → STerm' rep fvar t2 → STerm' rep fvar (stensor t1 t2)
-  | emptyDict : {domain ran : SurfaceTy} → STerm' rep fvar (SurfaceTy.dict domain ran)
-  | dictInsert : {dom range : SurfaceTy} → STerm' rep fvar dom → STerm' rep fvar range → STerm' rep fvar (SurfaceTy.dict dom range) → STerm' rep fvar (SurfaceTy.dict dom range)
-  | lookup : {dom range : SurfaceTy} → (aRange : SAdd range) → STerm' rep fvar (SurfaceTy.dict dom range) → STerm' rep fvar dom → STerm' rep fvar range
-  | sum : {dom range ty : SurfaceTy} → (a : SAdd ty) → STerm' rep fvar (SurfaceTy.dict dom range) → (rep dom → rep range → STerm' rep fvar ty) → STerm' rep fvar ty
-  | constRecord : {l : Schema}
-      → HList (fun (_, t) => STerm' rep fvar t) l
-      → STerm' rep fvar (.record l)
-  | projByName {nm t} : {σ : Schema}
-      → (p : HasField σ nm t)
-      → STerm' rep fvar (.record σ)
-      → STerm' rep fvar t
-  | builtin : {a b : SurfaceTy} → SBuiltin a b → STerm' rep fvar a → STerm' rep fvar b
+/-
+  Surface terms (PHOAS) with source location tracking.
+
+  `STermLoc'` pairs a term with its source location from the syntax macro.
+  `STerm'` is the underlying term structure.
+
+  These are mutually inductive: `STermLoc'` wraps `STerm'`, and `STerm'`
+  recursively contains `STermLoc'` in its sub-expressions.
+-/
+mutual
+  /-- A term paired with its source location -/
+  unsafe inductive STermLoc' (rep : SurfaceTy → Type) {n : Nat} (fvar : Fin n → SurfaceTy) : SurfaceTy → Type where
+    | mk : {ty : SurfaceTy} → (loc : SourceLocation) → STerm' rep fvar ty → STermLoc' rep fvar ty
+
+  /-- Core surface term constructors -/
+  unsafe inductive STerm' (rep : SurfaceTy → Type) {n : Nat} (fvar : Fin n → SurfaceTy) : SurfaceTy → Type where
+    | var   : {ty : SurfaceTy} → rep ty → STerm' rep fvar ty
+    | freeVariable : (f : Fin n) → STerm' rep fvar (fvar f)
+    | constInt : Int → STerm' rep fvar SurfaceTy.int
+    | constReal : Float → STerm' rep fvar SurfaceTy.real
+    | constBool : Bool → STerm' rep fvar SurfaceTy.bool
+    | constString : String → STerm' rep fvar SurfaceTy.string
+    | not : STermLoc' rep fvar SurfaceTy.bool → STerm' rep fvar SurfaceTy.bool
+    | ite : {ty : SurfaceTy} → STermLoc' rep fvar SurfaceTy.bool → STermLoc' rep fvar ty → STermLoc' rep fvar ty → STerm' rep fvar ty
+    | letin : {ty₁ ty₂ : SurfaceTy} → STermLoc' rep fvar ty₁ → (rep ty₁ → STermLoc' rep fvar ty₂) → STerm' rep fvar ty₂
+    | add : {ty : SurfaceTy} → (a : SAdd ty) → STermLoc' rep fvar ty → STermLoc' rep fvar ty → STerm' rep fvar ty
+    | mul : {sc t1 t2 : SurfaceTy} → (s1 : SScale sc t1) → (s2 : SScale sc t2)
+        → STermLoc' rep fvar t1 → STermLoc' rep fvar t2 → STerm' rep fvar (stensor t1 t2)
+    | emptyDict : {domain ran : SurfaceTy} → STerm' rep fvar (SurfaceTy.dict domain ran)
+    | dictInsert : {dom range : SurfaceTy} → STermLoc' rep fvar dom → STermLoc' rep fvar range → STermLoc' rep fvar (SurfaceTy.dict dom range) → STerm' rep fvar (SurfaceTy.dict dom range)
+    | lookup : {dom range : SurfaceTy} → (aRange : SAdd range) → STermLoc' rep fvar (SurfaceTy.dict dom range) → STermLoc' rep fvar dom → STerm' rep fvar range
+    | sum : {dom range ty : SurfaceTy} → (a : SAdd ty) → STermLoc' rep fvar (SurfaceTy.dict dom range) → (rep dom → rep range → STermLoc' rep fvar ty) → STerm' rep fvar ty
+    | constRecord : {l : Schema}
+        → HList (fun (_, t) => STermLoc' rep fvar t) l
+        → STerm' rep fvar (.record l)
+    | projByName {nm t} : {σ : Schema}
+        → (p : HasField σ nm t)
+        → STermLoc' rep fvar (.record σ)
+        → STerm' rep fvar t
+    | builtin : {a b : SurfaceTy} → SBuiltin a b → STermLoc' rep fvar a → STerm' rep fvar b
+end
+
+namespace STermLoc'
+  /-- Extract the source location from a located term -/
+  unsafe def loc {rep : SurfaceTy → Type} {n : Nat} {fvar : Fin n → SurfaceTy} {ty : SurfaceTy}
+      (e : STermLoc' rep fvar ty) : SourceLocation :=
+    match e with
+    | mk l _ => l
+
+  /-- Extract the underlying term from a located term -/
+  unsafe def term {rep : SurfaceTy → Type} {n : Nat} {fvar : Fin n → SurfaceTy} {ty : SurfaceTy}
+      (e : STermLoc' rep fvar ty) : STerm' rep fvar ty :=
+    match e with
+    | mk _ t => t
+
+  /-- Create a located term with an unknown location -/
+  unsafe def withUnknownLoc {rep : SurfaceTy → Type} {n : Nat} {fvar : Fin n → SurfaceTy} {ty : SurfaceTy}
+      (t : STerm' rep fvar ty) : STermLoc' rep fvar ty :=
+    mk SourceLocation.unknown t
+end STermLoc'
 
 
+/-- A closed surface term (no free representation variables) -/
 unsafe def STerm {n : Nat} (fvar : Fin n → SurfaceTy) (ty : SurfaceTy) :=
   {rep : SurfaceTy → Type} → STerm' rep fvar ty
 
-unsafe structure SProg  : Type 1 where
+/-- A closed surface term with location -/
+unsafe def STermLoc {n : Nat} (fvar : Fin n → SurfaceTy) (ty : SurfaceTy) :=
+  {rep : SurfaceTy → Type} → STermLoc' rep fvar ty
+
+/-- A program with located terms -/
+unsafe structure SProg : Type 1 where
   t : SurfaceTy
   n : Nat
   fvar : Fin n → SurfaceTy
-  term : STerm fvar t
+  term : {rep : SurfaceTy → Type} → STermLoc' rep fvar t
   loadPaths : Fin n → String
 
 
@@ -127,8 +173,9 @@ def f0 (f : Fin 0) : SurfaceTy  := nomatch f
 namespace ToCore
 
 -- Helper to project and coerce the result type via an index/equality proof
+-- Works with TermLoc' (takes a located record and returns an unlocated projected term)
 def projCast {rep : Ty → Type} {n : Nat} {fvar : Fin n → Ty} {l : List Ty}
-    (r : Term' rep fvar (Ty.record l)) (i : Nat) {t : Ty}
+    (r : TermLoc' rep fvar (Ty.record l)) (i : Nat) {t : Ty}
     (h : l.getD i Ty.int = t) : Term' rep fvar t :=
   by cases h; simpa using (Term'.proj l r i)
 
@@ -206,6 +253,14 @@ def toCoreScale : {sc t : SurfaceTy} → SScale sc t → ScaleM (ty sc) (ty t)
 theorem tyFields_cons (nm : String) (t : SurfaceTy) (σ : Schema) :
     tyFields ((nm, t) :: σ) = ty t :: tyFields σ := rfl
 
+-- tyFields distributes over concatenation
+theorem tyFields_append (σ1 σ2 : Schema) :
+    tyFields (σ1 ++ σ2) = tyFields σ1 ++ tyFields σ2 := by
+  induction σ1 with
+  | nil => simp [tyFields]
+  | cons h t ih =>
+    simp [tyFields, ih]
+
 @[simp]
 theorem List.getD_cons_zero {α} (x : α) (xs : List α) (d : α) :
     (List.getD (x :: xs) 0 d) = x := by
@@ -258,17 +313,27 @@ end
 
 
 mutual
+  /-- Translate a list of located record fields, preserving locations -/
   unsafe def trRecordFields {rep : Ty → Type} {n : Nat}
       (fvar : Fin n → SurfaceTy)
       : {l : Schema}
-      → HList (fun (_, t) => STerm' (rep ∘ ty) (fun i => fvar i) t) l
-      → HList (Term' rep (fun i => ty (fvar i))) (tyFields l)
+      → HList (fun (_, t) => STermLoc' (rep ∘ ty) (fun i => fvar i) t) l
+      → HList (TermLoc' rep (fun i => ty (fvar i))) (tyFields l)
     | [], HList.nil => HList.nil
     | (_ :: _), HList.cons h t =>
-        HList.cons (tr (fvar := fvar) h) (trRecordFields (fvar := fvar) t)
+        HList.cons (trLoc (fvar := fvar) h) (trRecordFields (fvar := fvar) t)
 
+  /-- Translate a located surface term to core, preserving location info -/
+  unsafe def trLoc {rep : Ty → Type} {n : Nat}
+      {fvar : Fin n → SurfaceTy} {t : SurfaceTy}
+      (e : STermLoc' (rep ∘ ty) fvar t) : TermLoc' rep (ty ∘ fvar) (ty t) :=
+    match e with
+    | STermLoc'.mk loc inner => TermLoc'.mk loc (tr loc inner)
+
+  /-- Translate an unlocated surface term to core, using provided location -/
   unsafe def tr {rep : Ty → Type} {n : Nat}
       {fvar : Fin n → SurfaceTy} {t : SurfaceTy}
+      (loc : SourceLocation)
       (e : STerm' (rep ∘ ty) fvar t) : Term' rep (ty ∘ fvar) (ty t) :=
     match e with
     | STerm'.var v => Term'.var v
@@ -277,20 +342,20 @@ mutual
     | STerm'.constReal r => Term'.constReal r
     | STerm'.constBool b => Term'.constBool b
     | STerm'.constString s => Term'.constString s
-    | STerm'.not e => Term'.not (tr e)
-    | STerm'.ite c t u => Term'.ite (tr c) (tr t) (tr u)
-    | STerm'.letin t f => Term'.letin (tr t) (fun v => tr (f v))
-    | @STerm'.add _ _ _ ty a t1 t2 => Term'.add (toCoreAdd a) (tr t1) (tr t2)
+    | STerm'.not e => Term'.not (trLoc e)
+    | STerm'.ite c t u => Term'.ite (trLoc c) (trLoc t) (trLoc u)
+    | STerm'.letin t f => Term'.letin (trLoc t) (fun v => trLoc (f v))
+    | @STerm'.add _ _ _ ty a t1 t2 => Term'.add (toCoreAdd a) (trLoc t1) (trLoc t2)
     | STerm'.emptyDict => Term'.emptyDict
-    | STerm'.dictInsert k v d => Term'.dictInsert (tr k) (tr v) (tr d)
-    | STerm'.lookup aRange d k => Term'.lookup (toCoreAdd aRange) (tr d) (tr k)
+    | STerm'.dictInsert k v d => Term'.dictInsert (trLoc k) (trLoc v) (trLoc d)
+    | STerm'.lookup aRange d k => Term'.lookup (toCoreAdd aRange) (trLoc d) (trLoc k)
     | STerm'.sum a d f =>
-        Term'.sum (toCoreAdd a) (tr d) (fun kd vd => tr (f kd vd))
+        Term'.sum (toCoreAdd a) (trLoc d) (fun kd vd => trLoc (f kd vd))
     | @STerm'.mul _ _ _ sc t1 t2 s1 s2 e1 e2 =>
         -- Cast the result type via `ty_stensor_eq` to match core `tensor`.
         by
           have hmul : Term' rep (fun i => ty (fvar i)) (tensor (ty t1) (ty t2)) :=
-            Term'.mul (toCoreScale s1) (toCoreScale s2) (tr e1) (tr e2)
+            Term'.mul (toCoreScale s1) (toCoreScale s2) (trLoc e1) (trLoc e2)
           simpa [ty_stensor_eq, -stensor] using hmul
     | STerm'.constRecord (l := l) fields =>
         by
@@ -300,8 +365,8 @@ mutual
     | STerm'.projByName (σ := σ) (nm := _nm) (t := t) p r =>
         -- compute positional index from field proof and project
         let idx := HasField.index p
-        have rr : Term' rep (fun i => ty (fvar i)) (Ty.record (tyFields σ)) :=
-          tr r
+        have rr : TermLoc' rep (fun i => ty (fvar i)) (Ty.record (tyFields σ)) :=
+          trLoc r
         have pr : Term' rep (fun i => ty (fvar i)) ((tyFields σ).getD idx Ty.int) :=
           Term'.proj (tyFields σ) rr idx
         -- Coerce the projected type to the named field's core type via the index lemma
@@ -310,34 +375,52 @@ mutual
             simpa using (projCast (rep := rep) (fvar := fun i => ty (fvar i)) rr idx (HasField.index_getD_ty (σ := σ) (nm := _nm) (t := t) p)))
     | STerm'.builtin b a =>
         match b with
-        | SBuiltin.And => Term'.builtin BuiltinFn.And (tr a)
-        | SBuiltin.Or  => Term'.builtin BuiltinFn.Or (tr a)
+        | SBuiltin.And => Term'.builtin BuiltinFn.And (trLoc a)
+        | SBuiltin.Or  => Term'.builtin BuiltinFn.Or (trLoc a)
         | @SBuiltin.Eq (t := t) =>
-            Term'.builtin (BuiltinFn.Eq (ty t)) (tr a)
+            Term'.builtin (BuiltinFn.Eq (ty t)) (trLoc a)
         | @SBuiltin.Leq (t := t) =>
-            Term'.builtin (BuiltinFn.Leq (ty t)) (tr a)
+            Term'.builtin (BuiltinFn.Leq (ty t)) (trLoc a)
         | @SBuiltin.Sub (t := t) =>
-            Term'.builtin (BuiltinFn.Sub (ty t)) (tr a)
-        | SBuiltin.StrEndsWith => Term'.builtin BuiltinFn.StrEndsWith (tr a)
-        | @SBuiltin.Dom dom range => Term'.builtin (BuiltinFn.Dom (dom := ty dom) (range := ty range)) (tr a)
-        | SBuiltin.Range => Term'.builtin BuiltinFn.Range (tr a)
-        | SBuiltin.DateLit yyyymmdd => Term'.builtin (BuiltinFn.DateLit yyyymmdd) (tr a)
+            Term'.builtin (BuiltinFn.Sub (ty t)) (trLoc a)
+        | SBuiltin.StrEndsWith => Term'.builtin BuiltinFn.StrEndsWith (trLoc a)
+        | @SBuiltin.Dom dom range => Term'.builtin (BuiltinFn.Dom (dom := ty dom) (range := ty range)) (trLoc a)
+        | SBuiltin.Range => Term'.builtin BuiltinFn.Range (trLoc a)
+        | SBuiltin.DateLit yyyymmdd => Term'.builtin (BuiltinFn.DateLit yyyymmdd) (trLoc a)
+        | @SBuiltin.Concat σ1 σ2 =>
+            -- Translate surface Concat to core Concat, adjusting types via tyFields_append
+            -- The result type of core Concat is `Ty.record (l1 ++ l2)`
+            -- The expected type is `ty (SurfaceTy.record (σ1 ++ σ2))` = `Ty.record (tyFields (σ1 ++ σ2))`
+            -- We need to show these are equal via tyFields_append
+            by
+              have h : tyFields σ1 ++ tyFields σ2 = tyFields (σ1 ++ σ2) := by
+                rw [tyFields_append]
+              rw [ty, ← h]
+              exact Term'.builtin (BuiltinFn.Concat (tyFields σ1) (tyFields σ2)) (trLoc a)
 
 end
 
+/-- Translate a program with located terms to core, preserving locations -/
 unsafe def trProg (p : SProg) : Prog :=
   { t := ty p.t
     n := p.n
     fvar := ty ∘ p.fvar
-    term := tr p.term
+    term := trLoc p.term
     loadPaths := p.loadPaths }
 
-unsafe def ex1 : STerm f0 (.record [("name", .string), ("age", .int)]) := .constRecord (.cons (.constString "Alice") (.cons (.constInt 30) .nil))
+-- Examples updated for STermLoc'
+unsafe def ex1 : STermLoc' (fun _ => String) f0 (.record [("name", .string), ("age", .int)]) :=
+  STermLoc'.mk SourceLocation.unknown
+    (.constRecord
+      (.cons (STermLoc'.mk SourceLocation.unknown (.constString "Alice"))
+        (.cons (STermLoc'.mk SourceLocation.unknown (.constInt 30)) .nil)))
 
-unsafe def ex2 : STerm f0 .string := .projByName (HasField.here) ex1
-#eval Term.show (tr ex1)
-#eval Term.show (tr ex2)
-#eval Term'.denote (fun (x : Fin 0) => nomatch x) (tr ex2)
+unsafe def ex2 : STermLoc' (fun _ => String) f0 .string :=
+  STermLoc'.mk SourceLocation.unknown (.projByName HasField.here ex1)
+
+#eval TermLoc'.show (trLoc (fvar := f0) ex1)
+#eval TermLoc'.show (trLoc (fvar := f0) ex2)
+-- Note: denote example removed as it requires fully instantiated rep type
 
 end ToCore
 
