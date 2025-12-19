@@ -17,3 +17,10 @@ def dmap {T : Type} (l : List T) {ftype : T → Type} (f : (t : T) → ftype t) 
   match l with
     | [] => HList.nil
     | t :: ts => HList.cons (f t) (dmap ts f)
+
+/-- Append two HLists. The result type is `HList β (l1 ++ l2)`. -/
+def hAppend {α : Type} {β : α → Type} {l1 l2 : List α}
+    (h1 : HList β l1) (h2 : HList β l2) : HList β (l1 ++ l2) :=
+  match l1, h1 with
+  | [], HList.nil => h2
+  | _ :: _, HList.cons x xs => HList.cons x (hAppend xs h2)
