@@ -10,3 +10,6 @@
 	path = tpch-dbgen
 	url = https://github.com/electrum/tpch-dbgen
 
+[submodule "sdql_reference/sdql"]
+	path = sdql_reference/sdql
+	url = https://github.com/edin-dal/sdql.git
