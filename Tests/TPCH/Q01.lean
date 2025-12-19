@@ -17,8 +17,8 @@ We skip the complex agg1/agg2 computations for now.
 -- Key: <linestatus: string, returnflag: string> (sorted alphabetically)
 -- Value: <l_quantity_sum: real, mult: int>
 
-unsafe def Q01 : SProg :=
-  [SDQLProg { { < linestatus : string, returnflag : string > ->
+unsafe def Q01 : SProg2 :=
+  [SDQLProg2 { { < linestatus : string, returnflag : string > ->
                < l_quantity_sum : real, mult : int > } }|
     let lineitem = load[<
       l_orderkey: @vec {int -> int},
