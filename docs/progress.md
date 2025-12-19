@@ -2,14 +2,15 @@
 
 What works:
 
-- Typed core with interpreter: `bool`, `int`, `real`, `string`, `record`, `dict`.
+- Typed core with interpreter: `bool`, `int`, `real`, `date`, `string`, `record`, `dict`.
 - Semimodule structure: `AddM` (with zeros) and `ScaleM`; includes `AddM.realA` and `ScaleM.realS`; tensor-shaped multiply via `ScaleM.mulDenote`.
-- Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`, and builtins (`And`, `Or`, `Eq`, `StrEndsWith`, `Dom`, `Range`).
+- Source locations: `SourceLocation` threaded through PHOAS terms (`TermLoc'`/`STermLoc'`) and DeBruijn terms (`TermLoc2`/`STermLoc2`) for better debugging/error reporting.
+- Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`, and builtins (`And`, `Or`, `Eq`, `Leq`, `Sub`, `StrEndsWith`, `Dom`, `Range`, `DateLit`, `Concat`).
 - Pretty-printing for records/dicts; numerous `#eval` demos.
 - SDQL DSL macros: `[SDQL| ... ]` elaborating to surface `STerm'` with support for literals, records (positional and named), dict singleton/lookup, `sum`, `let`, `if`, `not`, `+`, `*{int|bool}`, boolean ops `&&`/`||`/`==`, and builtins `dom`, `range`, `endsWith`. Typed empty dict has moved to the program DSL. Parser ambiguity between hierarchical identifiers (`r.field`) and dot projection syntax is handled by preferring the identifier interpretation when Lean produces a choice node.
-- Program EDSL: `[SDQLProg { T }| ... ]` produces an `SProg` by scanning `load[U]("file")` occurrences, mapping each distinct path to a free-variable index (alphabetically by path), rewriting the SDQL program body by replacing each `load[...]` with a `fvar[i]` placeholder, and then delegating expression elaboration to the shared `[SDQL| … ]` machinery in `SyntaxSDQL.lean`. Field projections on loaded records (e.g., `region.size`) work via hierarchical identifier splitting in `elabSDQL`. This EDSL adds type sugar `real`, `varchar(n)` (as `string`), `@vec {K->V}` (alias of `{K->V}`) and forms `sum(<k,v> <- d) …`, `e.field`, and typed empty dicts `{}_{ Tdom, Trange }`. See examples in `PartIiProject/SyntaxSDQLProg.lean`. Use `SurfaceCore.ToCore.trProg` and `Term.show` to inspect the lowered core term.
+- New program pipeline (DeBruijn): `[SDQLProg2 { T }| ... ]` elaborates to `LoadTermLoc` then runs `LoadTermLoc → UntypedTermLoc → STermLoc2` to produce an `SProg2` with an explicit typed context (`ctx : List SurfaceTy`) and `loadPaths`.
 - Rust codegen: renders expressions, let-blocks, conditionals, dict ops, lookup-with-default, and `sum` as a loop with an accumulator; open-term functions with typed parameters. Supports `real` zeros/addition and maps builtins to external helpers (`ext_and`, `ext_or`, `ext_eq`, `ext_str_ends_with`, `ext_dom`, `ext_range`).
-- Program-level Rust codegen: `renderRustProgShown` compiles a core `Prog` to a standalone Rust program. Generated programs import `sdql_runtime.rs` (a standalone file with helpers, loaders, and printing) via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`. The runtime includes:
+- Program-level Rust codegen: `renderRustProg2Shown` compiles a core `Prog2` to a standalone Rust program. Generated programs import `sdql_runtime.rs` (a standalone file with helpers, loaders, and printing) via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`. The runtime includes:
   - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`
   - Core types: `Real` (Ord-capable f64), `Date` (YYYYMMDD integer)
   - Traits: `SdqlAdd` for semimodule addition, `FromTblField` for TBL parsing, `SDQLShow` for printing
@@ -19,7 +20,7 @@ What works:
 - Testing: Lean test executable `sdql-tests` compiles SDQL→Rust, builds with `rustc`, runs programs, and compares outputs. Supports two modes:
   - `TestCase.program`: compares against hardcoded expected strings
   - `TestCase.programRef`: dynamically compares against a reference Rust binary (e.g., sdql-rs)
-- Tests: updated to consume `SProg` programs built via `[SDQLProg { T }| ... ]` and to generate Rust via `renderRustProgShown`. `.sdql-test-out/*.rs` and binaries are regenerated through this path.
+- Tests: updated to consume `SProg2` programs built via `[SDQLProg2 { T }| ... ]` and to generate Rust via `renderRustProg2Shown`. `.sdql-test-out/*.rs` and binaries are regenerated through this path.
 - TPCH Q02: now tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q02_tiny`) using dynamic output comparison.
 - TPCH Q01: simplified version compiles and passes (compile-only test). Full version requires `concat` builtin for string concatenation.
 - Date type: added `Ty.date` primitive with `SDQLDate` wrapper (YYYYMMDD integer), `DateLit` builtin constructor, and `Leq` comparison. Rust codegen uses a simple `Date` struct.
@@ -51,4 +52,4 @@ Known issues / caveats:
 - Codegen depends on helpers/traits included in generated files; multiplication is not yet wired end-to-end for programs (helpers exist for addition/tuples, and stubs for loaders).
 - Rust printing for tuples (records) is implemented for arities up to 5; extend as needed.
 - `nix build` may fail to resolve newly-added Lean modules unless the lean4‑nix manifest mapping is updated; `lake build` remains authoritative and succeeds.
-- The program EDSL is not yet imported by default; examples in `SyntaxSDQLProg.lean` compile when that module is built. Unrelated TPCH test scaffolding currently fails in `nix build` and is orthogonal to the program EDSL. Build and run tests with `lake build sdql-tests && ./.lake/build/bin/sdql-tests`.
+- The DeBruijn pipeline is the active direction; older PHOAS-based program plumbing is being phased out.

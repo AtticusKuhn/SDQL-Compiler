@@ -3,31 +3,47 @@
 Architecture overview:
 
 - Core types (`PartIiProject/Term.lean`):
-  - `Ty`: `bool | int | real | string | record (List Ty) | dict Ty Ty`.
+  - `Ty`: `bool | int | real | date | string | record (List Ty) | dict Ty Ty`.
   - `Ty.denote`: maps to Lean types; `Dict` wraps `Std.TreeMap` for finite maps.
   - `tensor : Ty → Ty → Ty`: dictionary nests the right type; record maps fields; scalars act as left units.
+- Source locations:
+  - `SourceLocation` (in `PartIiProject/Term.lean`) tracks byte offsets and a substring for better error reporting/debugging.
 - Semimodule structure:
   - `AddM t`: additive monoid witness for `t`. Current boolean addition uses XOR; integer uses `+`; dict and record are pointwise/fieldwise. `AddM.zero` gives additive identities and is used for lookup defaults and `sum` inits.
 - Real scalars: `AddM.realA` (0.0, `+`) and `ScaleM.realS` (`*`).
 - `ScaleM sc t`: scalar action of `sc` on `t`. Booleans act via AND; integers via multiplication; extends through dict and record. Record scaling uses a typed list‑membership predicate `Mem` in `ScaleM.recordS` to select per‑field scaling evidence in a way that supports structural recursion and definitional equalities.
 - Terms and evaluation:
-  - `Term' rep fvar ty`: PHOAS terms with vars, constants, records, dicts (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, and `sum`. `proj` is positional projection (index-based) on records.
-  - Builtins: `BuiltinFn` provides `And`, `Or`, `Eq`, `StrEndsWith`, `Dom` (key set), and `Range` (0..n-1). Applied via `Term'.builtin`.
-  - `Term'.denote`: definitional interpreter using `AddM`/`ScaleM` plus builtin semantics. `lookup` falls back to `AddM.zero` on misses; `sum` folds with `AddM.denote`.
+  - `TermLoc'`/`Term'`: PHOAS core terms with `SourceLocation` threaded through subterms. Includes vars/constants/records/dicts, `not`, `if`, `let`, `add`, `mul`, `sum`, and positional record projection `proj`.
+  - Builtins (`BuiltinFn`): includes `And`, `Or`, `Eq`, `Leq`, `Sub`, `StrEndsWith`, `Dom` (key set), `Range` (0..n-1), `DateLit`, and `Concat`.
+  - `Term'.denote`: definitional interpreter using `AddM`/`ScaleM` plus builtin semantics. `lookup` falls back to `AddM.zero` on misses; `sum` folds with `AddM.denote`. Locations are preserved for debugging/printing but do not affect evaluation.
 - Utilities:
   - `HList`: heterogeneous lists with `hmap`, `hmap2`, `dmap` helpers.
   - `Dict`: wrapper with `empty/insert/find?/mapValues` and `Ord` plumbed via a stored comparator.
 - Pretty-printers for records and dicts for clean `#eval` output.
 
+DeBruijn program pipeline (new):
+
+- Untyped pipeline + type inference (`PartIiProject/untyped.lean`):
+  - Parser output: `LoadTermLoc` (PHOAS, includes `load` nodes, carries `SourceLocation`).
+  - Load extraction: `LoadTermLoc → UntypedTermLoc` (DeBruijn indices; ctx is just a `Nat`).
+  - Type inference: `UntypedTermLoc → STermLoc2` (typed DeBruijn surface terms in `SurfaceCore2.lean`).
+  - Program packaging: `SProg2` carries `(t, ctx, term, loadPaths)` with `ctx : List SurfaceTy`.
+- Typed DeBruijn surface/core (`PartIiProject/SurfaceCore2.lean`, `PartIiProject/Term2.lean`):
+  - `STerm2`/`STermLoc2`: typed DeBruijn surface terms, variables via `Mem ty ctx`.
+  - `Term2`/`TermLoc2`: typed DeBruijn core terms, variables via `Mem ty ctx`.
+  - `ToCore2.trProg2 : SProg2 → Prog2`: erases surface names and lowers to core.
+
 Surface syntax (mini‑DSL):
 
-- `PartIiProject/SyntaxSDQL.lean` defines a `[SDQL| ... ]` quasiquoter that elaborates to surface `STerm'` (from `SurfaceCore`) instead of directly to core `Term'`:
+- `PartIiProject/SyntaxSDQL.lean` defines:
+  - `[SDQL| ... ]`: elaborates to a located surface term (`STermLoc` / `SurfaceCore`).
+  - `elabSDQLToLoad`: elaborates SDQL syntax to `LoadTermLoc` for the new pipeline.
   - Literals: ints, bools, strings.
   - Records: positional `< e1, e2 >`, `< e1, e2, e3 >`, and named `< a = e1, b = e2, ... >` literals.
   - Dicts: singleton `{ k -> v }` and multi‑entry literals. (Typed empty dict moved to the program DSL.)
   - Lookup: `d(k)`; `sum`: `sum( <k, v> in d ) body`.
   - Algebra: `e1 + e2`, `e1 *{int} e2`, `e1 *{bool} e2`; `if`, `not`, `let x = e1 in e2`.
-  - Boolean/builtin ops: `x && y`, `x || y`, `x == y`, `dom(e)`, `range(e)`, `endsWith(x,y)`.
+  - Boolean/builtin ops: `x && y`, `x || y`, `x == y`, `x <= y`, `x - y`, `dom(e)`, `range(e)`, `endsWith(x,y)`, plus record `concat`.
 - The DSL uses surface wrapper typeclasses `HasSAdd`/`HasSScale` and helpers `SDQL.add`, `SDQL.mulInt/Bool`, `SDQL.lookup`, `SDQL.sum` to infer `SAdd`/`SScale` evidence (ints, bools, dictionaries, and records via recursive builders).
 - Type elaboration: `elabTy` sorts record fields alphabetically for canonical type representation. `elabTyPreserveOrder` preserves declaration order for load schemas, ensuring field positions match TBL column indices.
 - To run or print, use `SurfaceCore.ToCore.tr` to translate `STerm'` to core `Term'`.
@@ -46,7 +62,7 @@ Testing infrastructure:
   - `Tests/Cases.lean`: defines SDQL test cases with two variants:
     - `TestCase.program`: compares output against a hardcoded expected string
     - `TestCase.programRef`: dynamically compares against a reference binary (sdql-rs)
-  - `Tests/Main.lean`: compiles each term to a standalone Rust program via `renderRustProgShown`, writes sources to `.sdql-test-out/`, builds with `rustc`, runs binaries, and compares outputs. For `programRef` tests, first runs the reference binary to get expected output.
+  - `Tests/Main.lean`: compiles each program (`SProg2`) to a standalone Rust program via `renderRustProg2Shown (ToCore2.trProg2 ...)`, writes sources to `.sdql-test-out/`, builds with `rustc`, runs binaries, and compares outputs. For `programRef` tests, first runs the reference binary to get expected output.
   - Lake executable target `sdql-tests` drives execution: `lake build sdql-tests && lake exe sdql-tests`.
   - Nix wrapper `sdql-tests-with-ref` builds sdql-rs reference binary if needed and runs tests: `nix run`.
 
@@ -70,12 +86,12 @@ Code generation integration:
 Code generation:
 
 - `PartIiProject/Rust.lean`: a tiny Rust-like AST (`Expr`, `Stmt`, `Ty`) and pretty-printer.
-- `PartIiProject/CodegenRust.lean`: compiles core `Term'` to this AST.
+- `PartIiProject/CodegenRust.lean`: compiles core terms/programs to this AST.
   - Maps basic ops (`+`, `^` for bool XOR, `not`, `if`, `let`).
   - `lookup` compiles to `lookup_or_default(m,k,zero)`; `sum` becomes a block with an accumulator and `for (k,v) in map.iter()` loop.
   - `mul` emits a placeholder call `sdql_mul(e1, e2)`; record/dict addition use helper calls `tuple_add` and `dict_add`.
-  - Builtins compile to external helpers: `ext_and`, `ext_or`, `ext_eq`, `ext_str_ends_with`, `ext_dom`, `ext_range`. Real zeros/addition are supported alongside ints.
-  - Open-term support: `renderRustFn` renders a `fn` with parameter types derived from the core types.
+  - Builtins compile to external helpers: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_sub`, `ext_str_ends_with`, `ext_dom`, `ext_range`, plus record concat support.
+  - Program support: `renderRustProg2Shown` renders a complete `main` from a `Prog2`, including table loaders for `loadPaths` and optional `SourceLocation` comments.
 
 Notable patterns:
 

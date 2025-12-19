@@ -20,13 +20,23 @@ Dev environment:
 
 Key modules:
 
-- `PartIiProject/Term.lean`: core types, semimodule evidence, tensor, PHOAS terms, interpreter, printers, examples.
-- `PartIiProject/SyntaxSDQL.lean`: Lean macros providing an SDQL mini‑DSL via `[SDQL| ... ]` elaborating to surface `STerm'` (from `SurfaceCore`). Includes surface wrapper typeclasses `HasSAdd`/`HasSScale` and helper combinators to infer addition/scaling evidence. Supports named record literals in addition to positional records, boolean ops `&&`/`||`/`==`, and builtins `dom`, `range`, `endsWith`.
+- `PartIiProject/Term.lean`: core types, semimodule evidence, tensor, PHOAS terms + interpreter, and `SourceLocation`/`TermLoc'` for location tracking.
+- `PartIiProject/SurfaceCore.lean`: named-record surface layer (PHOAS) with `STermLoc'` for location tracking.
+- `PartIiProject/SurfaceCore2.lean`: typed DeBruijn surface terms (`STerm2`/`STermLoc2`) and `SProg2`.
+- `PartIiProject/Term2.lean`: typed DeBruijn core terms (`Term2`/`TermLoc2`), `Prog2`, and lowering `ToCore2.trProg2`.
+- `PartIiProject/untyped.lean`: new pipeline pieces:
+  - `LoadTermLoc` (parser output, includes `load`)
+  - `UntypedTermLoc` (DeBruijn, untyped)
+  - type inference `typeinferOpen2` and pipeline entrypoint `loadTermToSProg2`
+- `PartIiProject/SyntaxSDQL.lean`: SDQL mini‑DSL:
+  - `[SDQL| ... ]` elaborates to a located surface term (`STermLoc` / `SurfaceCore`)
+  - `elabSDQLToLoad` elaborates SDQL syntax to `LoadTermLoc` for the new pipeline
+- `PartIiProject/SyntaxSDQLProg.lean`: program EDSL:
+  - `[SDQLProg2 { T }| ... ]` builds an `SProg2` via `LoadTermLoc → UntypedTermLoc → STermLoc2`
 - `PartIiProject/Dict.lean`: purely functional dictionary wrapper on `Std.TreeMap` with an embedded comparator.
 - `PartIiProject/HList.lean`: minimal heterogeneous list utilities.
 - `PartIiProject/Rust.lean`: simplified Rust AST and pretty-printer.
-- `PartIiProject/CodegenRust.lean`: core→Rust AST compiler; `renderRust`/`renderRustFn` and `renderRustShown` helpers; embeds `SDQLShow` runtime for printing. Includes generic TBL loaders (`FromTblField` trait, `build_col<T>`, `load_tbl`) and `genTableLoader` for generating inline table loading code. Supports `real` zero/addition and builtin lowering to external helpers (`ext_and`, `ext_or`, `ext_eq`, `ext_str_ends_with`, `ext_dom`, `ext_range`).
-- `PartIiProject/SurfaceCore.lean`: an explicit surface layer with named records and a surface→core translation (`ToCore.tr`) that erases names to positional records. Translation covers `constRecord`, `projByName`, `lookup`, `sum`, `add`, `mul`, and control flow. Surface scaling covers scalars, dictionaries, and records via `SScale.recordS` (typed membership `Mem`). Multiplication on the surface uses a tensor‑shape `stensor` with rewrite lemmas to align with core `tensor` during translation.
+- `PartIiProject/CodegenRust.lean`: core→Rust compiler; supports `Prog2` via `renderRustProg2Shown` and imports the shared runtime from `sdql_runtime.rs`.
 - `PartIiProject.lean`: examples invoking `renderRust` for quick demos.
 - Tests:
   - `Tests/Cases.lean`: SDQL test cases and expected printed strings.
@@ -35,14 +45,16 @@ Key modules:
 Nix/flake integration:
 
 - `flake.nix` wires `lean4-nix` to the `lean-toolchain`, exposes a dev shell, and provides a package/app to run the `sdql-tests` executable directly via `nix run`.
+- Repository dependencies used by the test suite are tracked as git submodules (`sdql-rs`, `tpch-dbgen`, `sdql_reference/sdql`, `lean4nix/lean4-nix`).
 
 How to run:
 
 - Build library: `lake build`.
 - Build tests: `lake build sdql-tests`.
 - Run tests: `lake exe sdql-tests`.
+- Preferred: `nix run` (runs the full test suite, including building the sdql-rs reference binary if needed).
 - Explore: open the `.lean` files and evaluate examples with `#eval`.
-- Try the DSL: define `def t : STerm f0 _ := [SDQL| 3 + 5 ]`, then translate with `SurfaceCore.ToCore.tr` for printing or evaluation via `Term'.denote`.
+- Try the DSL: define `def t := [SDQL| 3 + 5 ]`, then lower with `SurfaceCore.ToCore.tr` (PHOAS) or use `[SDQLProg2 { int }| 3 + 5 ]` for the DeBruijn program pipeline.
 
 Notes/constraints:
 

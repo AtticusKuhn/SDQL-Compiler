@@ -2,7 +2,7 @@
 
 This project implements a typed core calculus and verified foundations for the Sparse Dictionary Query Language (SDQL) in Lean 4. It provides:
 
-- A mechanized core: types, semimodule structure, tensor-shaped multiplication, and a PHOAS term language with a definitional evaluator.
+- A mechanized core: types, semimodule structure, tensor-shaped multiplication, and a definitional evaluator (with both PHOAS and DeBruijn-indexed term representations).
 - A minimal code generation path: compile core terms to a small Rust-like AST to explore execution and future optimization/compilation.
 - A Rust-backed test harness and CI that compiles generated Rust, executes tests, and compares printed outputs against the Lean evaluator’s printed outputs.
 - Room to extend toward the full SDQL spec (kinds, additional semirings, surface sugar, and verified optimizations).
