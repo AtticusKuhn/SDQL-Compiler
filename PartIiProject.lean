@@ -1,21 +1,16 @@
 import PartIiProject.Term
-import PartIiProject.Mem
-import PartIiProject.Rust
-import PartIiProject.CodegenRust
+import PartIiProject.SurfaceCore
+import PartIiProject.SurfaceCore2
+import PartIiProject.Term2
+import PartIiProject.untyped
 import PartIiProject.SyntaxSDQL
--- import PartIiProject.SDQLTests.TPCH.Q01
+import PartIiProject.SyntaxSDQLProg
+import PartIiProject.CodegenRust
+import PartIiProject.Rust
 
-open PartIiProject
--- import PartIiProject.SurfaceCore
+/-!
+Convenience import module for interactive use.
 
--- Open-term demo: compile a term with one runtime parameter to a Rust function.
--- SDQL term: fun (p : i64) => p + 2
-def f1 : Fin 1 → Ty := fun _ => Ty.int
-def openAdd2 : TermLoc' (fun _ => String) f1 Ty.int :=
-  TermLoc'.withUnknownLoc (Term'.add AddM.intA
-    (TermLoc'.withUnknownLoc (Term'.freeVariable 0))
-    (TermLoc'.withUnknownLoc (Term'.constInt 2)))
+The active pipeline is DeBruijn-indexed (`SProg2` / `Prog2` / `Term2`).
+-/
 
-def nameEnv1 : Fin 1 → String := fun _ => "p"
-
--- Demo string generation moved to Tests. Keep library modules clean.
