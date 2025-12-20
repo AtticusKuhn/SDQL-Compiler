@@ -1,5 +1,4 @@
 import PartIiProject.SyntaxSDQLProg
-import PartIiProject.SurfaceCore
 
 namespace Tests.TPCH
 
@@ -41,7 +40,7 @@ Source: sdql-rs/progs/tpch/11.sdql
 -- END SDQL
 
 -- Stub SProg to keep module usable
-unsafe def Q11_stub : SProg := [SDQLProg { int }| 0 ]
+unsafe def Q11_stub : SProg2 := [SDQLProg2 { int }| 0 ]
 
 -- Attempted port (placeholder; unsupported syntax likely)
 /-

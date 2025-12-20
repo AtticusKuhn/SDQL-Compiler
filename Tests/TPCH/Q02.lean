@@ -1,5 +1,4 @@
 import PartIiProject.SyntaxSDQLProg
-import PartIiProject.SurfaceCore
 import PartIiProject.CodegenRust
 import PartIiProject.Term2
 

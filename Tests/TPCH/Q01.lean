@@ -1,5 +1,4 @@
 import PartIiProject.SyntaxSDQLProg
-import PartIiProject.SurfaceCore
 
 namespace Tests.TPCH
 

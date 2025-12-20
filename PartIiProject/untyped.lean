@@ -683,12 +683,12 @@ unsafe def typeinferOpen2 (ctx : List SurfaceTy)
     Sorted alphabetically by path. If the same path appears with different types,
     later occurrences are ignored.
     Note: Uses Nat as rep for PHOAS instantiation during traversal. -/
-unsafe def collectLoads (e : LoadTermLoc Nat) : List (String × SurfaceTy × SourceLocation) :=
+unsafe def collectLoads (e : LoadTermLoc Unit) : List (String × SurfaceTy × SourceLocation) :=
   let collected := go e []
   let sorted := collected.toArray.qsort (fun (p1, _, _) (p2, _, _) => p1 < p2) |>.toList
   dedup sorted
 where
-  go : LoadTermLoc Nat → List (String × SurfaceTy × SourceLocation) → List (String × SurfaceTy × SourceLocation)
+  go : LoadTermLoc Unit → List (String × SurfaceTy × SourceLocation) → List (String × SurfaceTy × SourceLocation)
     | .mk stx inner, acc =>
       match inner with
       | .var _ => acc
@@ -705,14 +705,14 @@ where
       | .ite c t f => go f (go t (go c acc))
       | .letin bound body =>
           let boundLoads := go bound acc
-          go (body 0) boundLoads  -- dummy Nat for PHOAS traversal
+          go (body ()) boundLoads  -- dummy Nat for PHOAS traversal
       | .add e1 e2 => go e2 (go e1 acc)
       | .mul _ e1 e2 => go e2 (go e1 acc)
       | .projByName _ e => go e acc
       | .lookup d k => go k (go d acc)
       | .sum d body =>
           let dLoads := go d acc
-          go (body 0 0) dLoads  -- dummy Nats for PHOAS traversal
+          go (body () ()) dLoads  -- dummy Nats for PHOAS traversal
       | .load path ty =>
           if acc.any (fun (p, _, _) => p == path) then acc
           else (path, ty, stx) :: acc
@@ -752,7 +752,7 @@ structure ExtractedLoads2 where
 -/
 unsafe def extractLoads2 (e : LoadTerm) : Except TypeError ExtractedLoads2 := do
   let eNat : LoadTermLoc Nat := e (rep := Nat)
-  let loads := collectLoads eNat
+  let loads := collectLoads e
   let ctx : List SurfaceTy := loads.map (fun (_, ty, _) => ty)
   let loadPaths : List String := loads.map (fun (path, _, _) => path)
   let pathToIndex := zipWithIndex loads
