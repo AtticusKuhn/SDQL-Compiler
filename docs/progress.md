@@ -2,12 +2,12 @@
 
 What works:
 
-- Typed core with interpreter: `bool`, `int`, `real`, `date`, `string`, `record`, `dict`.
+- Typed core foundations: `bool`, `int`, `real`, `date`, `string`, `record`, `dict`, plus denotations and pretty-printing for values.
 - Semimodule structure: `AddM` (with zeros) and `ScaleM`; includes `AddM.realA` and `ScaleM.realS`; tensor-shaped multiply via `ScaleM.mulDenote`.
-- Source locations: `SourceLocation` threaded through PHOAS terms (`TermLoc'`/`STermLoc'`) and DeBruijn terms (`TermLoc2`/`STermLoc2`) for better debugging/error reporting.
+- Source locations: `SourceLocation` threaded through the pipeline (`LoadTermLoc`, `UntypedTermLoc`, `STermLoc2`, `TermLoc2`) for better debugging/error reporting.
 - Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`, and builtins (`And`, `Or`, `Eq`, `Leq`, `Sub`, `StrEndsWith`, `Dom`, `Range`, `DateLit`, `Concat`).
 - Pretty-printing for records/dicts; numerous `#eval` demos.
-- SDQL DSL macros: `[SDQL| ... ]` elaborating to surface `STerm'` with support for literals, records (positional and named), dict singleton/lookup, `sum`, `let`, `if`, `not`, `+`, `*{int|bool}`, boolean ops `&&`/`||`/`==`, and builtins `dom`, `range`, `endsWith`. Typed empty dict has moved to the program DSL. Parser ambiguity between hierarchical identifiers (`r.field`) and dot projection syntax is handled by preferring the identifier interpretation when Lean produces a choice node.
+- SDQL DSL macros: `[SDQL| ... ]` elaborates to `LoadTermLoc`, supporting literals, records (positional and named), dict literals, lookup, `sum`, `let`, `if`, `not`, `+`, `*{int|bool|real}`, boolean ops, and builtins (`dom`, `range`, `endsWith`, `date`, `concat`).
 - New program pipeline (DeBruijn): `[SDQLProg2 { T }| ... ]` elaborates to `LoadTermLoc` then runs `LoadTermLoc → UntypedTermLoc → STermLoc2` to produce an `SProg2` with an explicit typed context (`ctx : List SurfaceTy`) and `loadPaths`.
 - Rust codegen: renders expressions, let-blocks, conditionals, dict ops, lookup-with-default, and `sum` as a loop with an accumulator; open-term functions with typed parameters. Supports `real` zeros/addition and maps builtins to external helpers (`ext_and`, `ext_or`, `ext_eq`, `ext_str_ends_with`, `ext_dom`, `ext_range`).
 - Program-level Rust codegen: `renderRustProg2Shown` compiles a core `Prog2` to a standalone Rust program. Generated programs import `sdql_runtime.rs` (a standalone file with helpers, loaders, and printing) via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`. The runtime includes:
@@ -28,7 +28,7 @@ What works:
 - Subtraction: added `Sub` builtin for arithmetic subtraction on int/real types.
 - CI: GitHub Actions workflow builds the project and runs the test executable on pushes/PRs.
 - `nix run` support: wrapper script builds sdql-rs reference binary if needed and runs tests with proper environment setup.
-- Surface layer: `PartIiProject/SurfaceCore.lean` implements a named-record surface representation and a surface→core translation. Supports named `constRecord`, `projByName`, dictionary `lookup`, `sum`, `add`, `mul`, `let`, `if`, and `not`. Surface scaling includes scalars, dictionaries, and records (`SScale.recordS`). The translation uses membership proofs `Mem` for record scaling, `HasField.index_getD_ty` for named projection, and `stensor` shape lemmas (`ty_stensor_eq`, `tyFields_map_stensor`) to emit core `mul`.
+- Surface/core terms are DeBruijn-indexed: surface terms in `SurfaceCore2.lean`, core terms in `Term2.lean`, with lowering in `ToCore2`.
 
 What's left to build:
 
@@ -52,4 +52,4 @@ Known issues / caveats:
 - Codegen depends on helpers/traits included in generated files; multiplication is not yet wired end-to-end for programs (helpers exist for addition/tuples, and stubs for loaders).
 - Rust printing for tuples (records) is implemented for arities up to 5; extend as needed.
 - `nix build` may fail to resolve newly-added Lean modules unless the lean4‑nix manifest mapping is updated; `lake build` remains authoritative and succeeds.
-- The DeBruijn pipeline is the active direction; older PHOAS-based program plumbing is being phased out.
+- The DeBruijn pipeline is the only supported term/program representation (older PHOAS layers have been removed).

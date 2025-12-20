@@ -20,8 +20,8 @@ Dev environment:
 
 Key modules:
 
-- `PartIiProject/Term.lean`: core types, semimodule evidence, tensor, PHOAS terms + interpreter, and `SourceLocation`/`TermLoc'` for location tracking.
-- `PartIiProject/SurfaceCore.lean`: named-record surface layer (PHOAS) with `STermLoc'` for location tracking.
+- `PartIiProject/Term.lean`: core types (`Ty`), semimodule evidence (`AddM`/`ScaleM`), `tensor`, builtins, and `SourceLocation`.
+- `PartIiProject/SurfaceCore.lean`: surface types (`SurfaceTy`), field proofs (`HasField`), surface semimodule evidence (`SAdd`/`SScale`), and surface tensor `stensor`.
 - `PartIiProject/SurfaceCore2.lean`: typed DeBruijn surface terms (`STerm2`/`STermLoc2`) and `SProg2`.
 - `PartIiProject/Term2.lean`: typed DeBruijn core terms (`Term2`/`TermLoc2`), `Prog2`, and lowering `ToCore2.trProg2`.
 - `PartIiProject/untyped.lean`: new pipeline pieces:
@@ -29,8 +29,8 @@ Key modules:
   - `UntypedTermLoc` (DeBruijn, untyped)
   - type inference `typeinferOpen2` and pipeline entrypoint `loadTermToSProg2`
 - `PartIiProject/SyntaxSDQL.lean`: SDQL mini‑DSL:
-  - `[SDQL| ... ]` elaborates to a located surface term (`STermLoc` / `SurfaceCore`)
-  - `elabSDQLToLoad` elaborates SDQL syntax to `LoadTermLoc` for the new pipeline
+  - `[SDQL| ... ]` elaborates to `LoadTermLoc` (parser output for the pipeline)
+  - `elabSDQLToLoad` elaborates SDQL syntax to `LoadTermLoc`
 - `PartIiProject/SyntaxSDQLProg.lean`: program EDSL:
   - `[SDQLProg2 { T }| ... ]` builds an `SProg2` via `LoadTermLoc → UntypedTermLoc → STermLoc2`
 - `PartIiProject/Dict.lean`: purely functional dictionary wrapper on `Std.TreeMap` with an embedded comparator.
@@ -54,7 +54,7 @@ How to run:
 - Run tests: `lake exe sdql-tests`.
 - Preferred: `nix run` (runs the full test suite, including building the sdql-rs reference binary if needed).
 - Explore: open the `.lean` files and evaluate examples with `#eval`.
-- Try the DSL: define `def t := [SDQL| 3 + 5 ]`, then lower with `SurfaceCore.ToCore.tr` (PHOAS) or use `[SDQLProg2 { int }| 3 + 5 ]` for the DeBruijn program pipeline.
+- Try the DSL: use `[SDQLProg2 { int }| 3 + 5 ]` (runs the full pipeline) or start from `[SDQL| 3 + 5 ]` and call `loadTermToSProg2` explicitly.
 
 Notes/constraints:
 
@@ -62,7 +62,7 @@ Notes/constraints:
 - Codegen uses placeholder helpers (`sdql_mul`, `dict_add`, `tuple_add`). Execution path for tests relies on embedded runtime shims (`map_insert`, `lookup_or_default`, `SDQLShow`) in the generated program.
 - Rust iteration uses `.into_iter()` in the printed `for` loops to match ownership in helpers.
 - Kinds and scalar promotion are not modeled yet; scalars implemented include `bool`, `int`, and now `real` in the core.
-- The surface layer now emits multiplication and record scaling. It relies on an unsafe `stensor` (termination not proven) and rewrite lemmas (`ty_stensor_eq`, `tyFields_map_stensor`) to align shapes during translation; consider replacing unsafe definitions once proofs are available.
+- Surface multiplication uses `stensor` and casts via `ty_stensor_eq2`/`tyFields_map_stensor2` during surface→core lowering; these are currently `unsafe` (termination not proven).
 - Nix caveat: adding new modules (like `PartIiProject/SyntaxSDQL.lean`) can require the flake’s lean4‑nix manifest mapping to include them. Lake builds work; if `nix build` reports a missing module attribute, update manifests/lock or bump to the matching lean manifest (v4.24).
 CI:
 

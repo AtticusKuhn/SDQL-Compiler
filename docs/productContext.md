@@ -8,11 +8,9 @@ What it provides today:
 
 - Core calculus: types `bool|int|real|date|string|record|dict` with a denotation into Lean types.
 - Semimodule structure: `AddM` (addition) and `ScaleM` (scalar action) for dictionaries, records, and scalars; tensor-shaped multiply.
-- Terms and evaluation: PHOAS core terms with source locations (`TermLoc'`/`Term'`) plus a definitional evaluator. Builtins include `And`, `Or`, `Eq`, `Leq`, `Sub`, `StrEndsWith`, `Dom`, `Range`, `DateLit`, and `Concat`.
-- Pretty-printing: custom renderers for records and dictionaries to keep `#eval` usable.
-- Surface syntax macros: `[SDQL| ... ]` elaborates to located surface terms (`STermLoc'`/`STerm'`) and can be lowered to the PHOAS core via `SurfaceCore.ToCore.tr`.
-- New pipeline (DeBruijn): SDQL parsing can instead produce a `LoadTermLoc`, then run `LoadTermLoc → UntypedTermLoc → SProg2 → Prog2 → Rust` (typed DeBruijn indices throughout).
-- A surface layer with named records: `PartIiProject/SurfaceCore.lean` models a named-record surface and translates to the core positional representation. It supports named `constRecord`, `projByName`, and the same core constructs (`lookup`, `sum`, `add`, `let`, `if`, `not`) plus surface multiplication `mul` with surface-side scaling evidence. Record scaling is supported via `SScale.recordS` using a typed membership proof `Mem` for fields. The translation compiles multiplication by aligning a surface tensor shape `stensor` with the core `tensor` through lemmas (`ty_stensor_eq`, `tyFields_map_stensor`) and uses `HasField.index_getD_ty` to coerce named projections to the correct core type.
+- Terms (DeBruijn): typed surface terms `STermLoc2`/`SProg2` and typed core terms `TermLoc2`/`Prog2`, both indexed by an explicit context `ctx : List _` and using `Mem` proofs for variables. Builtins include `And`, `Or`, `Eq`, `Leq`, `Sub`, `StrEndsWith`, `Dom`, `Range`, `DateLit`, and `Concat`.
+- Parser pipeline: SDQL macros elaborate to `LoadTermLoc`, then run `LoadTermLoc → UntypedTermLoc → STermLoc2/SProg2 → TermLoc2/Prog2 → Rust`.
+- Pretty-printing: renderers for records/dictionaries values (`showValue`) and term printers (`Term2.showTermLoc2`) keep `#eval` usable.
 - Codegen (prototype): translation of core terms to a compact Rust-like AST and string rendering for quick demos and a path to real backends.
 - Tests: a Lean test executable that compiles SDQL to Rust, builds with `rustc`, runs outputs, and compares printed outputs (optionally against a reference implementation for TPCH queries).
 

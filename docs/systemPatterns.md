@@ -12,10 +12,10 @@ Architecture overview:
   - `AddM t`: additive monoid witness for `t`. Current boolean addition uses XOR; integer uses `+`; dict and record are pointwise/fieldwise. `AddM.zero` gives additive identities and is used for lookup defaults and `sum` inits.
 - Real scalars: `AddM.realA` (0.0, `+`) and `ScaleM.realS` (`*`).
 - `ScaleM sc t`: scalar action of `sc` on `t`. Booleans act via AND; integers via multiplication; extends through dict and record. Record scaling uses a typed list‑membership predicate `Mem` in `ScaleM.recordS` to select per‑field scaling evidence in a way that supports structural recursion and definitional equalities.
-- Terms and evaluation:
-  - `TermLoc'`/`Term'`: PHOAS core terms with `SourceLocation` threaded through subterms. Includes vars/constants/records/dicts, `not`, `if`, `let`, `add`, `mul`, `sum`, and positional record projection `proj`.
-  - Builtins (`BuiltinFn`): includes `And`, `Or`, `Eq`, `Leq`, `Sub`, `StrEndsWith`, `Dom` (key set), `Range` (0..n-1), `DateLit`, and `Concat`.
-  - `Term'.denote`: definitional interpreter using `AddM`/`ScaleM` plus builtin semantics. `lookup` falls back to `AddM.zero` on misses; `sum` folds with `AddM.denote`. Locations are preserved for debugging/printing but do not affect evaluation.
+- Terms:
+  - Core (DeBruijn): `TermLoc2`/`Term2` in `PartIiProject/Term2.lean`, indexed by `ctx : List Ty` and using `Mem ty ctx` for variables; includes records/dicts, `not`, `if`, `let`, `add`, `mul`, `sum`, `lookup`, and positional record projection `proj`.
+  - Surface (DeBruijn): `STermLoc2`/`STerm2` in `PartIiProject/SurfaceCore2.lean`, with named record projection via `HasField`.
+  - Builtins: `BuiltinFn` (core) and `SBuiltin` (surface) cover `And`, `Or`, `Eq`, `Leq`, `Sub`, `StrEndsWith`, `Dom`, `Range`, `DateLit`, and `Concat`.
 - Utilities:
   - `HList`: heterogeneous lists with `hmap`, `hmap2`, `dmap` helpers.
   - `Dict`: wrapper with `empty/insert/find?/mapValues` and `Ord` plumbed via a stored comparator.
@@ -24,7 +24,7 @@ Architecture overview:
 DeBruijn program pipeline (new):
 
 - Untyped pipeline + type inference (`PartIiProject/untyped.lean`):
-  - Parser output: `LoadTermLoc` (PHOAS, includes `load` nodes, carries `SourceLocation`).
+  - Parser output: `LoadTermLoc` (higher-order binders, includes `load` nodes, carries `SourceLocation`).
   - Load extraction: `LoadTermLoc → UntypedTermLoc` (DeBruijn indices; ctx is just a `Nat`).
   - Type inference: `UntypedTermLoc → STermLoc2` (typed DeBruijn surface terms in `SurfaceCore2.lean`).
   - Program packaging: `SProg2` carries `(t, ctx, term, loadPaths)` with `ctx : List SurfaceTy`.
@@ -36,25 +36,22 @@ DeBruijn program pipeline (new):
 Surface syntax (mini‑DSL):
 
 - `PartIiProject/SyntaxSDQL.lean` defines:
-  - `[SDQL| ... ]`: elaborates to a located surface term (`STermLoc` / `SurfaceCore`).
-  - `elabSDQLToLoad`: elaborates SDQL syntax to `LoadTermLoc` for the new pipeline.
+  - `[SDQL| ... ]`: elaborates to `LoadTermLoc` (the front-end pipeline input).
+  - `elabSDQLToLoad`: elaborates SDQL syntax to `LoadTermLoc`.
   - Literals: ints, bools, strings.
   - Records: positional `< e1, e2 >`, `< e1, e2, e3 >`, and named `< a = e1, b = e2, ... >` literals.
   - Dicts: singleton `{ k -> v }` and multi‑entry literals. (Typed empty dict moved to the program DSL.)
   - Lookup: `d(k)`; `sum`: `sum( <k, v> in d ) body`.
   - Algebra: `e1 + e2`, `e1 *{int} e2`, `e1 *{bool} e2`; `if`, `not`, `let x = e1 in e2`.
   - Boolean/builtin ops: `x && y`, `x || y`, `x == y`, `x <= y`, `x - y`, `dom(e)`, `range(e)`, `endsWith(x,y)`, plus record `concat`.
-- The DSL uses surface wrapper typeclasses `HasSAdd`/`HasSScale` and helpers `SDQL.add`, `SDQL.mulInt/Bool`, `SDQL.lookup`, `SDQL.sum` to infer `SAdd`/`SScale` evidence (ints, bools, dictionaries, and records via recursive builders).
 - Type elaboration: `elabTy` sorts record fields alphabetically for canonical type representation. `elabTyPreserveOrder` preserves declaration order for load schemas, ensuring field positions match TBL column indices.
-- To run or print, use `SurfaceCore.ToCore.tr` to translate `STerm'` to core `Term'`.
+- To build a typed program, use `[SDQLProg2 { T }| ... ]` (see `SyntaxSDQLProg.lean`) which runs the full pipeline to produce an `SProg2`.
 
 Surface layer with named records:
 
-- `PartIiProject/SurfaceCore.lean` defines an explicit “surface” representation with names:
-  - `SurfaceTy`: mirrors core types but `record` carries a `List (String × SurfaceTy)`.
-  - `SAdd` and `SScale`: surface-side evidence for addition and scaling. Scaling covers scalars, dictionaries, and records via `SScale.recordS`, which accepts a function producing per-field scale evidence from a typed list‑membership proof `Mem`.
-  - `STerm'`: surface terms featuring `constRecord` and `projByName` using a `HasField` proof to locate a field by name; plus `add`, `mul`, `lookup`, `sum`, `let`, `if`, `not`, `dict` empty/insert, and `builtin` nodes (`SBuiltin` for And/Or/Eq/StrEndsWith/Dom/Range). A surface tensor shape `stensor` matches the core shape at erased types.
-  - `ToCore.tr`: translation erases names to positional records (`Ty.record (tyFields …)`), translates `SAdd`/`SScale` to core `AddM`/`ScaleM`, compiles named projection to positional `proj` via an index computed from `HasField` and the lemma `HasField.index_getD_ty`, and emits core `mul` while rewriting the result type using lemmas `ty_stensor_eq` and `tyFields_map_stensor` to align `stensor` with core `tensor`.
+- `PartIiProject/SurfaceCore.lean` defines surface *types* (`SurfaceTy`), field lookup proofs (`HasField`), and surface semimodule evidence (`SAdd`/`SScale`), plus a surface tensor shape `stensor`.
+- `PartIiProject/SurfaceCore2.lean` defines DeBruijn-indexed surface terms (`STermLoc2`/`STerm2`) including `constRecord` and `projByName` via `HasField`.
+- `PartIiProject/Term2.lean` lowers surface terms to core terms via `ToCore2` (erasing names to positional records).
 
 Testing infrastructure:
 
@@ -80,7 +77,7 @@ Testing infrastructure:
 
 Code generation integration:
 
-- `renderRustShown` emits a complete Rust `main` that prints the result via the `SDQLShow` trait for comparison with Lean’s `showValue`.
+- `renderRustProg2Shown` emits a complete Rust `main` that prints the result via the `SDQLShow` trait.
 - Current tests avoid `sdql_mul` and complex tuple ops in Rust; those remain placeholders to expand later.
 
 Code generation:
@@ -95,10 +92,10 @@ Code generation:
 
 Notable patterns:
 
-- Shape-directed multiply is implemented at the interpreter level via `ScaleM.mulDenote`, ensuring compile-time result shape `tensor t1 t2`. On the surface, an unsafe `stensor` is related to core `tensor` by rewrite lemmas to justify emitting `mul` during translation.
-- Addition and scaling are encoded as explicit evidence, guiding both typing and evaluation.
+- Shape-directed multiply is specified via `ScaleM.mulDenote`, ensuring compile-time result shape `tensor t1 t2`; Rust codegen currently emits a placeholder `sdql_mul(...)`.
+- Addition and scaling are encoded as explicit evidence, guiding typing and compilation.
 - Lookups and sums rely on the additive identity of the result to stay total and align with sparse semantics.
-- Tests compare Lean vs. Rust by printing values on both sides and checking string equality. Rust programs use `SDQLShow::show(&result)`; Lean uses `showValue`.
+- Tests compare Rust program output against expected strings or a reference binary. Rust programs use `SDQLShow::show(&result)`.
 
 Legacy/experiments:
 
