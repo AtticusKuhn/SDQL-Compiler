@@ -206,8 +206,10 @@ mutual
     | .borrow e => s!"&{paren (showExprLoc e indent config)}"
     | .mapEmpty => "std::collections::BTreeMap::new()"
     | .mapInsert m k v => s!"map_insert({showExprLoc m indent config}, {showExprLoc k indent config}, {showExprLoc v indent config})"
-    | .binop op a b => s!"{showExprLoc a indent config} {showBinOp op} {showExprLoc b indent config}"
-    | .not a => s!"!{showExprLoc a indent config}"
+    -- Always parenthesize binary operator operands to avoid Rust precedence pitfalls
+    -- (e.g. `x * (1.0 + y)` must not render as `x * 1.0 + y`).
+    | .binop op a b => s!"{paren (showExprLoc a indent config)} {showBinOp op} {paren (showExprLoc b indent config)}"
+    | .not a => s!"!{paren (showExprLoc a indent config)}"
     | .ite c t f =>
         let ci := showExprLoc c indent config
         let ti := showExprLoc t (indent+1) config

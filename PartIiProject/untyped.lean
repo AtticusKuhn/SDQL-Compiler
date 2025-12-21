@@ -310,12 +310,31 @@ unsafe def typeof2 (ctx : List SurfaceTy) (e : UntypedTermLoc ctx.length) : Exce
     | .builtinOr _ => pure .bool
     | .builtinEq _ _ => pure .bool
     | .builtinLeq _ _ => pure .bool
-    | .builtinSub t _ => pure t
+    | .builtinSub _ arg => do
+        let argTy ← typeof2 ctx arg
+        match argTy with
+        | .record [("_1", t1), ("_2", t2)] =>
+            if tyEq t1 t2 then
+              pure t1
+            else
+              .error (stx, s!"- expects both operands to have the same type, got {tyToString t1} and {tyToString t2}")
+        | other =>
+            .error (stx, s!"- expects a pair record argument, got {tyToString other}")
     | .builtinStrEndsWith _ => pure .bool
-    | .builtinDom dom _ _ => pure (.dict dom .bool)
+    | .builtinDom _ _ arg => do
+        let argTy ← typeof2 ctx arg
+        match argTy with
+        | .dict domTy _ => pure (.dict domTy .bool)
+        | other => .error (stx, s!"dom expects a dictionary argument, got {tyToString other}")
     | .builtinRange _ => pure (.dict .int .bool)
     | .builtinDateLit _ => pure .date
-    | .builtinConcat σ1 σ2 _ => pure (.record (σ1 ++ σ2))
+    | .builtinConcat _ _ arg => do
+        let argTy ← typeof2 ctx arg
+        match argTy with
+        | .record [("_1", .record σ1), ("_2", .record σ2)] =>
+            pure (.record (σ1 ++ σ2))
+        | other =>
+            .error (stx, s!"concat expects a pair of records, got {tyToString other}")
 where
   typeofFields2 (ctx : List SurfaceTy) : List (String × UntypedTermLoc ctx.length) → Except TypeError Schema
     | [] => pure []
@@ -638,10 +657,14 @@ unsafe def infer2 (ctx : List SurfaceTy)
       checkTyEq2 stx .date expectedTy builtinTerm
 
   | .builtinConcat σ1 σ2 arg => do
-      let argTerm ← infer2 ctx (.record [("_1", .record σ1), ("_2", .record σ2)]) arg
-      let builtinTerm : STermLoc2 ctx (.record (σ1 ++ σ2)) :=
-        STermLoc2.mk stx (STerm2.builtin (SBuiltin.Concat σ1 σ2) argTerm)
-      checkTyEq2 stx (.record (σ1 ++ σ2)) expectedTy builtinTerm
+      let argTy ← typeof2 ctx arg
+      match argTy with
+      | .record [("_1", .record σ1), ("_2", .record σ2)] => do
+          let argTerm ← infer2 ctx (.record [("_1", .record σ1), ("_2", .record σ2)]) arg
+          let builtinTerm : STermLoc2 ctx (.record (σ1 ++ σ2)) :=
+            STermLoc2.mk stx (STerm2.builtin (SBuiltin.Concat σ1 σ2) argTerm)
+          checkTyEq2 stx (.record (σ1 ++ σ2)) expectedTy builtinTerm
+      | other => .error (stx, s!"concat expects a pair of records, got {tyToString other}")
 
 end TypeInfer2
 

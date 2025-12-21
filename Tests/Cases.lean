@@ -53,7 +53,8 @@ unsafe def smallCases : List TestCase :=
    compiled to Rust, executed against the tiny TPCH dataset, and their outputs
    compared against the reference implementation results. -/
 unsafe def tpchCases : List TestCase :=
-  [ TestCase.compileOnly "tpch_q01" TPCH.Q01
+  [ TestCase.programRef "tpch_q01" TPCH.Q01 "sdql-rs/target/release/tpch_q01_tiny"
+      [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
   , TestCase.programRef "tpch_q02" TPCH.Q02 "sdql-rs/target/release/tpch_q02_tiny"
       [("TPCH_DATASET_PATH", "datasets/tpch-tiny")] ]
 

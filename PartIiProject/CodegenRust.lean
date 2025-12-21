@@ -147,8 +147,17 @@ mutual
         let lhs ← compileLoc2 env t1
         let rhs ← compileLoc2 env t2
         return Compile.compileAdd a lhs rhs
-    | .mul _ _ e1 e2 =>
-        return .call "sdql_mul" [← compileLoc2 env e1, ← compileLoc2 env e2]
+    | @Term2.mul _ _ _ _ s1 s2 e1 e2 =>
+        let lhs ← compileLoc2 env e1
+        let rhs ← compileLoc2 env e2
+        match s1, s2 with
+        | .realS, .realS => return .binop .mul lhs rhs
+        | .intS, .intS => return .binop .mul lhs rhs
+        | .boolS, .boolS =>
+            let arg := ExprLoc.withUnknownLoc (.tuple [lhs, rhs])
+            return .call "ext_and" [arg]
+        | _, _ =>
+            return .call "sdql_mul" [lhs, rhs]
     | .lookup aRange d k =>
         return .lookupOrDefault (← compileLoc2 env d) (← compileLoc2 env k) (zeroOfAddMLoc aRange)
     | @Term2.sum _ dom range _ a d body =>
