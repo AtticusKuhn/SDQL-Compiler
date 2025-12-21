@@ -22,7 +22,7 @@ What works:
   - `TestCase.programRef`: dynamically compares against a reference Rust binary (e.g., sdql-rs)
 - Tests: updated to consume `SProg2` programs built via `[SDQLProg2 { T }| ... ]` and to generate Rust via `renderRustProg2Shown`. `.sdql-test-out/*.rs` and binaries are regenerated through this path.
 - TPCH Q02: now tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q02_tiny`) using dynamic output comparison.
-- TPCH Q01: simplified version compiles and passes (compile-only test). Full version requires `concat` builtin for string concatenation.
+- TPCH Q01: now tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q01_tiny`) using dynamic output comparison.
 - Date type: added `Ty.date` primitive with `SDQLDate` wrapper (YYYYMMDD integer), `DateLit` builtin constructor, and `Leq` comparison. Rust codegen uses a simple `Date` struct.
 - Real number literals: added `constReal` for floating-point constants in the DSL.
 - Subtraction: added `Sub` builtin for arithmetic subtraction on int/real types.
@@ -33,7 +33,6 @@ What works:
 What's left to build:
 
 - **TPCH benchmark completion**:
-  - Q01: needs `concat` builtin to concatenate strings for full implementation; simplified version (grouping by returnflag/linestatus, summing quantities) works.
   - Q03-Q22: not yet implemented; will require additional builtins and potentially more complex aggregation patterns.
 - Boolean semiring OR (instead of XOR) to match SDQL; update examples.
 - Promotion and additional scalar semirings beyond `bool`/`int`.
