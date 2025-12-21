@@ -3,6 +3,7 @@ old
 AGENTS.md
 CLAUDE.md
 task.md
+task2.md
 .claude/
 .sdql-test-out/*.bin
 .sdql-test-out/*
