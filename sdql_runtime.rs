@@ -10,7 +10,7 @@
 //! - Pretty-printing: SDQLShow trait and implementations
 
 use std::collections::BTreeMap;
-use std::ops::Add;
+use std::ops::{Add, Mul, Sub};
 use std::cmp::Ordering;
 use std::io::{BufRead, BufReader};
 use std::fs::File;
@@ -55,6 +55,16 @@ impl Ord for Real {
 impl Add for Real {
     type Output = Self;
     fn add(self, rhs: Self) -> Self { Real(self.0 + rhs.0) }
+}
+
+impl Sub for Real {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self { Real(self.0 - rhs.0) }
+}
+
+impl Mul for Real {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self { Real(self.0 * rhs.0) }
 }
 
 /// SDQL Date type: stored as YYYYMMDD integer for ordering.

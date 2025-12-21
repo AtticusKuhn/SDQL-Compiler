@@ -59,7 +59,7 @@
           # This expects to be run from the project root with sdql-rs already built
           sdqlTestsWithRef = pkgs.writeShellApplication {
             name = "sdql-tests-with-ref";
-            runtimeInputs = [ pkgs.rustc rustToolchain ];
+            runtimeInputs = [ rustToolchain ];
             text = ''
               set -euo pipefail
 
@@ -69,8 +69,14 @@
                 exit 1
               fi
 
-              # Build sdql-rs reference binary if needed
-              if [ ! -f "sdql-rs/target/release/tpch_q02_tiny" ]; then
+              # Build sdql-rs reference binaries if needed (or if sources are newer)
+              if [ ! -f "sdql-rs/target/release/tpch_q01_tiny" ] || \
+                 [ "sdql-rs/src/bin/tpch_q01_tiny.rs" -nt "sdql-rs/target/release/tpch_q01_tiny" ]; then
+                echo "Building sdql-rs reference binary..."
+                (cd sdql-rs && cargo build --release --bin tpch_q01_tiny)
+              fi
+              if [ ! -f "sdql-rs/target/release/tpch_q02_tiny" ] || \
+                 [ "sdql-rs/src/bin/tpch_q02_tiny.rs" -nt "sdql-rs/target/release/tpch_q02_tiny" ]; then
                 echo "Building sdql-rs reference binary..."
                 (cd sdql-rs && cargo build --release --bin tpch_q02_tiny)
               fi
