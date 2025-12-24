@@ -1,6 +1,7 @@
 import PartIiProject.Term2
 import PartIiProject.CodegenRust
 import PartIiProject.SyntaxSDQLProg
+import Tests.GuardMsgs
 import Tests.TPCH.Q01
 import Tests.TPCH.Q02
 import Tests.TPCH.Q03
@@ -43,6 +44,9 @@ unsafe def p_lookup_miss : SProg2 :=
 unsafe def p_sum_vals : SProg2 :=
   [SDQLProg2 { int }| sum( <k, v> in { 3 -> 4, 5 -> 6 } ) v ]
 
+unsafe def p_underscore_ident : SProg2 :=
+  [SDQLProg2 { int }| let _ = 3 in _ + 1 ]
+
 unsafe def p_if_then_true : SProg2 :=
   [SDQLProg2 { int }| if true then 7 ]
 
@@ -55,6 +59,7 @@ unsafe def smallCases : List TestCase :=
   , TestCase.program "lookup_hit" p_lookup_hit "2"
   , TestCase.program "lookup_miss" p_lookup_miss "0"
   , TestCase.program "sum_vals" p_sum_vals "10"
+  , TestCase.program "underscore_ident" p_underscore_ident "4"
   , TestCase.program "if_then_true" p_if_then_true "7"
   , TestCase.program "if_then_false" p_if_then_false "0"
   ]

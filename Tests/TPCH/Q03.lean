@@ -64,16 +64,16 @@ unsafe def Q03 : SProg2 :=
         in
 
     let o_h =
-      sum(<i,_v> <- range(orders.size))
+      sum(<i,_> <- range(orders.size))
         if(
             (orders.o_orderdate(i) < date (19950315))
             && (dom(c_h)(orders.o_custkey(i)))
           ) then
-          { unique(orders.o_orderkey(i)) -> < _v = orders.o_orderdate(i), _o = orders.o_shippriority(i) > }
+          { unique(orders.o_orderkey(i)) -> < orders.o_orderdate(i), orders.o_shippriority(i) > }
          in
 
     let l_h =
-      sum(<i,_v> <- range(lineitem.size))
+      sum(<i,_> <- range(lineitem.size))
         if(
             (date (19950315) < lineitem.l_shipdate(i))
             && (dom(o_h)(lineitem.l_orderkey(i)))
@@ -81,8 +81,8 @@ unsafe def Q03 : SProg2 :=
           {
             <
               l_orderkey = lineitem.l_orderkey(i),
-              o_orderdate = o_h(lineitem.l_orderkey(i))._v,
-              o_shippriority = o_h(lineitem.l_orderkey(i))._o
+              o_orderdate = o_h(lineitem.l_orderkey(i))._1,
+              o_shippriority = o_h(lineitem.l_orderkey(i))._2
             > ->
              < revenue = lineitem.l_extendedprice(i) *{real} (1.0 - lineitem.l_discount(i)) >
           }
@@ -92,5 +92,8 @@ unsafe def Q03 : SProg2 :=
       { unique(concat(k,v)) -> true }
   ]
 
+
+#print Q03
+#eval Q03
 
 end Tests.TPCH

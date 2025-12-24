@@ -199,6 +199,13 @@ abbrev TypeError := SourceLocation × String
 /-- Create a type error with SourceLocation location -/
 def typeError (stx : SourceLocation) (msg : String) : TypeError := (stx, msg)
 
+/-- Human-readable location snippet for error messages. -/
+def sourceLocWhere (stx : SourceLocation) : String :=
+  if stx.substring.isEmpty then
+    "unknown location"
+  else
+    stx.substring
+
 -- ============================================================================
 -- Type Equality and Utilities
 -- ============================================================================
@@ -970,14 +977,7 @@ unsafe instance : Inhabited SProg2 := ⟨dummySProg2⟩
 unsafe def loadTermToSProg2 (expectedTy : SurfaceTy) (e : LoadTerm) : SProg2 :=
   match extractLoads2 e with
   | .error (stx, msg) =>
-      let whereBlock :=
-        if stx.startPos == 0 && stx.endPos == 0 then
-          if stx.substring.isEmpty then
-            "unknown location"
-          else
-            s!"{stx.substring} (unknown location)"
-        else
-          s!"{stx.substring} [{stx.startPos}..{stx.endPos}]"
+      let whereBlock := sourceLocWhere stx
       panic! s!"Internal error while extracting loads\nExpected: {tyToString expectedTy}\nAt: {whereBlock}\n{msg}"
   | .ok extracted =>
       match typeinferOpen2 extracted.ctx expectedTy extracted.term with
@@ -994,14 +994,7 @@ unsafe def loadTermToSProg2 (expectedTy : SurfaceTy) (e : LoadTerm) : SProg2 :=
               ""
             else
               "\nLoads:\n" ++ String.intercalate "\n" loadLines
-          let whereBlock :=
-            if stx.startPos == 0 && stx.endPos == 0 then
-              if stx.substring.isEmpty then
-                "unknown location"
-              else
-                s!"{stx.substring} (unknown location)"
-            else
-              s!"{stx.substring} [{stx.startPos}..{stx.endPos}]"
+          let whereBlock := sourceLocWhere stx
           panic! s!"Type error while typechecking SDQL program\nExpected: {tyToString expectedTy}\nAt: {whereBlock}\n{msg}{loadsBlock}"
 
 /-- Process a LoadTerm through the pipeline with error handling.

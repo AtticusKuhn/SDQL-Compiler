@@ -20,28 +20,38 @@ This file intentionally does *not* elaborate directly to typed surface/core term
 /- SDQL term grammar -/
 declare_syntax_cat sdql
 
+/- SDQL identifiers
+
+Lean reserves `_` as a hole, but SDQL allows `_` as an identifier.
+We parse SDQL identifiers into a separate syntax category and map `_` to a
+valid Lean binder identifier when building the HOAS `LoadTermLoc` AST.
+-/
+declare_syntax_cat sdqlident
+syntax ident : sdqlident
+syntax "_"   : sdqlident
+
 -- atoms
 syntax num                              : sdql
 syntax scientific                       : sdql
 syntax str                              : sdql
-syntax ident                            : sdql
+syntax sdqlident                        : sdql
 syntax (name := sdqlTrue) "true"        : sdql
 syntax (name := sdqlFalse) "false"      : sdql
 syntax "(" sdql ")"                     : sdql
 syntax "<" sdql "," sdql ">"            : sdql
 syntax "<" sdql "," sdql "," sdql ">"   : sdql
-syntax "<" sepBy(ident "=" sdql, ",") ">" : sdql
+syntax "<" sepBy(sdqlident "=" sdql, ",") ">" : sdql
 syntax "{" sepBy(sdql "->" sdql, ",")  "}" : sdql
 
 -- lookup and projection
 syntax:70 sdql:70 "(" sdql ")" : sdql
-syntax:70 sdql:70 "." ident : sdql
+syntax:70 sdql:70 "." sdqlident : sdql
 
 -- unary / control
 syntax "not" sdql : sdql
 syntax "if" sdql "then" sdql "else" sdql : sdql
 syntax "if" sdql "then" sdql : sdql
-syntax "let" ident "=" sdql "in" sdql : sdql
+syntax "let" sdqlident "=" sdql "in" sdql : sdql
 
 -- binary ops (left-assoc precedence)
 syntax:60 sdql:60 "+" sdql:61 : sdql
@@ -64,8 +74,8 @@ syntax "date" "(" num ")" : sdql
 syntax "concat" "(" sdql "," sdql ")" : sdql
 
 -- summation over dictionaries
-syntax "sum" "(" "<" ident "," ident ">" "in" sdql ")" sdql : sdql
-syntax "sum" "(" "<" ident "," ident ">" "<-" sdql ")" sdql : sdql
+syntax "sum" "(" "<" sdqlident "," sdqlident ">" "in" sdql ")" sdql : sdql
+syntax "sum" "(" "<" sdqlident "," sdqlident ">" "<-" sdql ")" sdql : sdql
 
 -- types
 declare_syntax_cat sdqlty
@@ -77,7 +87,7 @@ syntax (name := sdqltyDate) "date" : sdqlty
 syntax (name := sdqltyDict) "{" sdqlty "->" sdqlty "}" : sdqlty
 syntax (name := sdqltyVec) "@vec" "{" sdqlty "->" sdqlty "}" : sdqlty
 syntax (name := sdqltyVarchar) "varchar" "(" num ")" : sdqlty
-syntax (name := sdqltyRecord) "<" sepBy(ident ":" sdqlty, ",") ">" : sdqlty
+syntax (name := sdqltyRecord) "<" sepBy(sdqlident ":" sdqlty, ",") ">" : sdqlty
 
 -- typed empty dictionary: {}_{ Tdom, Trange }
 syntax "{" "}" "_" "{" sdqlty "," sdqlty "}" : sdql
@@ -85,14 +95,30 @@ syntax "{" "}" "_" "{" sdqlty "," sdqlty "}" : sdql
 -- load expressions
 syntax (name := sdqlLoad) "load" "[" sdqlty "]" "(" str ")" : sdql
 
+/-- SDQL identifier `_` is a hole in Lean; map it to a safe binder identifier. -/
+private def sdqlBlankBinderName : Name :=
+  Name.mkSimple "_sdql_blank"
+
+private def sdqlIdentToLeanIdent (x : TSyntax `sdqlident) : MacroM (TSyntax `ident) := do
+  match x with
+  | `(sdqlident| $i:ident) => pure i
+  | `(sdqlident| _) => pure <| mkIdentFrom x sdqlBlankBinderName
+  | _ => Macro.throwErrorAt x "unexpected SDQL identifier"
+
+private def sdqlIdentToString (x : TSyntax `sdqlident) : MacroM String := do
+  match x with
+  | `(sdqlident| $i:ident) => pure i.getId.toString
+  | `(sdqlident| _) => pure "_"
+  | _ => Macro.throwErrorAt x "unexpected SDQL identifier"
+
 /-- Helper to elaborate a record type with a given field ordering. -/
-partial def elabRecordTy (stx : TSyntax `sdqlty) (ns : Array (TSyntax `ident)) (ts : Array (TSyntax `sdqlty))
+partial def elabRecordTy (stx : TSyntax `sdqlty) (ns : Array (TSyntax `sdqlident)) (ts : Array (TSyntax `sdqlty))
     (sortFields : Bool) (elabField : TSyntax `sdqlty → MacroM (TSyntax `term)) : MacroM (TSyntax `term) := do
   if ns.size != ts.size then
     Macro.throwErrorAt stx "mismatched fields in record type"
   let mut pairs : Array (String × Nat) := #[]
   for i in [:ns.size] do
-    pairs := pairs.push ((ns[i]!).getId.toString, i)
+    pairs := pairs.push ((← sdqlIdentToString (ns[i]!)), i)
   let orderedPairs := if sortFields then pairs.qsort (fun a b => a.fst < b.fst) else pairs
   let mut elems : Array (TSyntax `term) := #[]
   for (nm, idx) in orderedPairs do
@@ -124,7 +150,7 @@ partial def elabTy : TSyntax `sdqlty → MacroM (TSyntax `term)
       let kk ← elabTy k
       let vv ← elabTy v
       `(SurfaceTy.dict $kk $vv)
-  | stx@`(sdqlty| < $[ $n:ident : $t:sdqlty ],* >) =>
+  | stx@`(sdqlty| < $[ $n:sdqlident : $t:sdqlty ],* >) =>
       elabRecordTy stx n t Bool.true elabTy
   | stx => Macro.throwErrorAt stx "unsupported SDQL type"
 
@@ -145,7 +171,7 @@ partial def elabTyPreserveOrder : TSyntax `sdqlty → MacroM (TSyntax `term)
       let kk ← elabTyPreserveOrder k
       let vv ← elabTyPreserveOrder v
       `(SurfaceTy.dict $kk $vv)
-  | stx@`(sdqlty| < $[ $n:ident : $t:sdqlty ],* >) =>
+  | stx@`(sdqlty| < $[ $n:sdqlident : $t:sdqlty ],* >) =>
       elabRecordTy stx n t Bool.false elabTyPreserveOrder
   | stx => Macro.throwErrorAt stx "unsupported SDQL type"
 
@@ -183,7 +209,7 @@ def wrapLoadWithStx (stx : TSyntax `sdql) (inner : TSyntax `term) : MacroM (TSyn
 
 mutual
   /-- Elaborate a named record literal to `LoadTermLoc`. -/
-  partial def elabNamedRecordToLoad (stx : TSyntax `sdql) (ns : Array (TSyntax `ident))
+  partial def elabNamedRecordToLoad (stx : TSyntax `sdql) (ns : Array (TSyntax `sdqlident))
       (es : Array (TSyntax `sdql)) : MacroM (TSyntax `term) := do
     withRef stx do
       let n := ns.size
@@ -191,7 +217,7 @@ mutual
         Macro.throwErrorAt stx "mismatched fields in named record"
       let mut pairs : Array (TSyntax `term) := #[]
       for i in [:n] do
-        let nm := Syntax.mkStrLit (ns[i]!).getId.toString
+        let nm := Syntax.mkStrLit (← sdqlIdentToString (ns[i]!))
         let ei ← elabSDQLToLoad (es[i]!)
         pairs := pairs.push (← `(Prod.mk $nm $ei))
       let mut pairList : TSyntax `term := (← `(List.nil))
@@ -215,18 +241,19 @@ mutual
       | `(sdql| false) => wrapLoadWithStx stx (← `(LoadTerm'.constBool Bool.false))
 
       -- variable / dotted variable path (e.g. `r.field.subfield`)
-      | `(sdql| $x:ident) => do
-          let name := x.getId
+      | `(sdql| $x:sdqlident) => do
+          let xIdent ← sdqlIdentToLeanIdent x
+          let name := xIdent.getId
           let components := name.componentsRev.reverse
           if components.length > 1 then
-            let baseIdent := mkIdent (Name.mkSimple components[0]!.toString)
+            let baseIdent := mkIdentFrom xIdent (Name.mkSimple components[0]!.toString)
             let mut result ← wrapLoadWithStx stx (← `(LoadTerm'.var $baseIdent))
             for i in [1:components.length] do
               let fieldName := Syntax.mkStrLit components[i]!.toString
               result ← wrapLoadWithStx stx (← `(LoadTerm'.projByName $fieldName $result))
             return result
           else
-            wrapLoadWithStx stx (← `(LoadTerm'.var $x))
+            wrapLoadWithStx stx (← `(LoadTerm'.var $xIdent))
 
       | `(sdql| ( $e:sdql )) => elabSDQLToLoad e
 
@@ -240,7 +267,7 @@ mutual
           let tb ← elabSDQLToLoad b
           let tc ← elabSDQLToLoad c
           wrapLoadWithStx stx (← `(LoadTerm'.constRecord [("_1", $ta), ("_2", $tb), ("_3", $tc)]))
-      | stx@`(sdql| < $[ $n:ident = $e:sdql ],* >) =>
+      | stx@`(sdql| < $[ $n:sdqlident = $e:sdql ],* >) =>
           elabNamedRecordToLoad stx n e
 
       -- dictionary literals (syntactic sugar over inserts)
@@ -261,9 +288,9 @@ mutual
           wrapLoadWithStx stx (← `(LoadTerm'.emptyDictAnn $dd $rr))
 
       -- projection / lookup
-      | `(sdql| $r:sdql . $fname:ident) => do
+      | `(sdql| $r:sdql . $fname:sdqlident) => do
           let rr ← elabSDQLToLoad r
-          let fieldName := Syntax.mkStrLit fname.getId.toString
+          let fieldName := Syntax.mkStrLit (← sdqlIdentToString fname)
           wrapLoadWithStx stx (← `(LoadTerm'.projByName $fieldName $rr))
       | `(sdql| $d:sdql ( $k:sdql )) => do
           let dd ← elabSDQLToLoad d
@@ -282,10 +309,11 @@ mutual
           let cc ← elabSDQLToLoad c
           let tt ← elabSDQLToLoad t
           wrapLoadWithStx stx (← `(LoadTerm'.iteThen $cc $tt))
-      | `(sdql| let $x:ident = $e:sdql in $b:sdql) => do
+      | `(sdql| let $x:sdqlident = $e:sdql in $b:sdql) => do
           let ee ← elabSDQLToLoad e
           let bb ← elabSDQLToLoad b
-          wrapLoadWithStx stx (← `(LoadTerm'.letin $ee (fun $x => $bb)))
+          let xIdent ← sdqlIdentToLeanIdent x
+          wrapLoadWithStx stx (← `(LoadTerm'.letin $ee (fun $xIdent => $bb)))
 
       -- arithmetic / boolean ops
       | `(sdql| $x:sdql + $y:sdql) => do
@@ -364,11 +392,13 @@ mutual
           wrapLoadWithStx stx (← `(LoadTerm'.builtinConcat [] [] $arg))
 
       -- summation
-      | `(sdql| sum(<$k:ident, $v:ident> in $d:sdql) $body:sdql) => do
+      | `(sdql| sum(<$k:sdqlident, $v:sdqlident> in $d:sdql) $body:sdql) => do
           let dd ← elabSDQLToLoad d
           let bb ← elabSDQLToLoad body
-          wrapLoadWithStx stx (← `(LoadTerm'.sum $dd (fun $k => fun $v => $bb)))
-      | `(sdql| sum(<$k:ident, $v:ident> <- $d:sdql) $body:sdql) =>
+          let kIdent ← sdqlIdentToLeanIdent k
+          let vIdent ← sdqlIdentToLeanIdent v
+          wrapLoadWithStx stx (← `(LoadTerm'.sum $dd (fun $kIdent => fun $vIdent => $bb)))
+      | `(sdql| sum(<$k:sdqlident, $v:sdqlident> <- $d:sdql) $body:sdql) =>
           elabSDQLToLoad (← `(sdql| sum(<$k, $v> in $d) $body))
 
       -- load
