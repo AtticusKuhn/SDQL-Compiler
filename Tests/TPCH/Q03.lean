@@ -61,7 +61,7 @@ unsafe def Q03 : SProg2 :=
       sum(<i,_v> <- range(customer.size))
         if(customer.c_mktsegment(i) == "BUILDING") then
           { unique(customer.c_custkey(i)) -> < _v = customer.c_custkey(i) > }
-        else {}_{ int, < _v : int > } in
+        in
 
     let o_h =
       sum(<i,_v> <- range(orders.size))
@@ -70,7 +70,7 @@ unsafe def Q03 : SProg2 :=
             && (dom(c_h)(orders.o_custkey(i)))
           ) then
           { unique(orders.o_orderkey(i)) -> < _v = orders.o_orderdate(i), _o = orders.o_shippriority(i) > }
-        else {}_{ int, < _o : int, _v : date > } in
+         in
 
     let l_h =
       sum(<i,_v> <- range(lineitem.size))
@@ -86,7 +86,7 @@ unsafe def Q03 : SProg2 :=
             > ->
              < revenue = lineitem.l_extendedprice(i) *{real} (1.0 - lineitem.l_discount(i)) >
           }
-        else {}_{ < l_orderkey : int, o_orderdate : date, o_shippriority : int >, < revenue : real > } in
+        in
 
     sum(<k,v> <- l_h)
       { unique(concat(k,v)) -> true }
