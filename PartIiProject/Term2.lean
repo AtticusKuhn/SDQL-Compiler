@@ -406,6 +406,7 @@ mutual
         | SBuiltin.Or => Term2.builtin BuiltinFn.Or (trLoc2 a)
         | @SBuiltin.Eq st => Term2.builtin (BuiltinFn.Eq (ty st)) (trLoc2 a)
         | @SBuiltin.Leq st => Term2.builtin (BuiltinFn.Leq (ty st)) (trLoc2 a)
+        | @SBuiltin.Lt st => Term2.builtin (BuiltinFn.Lt (ty st)) (trLoc2 a)
         | @SBuiltin.Sub st => Term2.builtin (BuiltinFn.Sub (ty st)) (trLoc2 a)
         | SBuiltin.StrEndsWith => Term2.builtin BuiltinFn.StrEndsWith (trLoc2 a)
         | @SBuiltin.Dom dom range =>

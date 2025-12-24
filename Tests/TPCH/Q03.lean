@@ -50,44 +50,47 @@ Source: sdql-rs/progs/tpch/3.sdql
 unsafe def Q03_stub : SProg2 := [SDQLProg2 { int }| 0 ]
 
 -- Attempted port (placeholder; unsupported syntax likely)
-/- 
-unsafe def Q03 : SProg :=
-  [SDQLProg { int }|
-    let customer = load[<c_custkey: @vec {int -> int}, c_name: @vec {int -> varchar(25)}, c_address: @vec {int -> varchar(40)}, c_nationkey: @vec {int -> int}, c_phone: @vec {int -> varchar(15)}, c_acctbal: @vec {int -> real}, c_mktsegment: @vec {int -> varchar(10)}, c_comment: @vec {int -> varchar(117)}, size: int>]("datasets/tpch/customer.tbl")
-    let orders = load[<o_orderkey: @vec {int -> int}, o_custkey: @vec {int -> int}, o_orderstatus: @vec {int -> varchar(1)}, o_totalprice: @vec {int -> real}, o_orderdate: @vec {int -> date}, o_orderpriority: @vec {int -> varchar(15)}, o_clerk: @vec {int -> varchar(15)}, o_shippriority: @vec {int -> int}, o_comment: @vec {int -> varchar(79)}, size: int>]("datasets/tpch/orders.tbl")
-    let lineitem = load[<l_orderkey: @vec {int -> int}, l_partkey: @vec {int -> int}, l_suppkey: @vec {int -> int}, l_linenumber: @vec {int -> int}, l_quantity: @vec {int -> real}, l_extendedprice: @vec {int -> real}, l_discount: @vec {int -> real}, l_tax: @vec {int -> real}, l_returnflag: @vec {int -> varchar(1)}, l_linestatus: @vec {int -> varchar(1)}, l_shipdate: @vec {int -> date}, l_commitdate: @vec {int -> date}, l_receiptdate: @vec {int -> date}, l_shipinstruct: @vec {int -> varchar(25)}, l_shipmode: @vec {int -> varchar(10)}, l_comment: @vec {int -> varchar(44)}, size: int>]("datasets/tpch/lineitem.tbl")
+
+unsafe def Q03 : SProg2 :=
+  [SDQLProg2 { { < l_orderkey : int, o_orderdate : date, o_shippriority : int, revenue : real > -> bool } }|
+    let customer = load[<c_custkey: @vec {int -> int}, c_name: @vec {int -> varchar(25)}, c_address: @vec {int -> varchar(40)}, c_nationkey: @vec {int -> int}, c_phone: @vec {int -> varchar(15)}, c_acctbal: @vec {int -> real}, c_mktsegment: @vec {int -> varchar(10)}, c_comment: @vec {int -> varchar(117)}, size: int>]("datasets/tpch/customer.tbl") in
+    let orders = load[<o_orderkey: @vec {int -> int}, o_custkey: @vec {int -> int}, o_orderstatus: @vec {int -> varchar(1)}, o_totalprice: @vec {int -> real}, o_orderdate: @vec {int -> date}, o_orderpriority: @vec {int -> varchar(15)}, o_clerk: @vec {int -> varchar(15)}, o_shippriority: @vec {int -> int}, o_comment: @vec {int -> varchar(79)}, size: int>]("datasets/tpch/orders.tbl") in
+    let lineitem = load[<l_orderkey: @vec {int -> int}, l_partkey: @vec {int -> int}, l_suppkey: @vec {int -> int}, l_linenumber: @vec {int -> int}, l_quantity: @vec {int -> real}, l_extendedprice: @vec {int -> real}, l_discount: @vec {int -> real}, l_tax: @vec {int -> real}, l_returnflag: @vec {int -> varchar(1)}, l_linestatus: @vec {int -> varchar(1)}, l_shipdate: @vec {int -> date}, l_commitdate: @vec {int -> date}, l_receiptdate: @vec {int -> date}, l_shipinstruct: @vec {int -> varchar(25)}, l_shipmode: @vec {int -> varchar(10)}, l_comment: @vec {int -> varchar(44)}, size: int>]("datasets/tpch/lineitem.tbl") in
 
     let c_h =
-      sum(<i,_> <- range(customer.size))
+      sum(<i,_v> <- range(customer.size))
         if(customer.c_mktsegment(i) == "BUILDING") then
-          { unique(customer.c_custkey(i)) -> < _ = customer.c_custkey(i) > }
+          { unique(customer.c_custkey(i)) -> < _v = customer.c_custkey(i) > }
+        else {}_{ int, < _v : int > } in
 
     let o_h =
-      sum(<i,_> <- range(orders.size))
+      sum(<i,_v> <- range(orders.size))
         if(
-            (orders.o_orderdate(i) < date(19950315))
+            (orders.o_orderdate(i) < date (19950315))
             && (dom(c_h)(orders.o_custkey(i)))
           ) then
-          { unique(orders.o_orderkey(i)) -> < _ = orders.o_orderdate(i), _ = orders.o_shippriority(i) > }
+          { unique(orders.o_orderkey(i)) -> < _v = orders.o_orderdate(i), _o = orders.o_shippriority(i) > }
+        else {}_{ int, < _o : int, _v : date > } in
 
     let l_h =
-      sum(<i,_> <- range(lineitem.size))
+      sum(<i,_v> <- range(lineitem.size))
         if(
-            (date(19950315) < lineitem.l_shipdate(i))
+            (date (19950315) < lineitem.l_shipdate(i))
             && (dom(o_h)(lineitem.l_orderkey(i)))
           ) then
           {
             <
               l_orderkey = lineitem.l_orderkey(i),
-              o_orderdate = o_h(lineitem.l_orderkey(i))(0),
-              o_shippriority = o_h(lineitem.l_orderkey(i))(1)
+              o_orderdate = o_h(lineitem.l_orderkey(i))._v,
+              o_shippriority = o_h(lineitem.l_orderkey(i))._o
             > ->
-             < revenue = lineitem.l_extendedprice(i) * (1.0 - lineitem.l_discount(i)) >
+             < revenue = lineitem.l_extendedprice(i) *{real} (1.0 - lineitem.l_discount(i)) >
           }
+        else {}_{ < l_orderkey : int, o_orderdate : date, o_shippriority : int >, < revenue : real > } in
 
     sum(<k,v> <- l_h)
       { unique(concat(k,v)) -> true }
   ]
--/
+
 
 end Tests.TPCH

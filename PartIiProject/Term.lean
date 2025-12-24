@@ -268,6 +268,7 @@ inductive BuiltinFn : Ty → Ty → Type
   | And : BuiltinFn (Ty.record [.bool, .bool]) Ty.bool
   | Eq (t : Ty) : BuiltinFn (Ty.record [t, t]) Ty.bool
   | Leq (t : Ty) : BuiltinFn (Ty.record [t, t]) Ty.bool
+  | Lt (t : Ty) : BuiltinFn (Ty.record [t, t]) Ty.bool
   | Sub (t : Ty) : BuiltinFn (Ty.record [t, t]) t
   | StrEndsWith : BuiltinFn (Ty.record [.string, .string]) Ty.bool
   | Dom : {dom range : Ty} → BuiltinFn (.dict dom range) (.dict dom Ty.bool)
@@ -279,4 +280,3 @@ inductive BuiltinFn : Ty → Ty → Type
 The previous PHOAS core term/program layer (`Term'`/`Prog`) has been removed.
 Use the DeBruijn-indexed core terms in `PartIiProject.Term2`.
 -/
-

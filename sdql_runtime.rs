@@ -253,6 +253,8 @@ pub fn ext_eq<T: PartialEq>(args: (T, T)) -> bool { args.0 == args.1 }
 
 pub fn ext_leq<T: PartialOrd>(args: (T, T)) -> bool { args.0 <= args.1 }
 
+pub fn ext_lt<T: PartialOrd>(args: (T, T)) -> bool { args.0 < args.1 }
+
 pub fn ext_sub<T: std::ops::Sub<Output = T>>(args: (T, T)) -> T { args.0 - args.1 }
 
 pub fn ext_str_ends_with(args: (String, String)) -> bool {
@@ -494,6 +496,25 @@ fn parse_tbl_lines(path: &str) -> Vec<Vec<String>> {
     rows
 }
 
+/// Resolve TPCH dataset paths at runtime.
+///
+/// When SDQL programs refer to files under `datasets/tpch/...`, tests can override the base
+/// directory by setting `TPCH_DATASET_PATH` (e.g. to `datasets/tpch-tiny`).
+fn resolve_tbl_path(path: &str) -> String {
+    const PREFIX: &str = "datasets/tpch/";
+    if let Some(rest) = path.strip_prefix(PREFIX) {
+        let base = std::env::var("TPCH_DATASET_PATH").unwrap_or_else(|_| "datasets/tpch".to_string());
+        let base = base.trim_end_matches('/');
+        if rest.is_empty() {
+            base.to_string()
+        } else {
+            format!("{}/{}", base, rest)
+        }
+    } else {
+        path.to_string()
+    }
+}
+
 /// Generic column builder: parses column `col` from each row into a BTreeMap<i64, T>.
 pub fn build_col<T: FromTblField>(rows: &[Vec<String>], col: usize) -> BTreeMap<i64, T> {
     let mut m = BTreeMap::new();
@@ -507,7 +528,8 @@ pub fn build_col<T: FromTblField>(rows: &[Vec<String>], col: usize) -> BTreeMap<
 /// Generic TBL loader: parses a TBL file and returns (rows, size).
 /// Callers use build_col to extract typed columns.
 pub fn load_tbl(path: &str) -> (Vec<Vec<String>>, i64) {
-    let rows = parse_tbl_lines(path);
+    let resolved = resolve_tbl_path(path);
+    let rows = parse_tbl_lines(&resolved);
     let size = rows.len() as i64;
     (rows, size)
 }

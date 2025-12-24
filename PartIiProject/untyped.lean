@@ -70,6 +70,8 @@ mutual
     | dictInsert : LoadTermLoc rep → LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
     | not : LoadTermLoc rep → LoadTerm' rep
     | ite : LoadTermLoc rep → LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
+    /-- `if c then t` (no `else`); desugars during type inference using the additive identity of the expected type. -/
+    | iteThen : LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
     | letin : LoadTermLoc rep → (rep → LoadTermLoc rep) → LoadTerm' rep
     | add : LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
     | mul : SurfaceTy → LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
@@ -81,6 +83,7 @@ mutual
     | builtinOr : LoadTermLoc rep → LoadTerm' rep
     | builtinEq : SurfaceTy → LoadTermLoc rep → LoadTerm' rep
     | builtinLeq : SurfaceTy → LoadTermLoc rep → LoadTerm' rep
+    | builtinLt : SurfaceTy → LoadTermLoc rep → LoadTerm' rep
     | builtinSub : SurfaceTy → LoadTermLoc rep → LoadTerm' rep
     | builtinStrEndsWith : LoadTermLoc rep → LoadTerm' rep
     | builtinDom : SurfaceTy → SurfaceTy → LoadTermLoc rep → LoadTerm' rep  -- dom, range
@@ -127,6 +130,8 @@ mutual
     | dictInsert : {ctx : Nat} → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTerm' ctx
     | not : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
     | ite : {ctx : Nat} → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTerm' ctx
+    /-- `if c then t` (no `else`); desugars during type inference using the additive identity of the expected type. -/
+    | iteThen : {ctx : Nat} → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTerm' ctx
     | letin : {ctx : Nat} → UntypedTermLoc ctx → (UntypedTermLoc ctx.succ) → UntypedTerm' ctx
     | add : {ctx : Nat} → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTerm' ctx
     | mul : {ctx : Nat} → SurfaceTy → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTerm' ctx
@@ -137,6 +142,7 @@ mutual
     | builtinOr : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinEq : {ctx : Nat} → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinLeq : {ctx : Nat} → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
+    | builtinLt : {ctx : Nat} → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinSub : {ctx : Nat} → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinStrEndsWith : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinDom : {ctx : Nat} → SurfaceTy → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
@@ -280,6 +286,7 @@ unsafe def typeof2 (ctx : List SurfaceTy) (e : UntypedTermLoc ctx.length) : Exce
         pure (.dict domTy rangeTy)
     | .not _ => pure .bool
     | .ite _ t _ => typeof2 ctx t
+    | .iteThen _ t => typeof2 ctx t
     | .letin bound body => do
         let boundTy ← typeof2 ctx bound
         typeof2 (boundTy :: ctx) body
@@ -310,6 +317,7 @@ unsafe def typeof2 (ctx : List SurfaceTy) (e : UntypedTermLoc ctx.length) : Exce
     | .builtinOr _ => pure .bool
     | .builtinEq _ _ => pure .bool
     | .builtinLeq _ _ => pure .bool
+    | .builtinLt _ _ => pure .bool
     | .builtinSub _ arg => do
         let argTy ← typeof2 ctx arg
         match argTy with
@@ -427,6 +435,32 @@ unsafe def inferRecordFields2 {ctx : List SurfaceTy}
         let restTerms ← inferRecordFields2 inferFn stx restSchema restFields
         pure (STermFields2.cons term restTerms)
 
+-- Additive identities as surface terms (used for `if-then` sugar).
+mutual
+  /-- Additive identity term for the given `SAdd` evidence. -/
+  unsafe def zeroOfSAddLoc {ctx : List SurfaceTy} {ty : SurfaceTy}
+      (stx : SourceLocation) (a : SAdd ty) : STermLoc2 ctx ty :=
+    match ty, a with
+    | .bool, .boolA => STermLoc2.mk stx (STerm2.constBool false)
+    | .int, .intA => STermLoc2.mk stx (STerm2.constInt 0)
+    | .real, .realA => STermLoc2.mk stx (STerm2.constReal 0.0)
+    | .date, .dateA =>
+        let emptyRec : STermLoc2 ctx (.record []) :=
+          STermLoc2.mk stx (STerm2.constRecord STermFields2.nil)
+        STermLoc2.mk stx (STerm2.builtin (SBuiltin.DateLit 10101) emptyRec)
+    | .string, .stringA => STermLoc2.mk stx (STerm2.constString "")
+    | .dict dom range, .dictA _ =>
+        STermLoc2.mk stx (STerm2.emptyDict (domain := dom) (ran := range))
+    | .record σ, .recordA fields =>
+        STermLoc2.mk stx (STerm2.constRecord (zerosForSAddFields (ctx := ctx) stx σ fields))
+
+  unsafe def zerosForSAddFields {ctx : List SurfaceTy} (stx : SourceLocation)
+      : (σ : Schema) → HList (fun p => SAdd p.snd) σ → STermFields2 ctx σ
+    | [], .nil => STermFields2.nil
+    | (_name, t) :: rest, .cons h tl =>
+        STermFields2.cons (zeroOfSAddLoc (ctx := ctx) (ty := t) stx h) (zerosForSAddFields (ctx := ctx) stx rest tl)
+end
+
 /-- Main type inference function for DeBruijn terms.
 
     Parameters:
@@ -518,6 +552,13 @@ unsafe def infer2 (ctx : List SurfaceTy)
       let condTerm ← infer2 ctx .bool c
       let thenTerm ← infer2 ctx expectedTy t
       let elseTerm ← infer2 ctx expectedTy f
+      pure (STermLoc2.mk stx (STerm2.ite condTerm thenTerm elseTerm))
+
+  | .iteThen c t => do
+      let condTerm ← infer2 ctx .bool c
+      let thenTerm ← infer2 ctx expectedTy t
+      let addEv ← synthSAdd stx expectedTy
+      let elseTerm : STermLoc2 ctx expectedTy := zeroOfSAddLoc (ctx := ctx) (ty := expectedTy) stx addEv
       pure (STermLoc2.mk stx (STerm2.ite condTerm thenTerm elseTerm))
 
   | .letin bound body => do
@@ -614,6 +655,17 @@ unsafe def infer2 (ctx : List SurfaceTy)
             STermLoc2.mk stx (STerm2.builtin SBuiltin.Leq argTerm)
           checkTyEq2 stx .bool expectedTy builtinTerm
       | other => .error (stx, s!"<= expects a pair record argument, got {tyToString other}")
+
+  | .builtinLt _ arg => do
+      -- Infer the type of the argument to get the actual comparison type
+      let argTy ← typeof2 ctx arg
+      match argTy with
+      | .record [("_1", t1), ("_2", _)] =>
+          let argTerm ← infer2 ctx (.record [("_1", t1), ("_2", t1)]) arg
+          let builtinTerm : STermLoc2 ctx .bool :=
+            STermLoc2.mk stx (STerm2.builtin SBuiltin.Lt argTerm)
+          checkTyEq2 stx .bool expectedTy builtinTerm
+      | other => .error (stx, s!"< expects a pair record argument, got {tyToString other}")
 
   | .builtinSub _ arg => do
       -- Infer the type of the argument to get the actual subtraction type
@@ -726,6 +778,7 @@ where
       | .dictInsert k v d => go d (go v (go k acc))
       | .not e => go e acc
       | .ite c t f => go f (go t (go c acc))
+      | .iteThen c t => go t (go c acc)
       | .letin bound body =>
           let boundLoads := go bound acc
           go (body ()) boundLoads  -- dummy Nat for PHOAS traversal
@@ -743,6 +796,7 @@ where
       | .builtinOr arg => go arg acc
       | .builtinEq _ arg => go arg acc
       | .builtinLeq _ arg => go arg acc
+      | .builtinLt _ arg => go arg acc
       | .builtinSub _ arg => go arg acc
       | .builtinStrEndsWith arg => go arg acc
       | .builtinDom _ _ arg => go arg acc
@@ -847,6 +901,8 @@ where
     | .not e => return .not (← transform depth pathToIndex e)
     | .ite c t f =>
         return .ite (← transform depth pathToIndex c) (← transform depth pathToIndex t) (← transform depth pathToIndex f)
+    | .iteThen c t =>
+        return .iteThen (← transform depth pathToIndex c) (← transform depth pathToIndex t)
     | .letin bound body =>
         -- Increase depth for the body, pass current depth as the PHOAS level
         return .letin (← transform depth pathToIndex bound) (← transform (depth + 1) pathToIndex (body depth))
@@ -881,6 +937,7 @@ where
     | .builtinOr arg => return .builtinOr (← transform depth pathToIndex arg)
     | .builtinEq t arg => return .builtinEq t (← transform depth pathToIndex arg)
     | .builtinLeq t arg => return .builtinLeq t (← transform depth pathToIndex arg)
+    | .builtinLt t arg => return .builtinLt t (← transform depth pathToIndex arg)
     | .builtinSub t arg => return .builtinSub t (← transform depth pathToIndex arg)
     | .builtinStrEndsWith arg => return .builtinStrEndsWith (← transform depth pathToIndex arg)
     | .builtinDom dom range arg => return .builtinDom dom range (← transform depth pathToIndex arg)

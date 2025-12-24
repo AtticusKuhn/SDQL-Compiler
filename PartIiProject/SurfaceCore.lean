@@ -67,6 +67,7 @@ inductive SBuiltin : SurfaceTy → SurfaceTy → Type where
   | Or  : SBuiltin (.record [("_1", .bool), ("_2", .bool)]) .bool
   | Eq {t : SurfaceTy} : SBuiltin (.record [("_1", t), ("_2", t)]) .bool
   | Leq {t : SurfaceTy} : SBuiltin (.record [("_1", t), ("_2", t)]) .bool
+  | Lt {t : SurfaceTy} : SBuiltin (.record [("_1", t), ("_2", t)]) .bool
   | Sub {t : SurfaceTy} : SBuiltin (.record [("_1", t), ("_2", t)]) t
   | StrEndsWith : SBuiltin (.record [("_1", .string), ("_2", .string)]) .bool
   | Dom {dom range : SurfaceTy} : SBuiltin (.dict dom range) (.dict dom .bool)
@@ -76,4 +77,3 @@ inductive SBuiltin : SurfaceTy → SurfaceTy → Type where
       SBuiltin (.record [("_1", .record σ1), ("_2", .record σ2)]) (.record (σ1 ++ σ2))
 
 end PartIiProject
-

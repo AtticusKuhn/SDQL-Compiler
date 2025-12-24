@@ -3,6 +3,8 @@ import PartIiProject.CodegenRust
 import PartIiProject.SyntaxSDQLProg
 import Tests.TPCH.Q01
 import Tests.TPCH.Q02
+import Tests.TPCH.Q03
+
 
 namespace Tests
 namespace Cases
@@ -41,12 +43,20 @@ unsafe def p_lookup_miss : SProg2 :=
 unsafe def p_sum_vals : SProg2 :=
   [SDQLProg2 { int }| sum( <k, v> in { 3 -> 4, 5 -> 6 } ) v ]
 
+unsafe def p_if_then_true : SProg2 :=
+  [SDQLProg2 { int }| if true then 7 ]
+
+unsafe def p_if_then_false : SProg2 :=
+  [SDQLProg2 { int }| if false then 7 ]
+
 unsafe def smallCases : List TestCase :=
   [ TestCase.program "add_int" p_add_int "8"
   , TestCase.program "dict_insert" p_dict_is "{1 -> \"one\", }"
   , TestCase.program "lookup_hit" p_lookup_hit "2"
   , TestCase.program "lookup_miss" p_lookup_miss "0"
   , TestCase.program "sum_vals" p_sum_vals "10"
+  , TestCase.program "if_then_true" p_if_then_true "7"
+  , TestCase.program "if_then_false" p_if_then_false "0"
   ]
 
 /- TPCH-style programs exercise file-loading pipelines. Queries listed here are
@@ -56,6 +66,8 @@ unsafe def tpchCases : List TestCase :=
   [ TestCase.programRef "tpch_q01" TPCH.Q01 "sdql-rs/target/release/tpch_q01_tiny"
       [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
   , TestCase.programRef "tpch_q02" TPCH.Q02 "sdql-rs/target/release/tpch_q02_tiny"
+      [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
+  , TestCase.programRef "tpch_q03" TPCH.Q03 "sdql-rs/target/release/tpch_q03_tiny"
       [("TPCH_DATASET_PATH", "datasets/tpch-tiny")] ]
 
 unsafe def cases : List TestCase :=
