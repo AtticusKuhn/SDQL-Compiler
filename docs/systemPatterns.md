@@ -61,7 +61,8 @@ Testing infrastructure:
     - `TestCase.programRef`: dynamically compares against a reference binary (sdql-rs)
   - `Tests/Main.lean`: compiles each program (`SProg2`) to a standalone Rust program via `renderRustProg2Shown (ToCore2.trProg2 ...)`, writes sources to `.sdql-test-out/`, builds with `rustc`, runs binaries, and compares outputs. For `programRef` tests, first runs the reference binary to get expected output.
   - Lake executable target `sdql-tests` drives execution: `lake build sdql-tests && lake exe sdql-tests`.
-  - Nix wrapper `sdql-tests-with-ref` builds sdql-rs reference binary if needed and runs tests: `nix run`.
+  - Reference binaries are built on-demand: if a `programRef` uses a path under `sdql-rs/target/release/`, the test runner will invoke `cargo build --release --bin <name>` from `sdql-rs/` when the binary is missing.
+  - Nix wrapper `sdql-tests-with-ref` (invoked by `nix run`) sets up datasets and runs the Lean test runner; it no longer prebuilds sdql-rs binaries.
 
 - Rust runtime (`sdql_runtime.rs`):
   - Standalone file imported via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`
@@ -70,6 +71,7 @@ Testing infrastructure:
   - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`
   - Extension functions: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_sub`, `ext_str_ends_with`, `ext_dom`, `ext_range`
   - TBL loaders: `FromTblField` trait for type-directed parsing (i64, String, Real, bool, Date), `build_col<T>` for extracting typed columns, `load_tbl` for parsing pipe-delimited TBL files
+  - TPCH dataset path override: `load_tbl` rewrites paths under `datasets/tpch/` using `TPCH_DATASET_PATH` (e.g. pointing to `datasets/tpch-tiny`) so SDQL sources can keep upstream paths while tests swap datasets.
   - Printing: `SDQLShow` trait for ints, bools, strings (quoted), tuples (up to arity 8), and `BTreeMap`
   - The Rust AST printer emits `map_insert(...)` and iterates maps with `.into_iter()` to match the runtime helpers
   - Table loading: `genTableLoader` generates inline loader code for each table parameter, using `load_tbl` and `build_col` with column indices derived from the table schema type
