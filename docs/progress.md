@@ -23,11 +23,12 @@ What works:
 - Tests: updated to consume `SProg2` programs built via `[SDQLProg2 { T }| ... ]` and to generate Rust via `renderRustProg2Shown`. `.sdql-test-out/*.rs` and binaries are regenerated through this path.
 - TPCH Q02: now tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q02_tiny`) using dynamic output comparison.
 - TPCH Q01: now tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q01_tiny`) using dynamic output comparison.
+- TPCH Q03: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q03_tiny`); relies on the `<` builtin (`Lt`/`ext_lt`) and `TPCH_DATASET_PATH` path rewriting for sources that use upstream `datasets/tpch/...` paths.
 - Date type: added `Ty.date` primitive with `SDQLDate` wrapper (YYYYMMDD integer), `DateLit` builtin constructor, and `Leq` comparison. Rust codegen uses a simple `Date` struct.
 - Real number literals: added `constReal` for floating-point constants in the DSL.
 - Subtraction: added `Sub` builtin for arithmetic subtraction on int/real types.
 - CI: GitHub Actions workflow builds the project and runs the test executable on pushes/PRs.
-- `nix run` support: wrapper script builds sdql-rs reference binary if needed and runs tests with proper environment setup.
+- `nix run` support: wrapper script ensures datasets are present and runs tests with proper environment setup; reference binaries are built on-demand by the Lean test runner when missing.
 - Surface/core terms are DeBruijn-indexed: surface terms in `SurfaceCore2.lean`, core terms in `Term2.lean`, with lowering in `ToCore2`.
 
 What's left to build:

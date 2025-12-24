@@ -52,7 +52,7 @@ How to run:
 - Build library: `lake build`.
 - Build tests: `lake build sdql-tests`.
 - Run tests: `lake exe sdql-tests`.
-- Preferred: `nix run` (runs the full test suite, including building the sdql-rs reference binary if needed).
+- Preferred: `nix run` (runs the full test suite; sdql-rs TPCH reference binaries are built on-demand by the Lean test runner via `cargo build --release --bin ...` when missing).
 - Explore: open the `.lean` files and evaluate examples with `#eval`.
 - Try the DSL: use `[SDQLProg2 { int }| 3 + 5 ]` (runs the full pipeline) or start from `[SDQL| 3 + 5 ]` and call `loadTermToSProg2` explicitly.
 

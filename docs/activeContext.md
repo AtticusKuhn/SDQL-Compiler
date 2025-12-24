@@ -17,7 +17,8 @@ Latest changes:
   - `SyntaxSDQL.lean` elaborates to `LoadTermLoc`.
   - `untyped.lean` does load extraction (`LoadTermLoc → UntypedTermLoc`) and type inference to `STermLoc2`.
 - Rust backend now consumes `Prog2` and imports a shared `sdql_runtime.rs` runtime file.
-- Tests use `SProg2` throughout; TPCH Q01/Q02 compare against sdql-rs reference binaries.
+- Tests use `SProg2` throughout; TPCH Q01/Q02/Q03 compare against sdql-rs reference binaries.
+- Testing flow: `Tests/Main.lean` builds missing sdql-rs reference binaries on-demand (via `cargo build --release --bin ...`), and `sdql_runtime.rs` supports `TPCH_DATASET_PATH` rewriting for `datasets/tpch/...` paths.
 - Fixed a Rust precedence bug in the pretty-printer that could change program meaning (missing parentheses under `*`).
 
 Next steps (proposed):
