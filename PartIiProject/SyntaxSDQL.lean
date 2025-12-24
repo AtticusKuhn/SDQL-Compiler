@@ -40,6 +40,7 @@ syntax:70 sdql:70 "." ident : sdql
 -- unary / control
 syntax "not" sdql : sdql
 syntax "if" sdql "then" sdql "else" sdql : sdql
+syntax "if" sdql "then" sdql : sdql
 syntax "let" ident "=" sdql "in" sdql : sdql
 
 -- binary ops (left-assoc precedence)
@@ -52,6 +53,7 @@ syntax:58 sdql:58 "&&" sdql:59 : sdql
 syntax:57 sdql:57 "||" sdql:58 : sdql
 syntax:59 sdql:59 "==" sdql:60 : sdql
 syntax:59 sdql:59 "<=" sdql:60 : sdql
+syntax:59 sdql:59 "<" sdql:60 : sdql
 
 -- builtins/functions
 syntax "dom" "(" sdql ")" : sdql
@@ -276,6 +278,10 @@ mutual
           let tt ← elabSDQLToLoad t
           let ff ← elabSDQLToLoad f
           wrapLoadWithStx stx (← `(LoadTerm'.ite $cc $tt $ff))
+      | `(sdql| if $c:sdql then $t:sdql) => do
+          let cc ← elabSDQLToLoad c
+          let tt ← elabSDQLToLoad t
+          wrapLoadWithStx stx (← `(LoadTerm'.iteThen $cc $tt))
       | `(sdql| let $x:ident = $e:sdql in $b:sdql) => do
           let ee ← elabSDQLToLoad e
           let bb ← elabSDQLToLoad b
@@ -327,6 +333,12 @@ mutual
           let loc ← mkSourceLoc stx
           let arg := (← `(LoadTermLoc.mk (stx := $loc) (LoadTerm'.constRecord [("_1", $xx), ("_2", $yy)])))
           wrapLoadWithStx stx (← `(LoadTerm'.builtinLeq SurfaceTy.int $arg))
+      | `(sdql| $x:sdql < $y:sdql) => do
+          let xx ← elabSDQLToLoad x
+          let yy ← elabSDQLToLoad y
+          let loc ← mkSourceLoc stx
+          let arg := (← `(LoadTermLoc.mk (stx := $loc) (LoadTerm'.constRecord [("_1", $xx), ("_2", $yy)])))
+          wrapLoadWithStx stx (← `(LoadTerm'.builtinLt SurfaceTy.int $arg))
 
       -- builtins
       | `(sdql| dom($e:sdql)) => do
@@ -369,4 +381,3 @@ mutual
 end
 
 end PartIiProject
-

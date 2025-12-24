@@ -6,6 +6,7 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     # Use local git repo (requires committing changes)
     lean4-nix.url = "git+file:///home/atticusk/coding/part_ii_project/lean4nix/lean4-nix";
+    # lean4-nix.url = "github:lenianiva/lean4-nix";
     # Rust nightly via oxalica/rust-overlay
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
@@ -55,8 +56,8 @@
             ];
           }).executable;
 
-          # Wrapper script that sets up sdql-rs binaries and datasets for tests
-          # This expects to be run from the project root with sdql-rs already built
+          # Wrapper script that sets up datasets for tests and runs the Lean test runner.
+          # TPCH reference binaries are built on-demand by `Tests/Main.lean`.
           sdqlTestsWithRef = pkgs.writeShellApplication {
             name = "sdql-tests-with-ref";
             runtimeInputs = [ rustToolchain ];
@@ -67,18 +68,6 @@
               if [ ! -d "sdql-rs" ]; then
                 echo "Error: must be run from the project root directory (sdql-rs/ not found)" >&2
                 exit 1
-              fi
-
-              # Build sdql-rs reference binaries if needed (or if sources are newer)
-              if [ ! -f "sdql-rs/target/release/tpch_q01_tiny" ] || \
-                 [ "sdql-rs/src/bin/tpch_q01_tiny.rs" -nt "sdql-rs/target/release/tpch_q01_tiny" ]; then
-                echo "Building sdql-rs reference binary..."
-                (cd sdql-rs && cargo build --release --bin tpch_q01_tiny)
-              fi
-              if [ ! -f "sdql-rs/target/release/tpch_q02_tiny" ] || \
-                 [ "sdql-rs/src/bin/tpch_q02_tiny.rs" -nt "sdql-rs/target/release/tpch_q02_tiny" ]; then
-                echo "Building sdql-rs reference binary..."
-                (cd sdql-rs && cargo build --release --bin tpch_q02_tiny)
               fi
 
               # Ensure datasets exist

@@ -41,6 +41,38 @@ def runProc (cmd : String) (args : Array String) (cwd? : Option FilePath := none
   let code := out.exitCode.toNat
   return (code, out.stdout, out.stderr)
 
+def lastPathComponent (p : String) : String :=
+  match (p.splitOn "/").getLast? with
+  | some c => c
+  | none => p
+
+def ensureSdqlRsRefBin (refBinPath : String) : IO (Except String Unit) := do
+  let refBin := FilePath.mk refBinPath
+  let refBinExists ← refBin.pathExists
+  if refBinExists then
+    return .ok ()
+  else
+    let isSdqlRsTarget := refBinPath.startsWith "sdql-rs/target/release/"
+    if isSdqlRsTarget then
+      let binName := lastPathComponent refBinPath
+      let srcPath := FilePath.mk s!"sdql-rs/src/bin/{binName}.rs"
+      let srcExists ← srcPath.pathExists
+      if srcExists then
+        let (code, _out, err) ← runProc "cargo" #["build", "--release", "--bin", binName]
+          (cwd? := some (FilePath.mk "sdql-rs"))
+        if code != 0 then
+          return .error s!"Failed to build reference binary {binName}:\n{err}"
+        else
+          let refBinExistsAfter ← refBin.pathExists
+          if refBinExistsAfter then
+            return .ok ()
+          else
+            return .error s!"Reference binary still missing after build: {refBinPath}"
+      else
+        return .error s!"Reference binary missing and no source found at {srcPath.toString}"
+    else
+      return .error s!"Reference binary not found: {refBinPath}"
+
 def compileRust (rsPath binPath : FilePath) : IO (Nat × String) := do
   let (code, _out, err) ← runProc "rustc" #["-O", "-o", binPath.toString, rsPath.toString]
   return (code, err)
@@ -112,6 +144,10 @@ unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
       | .ok _ =>
           return { name, kind := .compileOnly }
   | .programRef name sp refBinPath envVars => do
+      match ← ensureSdqlRsRefBin refBinPath with
+      | .error err =>
+          return { name, kind := .expectRefMatch, refBin? := some refBinPath, stderr? := some err }
+      | .ok () => pure ()
       -- First, run the reference binary to get expected output
       let (refCode, refOut, refErr) ← runBinaryWithEnv (FilePath.mk refBinPath) envVars
       if refCode != 0 then

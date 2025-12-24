@@ -70,6 +70,7 @@ def compileBuiltin {argTy resTy : _root_.Ty} (b : _root_.BuiltinFn argTy resTy) 
   | .Or => .call "ext_or" [argExpr]
   | .Eq _ => .call "ext_eq" [argExpr]
   | .Leq _ => .call "ext_leq" [argExpr]
+  | .Lt _ => .call "ext_lt" [argExpr]
   | .Sub _ => .call "ext_sub" [argExpr]
   | .StrEndsWith => .call "ext_str_ends_with" [argExpr]
   | .Dom => .call "ext_dom" [ExprLoc.withUnknownLoc (Rust.Expr.borrow argExpr)]
