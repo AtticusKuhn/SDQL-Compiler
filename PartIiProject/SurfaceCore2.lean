@@ -77,3 +77,6 @@ unsafe structure SProg2 : Type where
   ctx : List SurfaceTy
   term : STermLoc2 ctx t
   loadPaths : List String
+
+unsafe instance : ToString SProg2 :=
+  { toString := fun sp =>  "sprog"}

@@ -1,4 +1,5 @@
 import Lean
+import Lean.Elab.Util
 import PartIiProject.SyntaxSDQL
 import PartIiProject.untyped
 import PartIiProject.Term2
@@ -21,18 +22,37 @@ Pipeline:
 /- Program quasiquoter using DeBruijn pipeline (new architecture)
    Pipeline: Parser → LoadTerm → UntypedTerm → STerm2/SProg2 → Prog2 → Rust
 -/
-syntax "[SDQLProg2" "{" sdqlty "}" "|" sdql "]" : term
+syntax (name := sdqlProg2) "[SDQLProg2" "{" sdqlty "}" "|" sdql "]" : term
 
-macro_rules
-  | `([SDQLProg2 { $t:sdqlty }| $e:sdql ]) => do
-      -- Step 1: Elaborate to LoadTermLoc using the parser
-      let loadTermBody ← elabSDQLToLoad e
+@[term_elab sdqlProg2] unsafe def elabSdqlProg2 : Lean.Elab.Term.TermElab := fun stx _expectedType? => do
+  withRef stx do
+    match stx with
+    | `([SDQLProg2 { $t:sdqlty }| $e:sdql ]) => do
+        -- Step 1: Elaborate to LoadTermLoc using the parser
+        let loadTermBodyStx ← Lean.Elab.liftMacroM <| elabSDQLToLoad e
 
-      -- Step 2: Elaborate the expected result type
-      let tTerm ← elabTy t
+        -- Step 2: Elaborate the expected result type
+        let tTermStx ← Lean.Elab.liftMacroM <| elabTy t
 
-      -- Step 3: Use loadTermToSProg2 to extract loads, type-check with DeBruijn, and build SProg2
-      `(loadTermToSProg2 $tTerm $loadTermBody)
+        -- Step 3: Elaborate the generated terms to expressions and evaluate them, so we can
+        -- fail with a proper elaboration error (instead of `panic!` defaulting to `Inhabited`).
+        let expectedTyExpr ← Lean.Elab.Term.elabTerm tTermStx (some (Lean.mkConst ``SurfaceTy))
+        let loadExpr ← Lean.Elab.Term.elabTerm loadTermBodyStx (some (Lean.mkConst ``LoadTerm))
+
+        let expectedTy ← Lean.Meta.evalExpr SurfaceTy (Lean.mkConst ``SurfaceTy) expectedTyExpr (safety := .unsafe)
+
+        -- Run the checker during elaboration.
+        let checkExpr := Lean.mkApp2 (Lean.mkConst ``processLoadTerm2) expectedTyExpr loadExpr
+        let checkType ← Lean.Meta.inferType checkExpr
+        let checkRes ← Lean.Meta.evalExpr (Except TypeError SProg2) checkType checkExpr (safety := .unsafe)
+        match checkRes with
+        | .ok _ =>
+            -- Expand to the normal runtime pipeline (now guaranteed to succeed).
+            return Lean.mkApp2 (Lean.mkConst ``loadTermToSProg2) expectedTyExpr loadExpr
+        | .error (loc, msg) =>
+            let whereBlock := sourceLocWhere loc
+            throwError s!"Type error while typechecking SDQL program\nExpected: {tyToString expectedTy}\nAt: {whereBlock}\n{msg}"
+    | _ => Lean.Elab.throwUnsupportedSyntax
 
 end PartIiProject
 
