@@ -51,7 +51,9 @@ syntax (name := sdqlProg2) "[SDQLProg2" "{" sdqlty "}" "|" sdql "]" : term
             return Lean.mkApp2 (Lean.mkConst ``loadTermToSProg2) expectedTyExpr loadExpr
         | .error (loc, msg) =>
             let whereBlock := sourceLocWhere loc
-            throwError s!"Type error while typechecking SDQL program\nExpected: {tyToString expectedTy}\nAt: {whereBlock}\n{msg}"
+            throwErrorAt (Syntax.node (.original ⟨ loc.substring, ⟨ loc.startPos⟩ , ⟨ loc.endPos⟩⟩  ⟨ loc.startPos⟩   ⟨ loc.substring, ⟨ loc.startPos⟩ , ⟨ loc.endPos⟩⟩  ⟨ loc.endPos⟩ ) .anonymous #[]) s!"Type error while typechecking SDQL program\nExpected: {tyToString expectedTy}\nAt: {whereBlock}\n{msg}"
+
+            -- throwError s!"Type error while typechecking SDQL program\nExpected: {tyToString expectedTy}\nAt: {whereBlock}\n{msg}"
     | _ => Lean.Elab.throwUnsupportedSyntax
 
 end PartIiProject

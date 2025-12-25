@@ -43,6 +43,8 @@ syntax "<" sdql "," sdql "," sdql ">"   : sdql
 syntax "<" sepBy(sdqlident "=" sdql, ",") ">" : sdql
 syntax "{" sepBy(sdql "->" sdql, ",")  "}" : sdql
 
+syntax "date(" num ")" : sdql
+
 -- lookup and projection
 syntax:70 sdql:70 "(" sdql ")" : sdql
 syntax:70 sdql:70 "." sdqlident : sdql
@@ -70,7 +72,6 @@ syntax "dom" "(" sdql ")" : sdql
 syntax "range" "(" sdql ")" : sdql
 syntax "endsWith" "(" sdql "," sdql ")" : sdql
 syntax "unique" "(" sdql ")" : sdql
-syntax "date" "(" num ")" : sdql
 syntax "concat" "(" sdql "," sdql ")" : sdql
 
 -- summation over dictionaries

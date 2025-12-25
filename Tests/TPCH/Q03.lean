@@ -66,7 +66,7 @@ unsafe def Q03 : SProg2 :=
     let o_h =
       sum(<i,_> <- range(orders.size))
         if(
-            (orders.o_orderdate(i) < date (19950315))
+            (orders.o_orderdate(i) < date(19950315))
             && (dom(c_h)(orders.o_custkey(i)))
           ) then
           { unique(orders.o_orderkey(i)) -> < orders.o_orderdate(i), orders.o_shippriority(i) > }
@@ -75,7 +75,7 @@ unsafe def Q03 : SProg2 :=
     let l_h =
       sum(<i,_> <- range(lineitem.size))
         if(
-            (date (19950315) < lineitem.l_shipdate(i))
+            (date(19950315) < lineitem.l_shipdate(i))
             && (dom(o_h)(lineitem.l_orderkey(i)))
           ) then
           {
