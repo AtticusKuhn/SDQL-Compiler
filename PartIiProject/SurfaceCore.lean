@@ -23,6 +23,10 @@ inductive SurfaceTy : Type where
   | record : List (String × SurfaceTy) → SurfaceTy
   deriving Inhabited, Repr
 
+
+instance : ToString SurfaceTy := {
+  toString := fun s => toString (repr s)
+}
 abbrev Schema := List (String × SurfaceTy)
 
 /- Field-membership proof with an index extractor (used for dot projection). -/

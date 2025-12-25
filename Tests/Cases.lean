@@ -5,6 +5,9 @@ import Tests.GuardMsgs
 import Tests.TPCH.Q01
 import Tests.TPCH.Q02
 import Tests.TPCH.Q03
+import Tests.TPCH.Q04
+import Tests.TPCH.Q05
+import Tests.TPCH.Q06
 
 
 namespace Tests
@@ -73,7 +76,12 @@ unsafe def tpchCases : List TestCase :=
   , TestCase.programRef "tpch_q02" TPCH.Q02 "sdql-rs/target/release/tpch_q02_tiny"
       [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
   , TestCase.programRef "tpch_q03" TPCH.Q03 "sdql-rs/target/release/tpch_q03_tiny"
-      [("TPCH_DATASET_PATH", "datasets/tpch-tiny")] ]
+      [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
+  , TestCase.programRef "tpch_q04" TPCH.Q04 "sdql-rs/target/release/tpch_q04_tiny"
+      [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
+  , TestCase.programRef "tpch_q05" TPCH.Q05 "sdql-rs/target/release/tpch_q05_tiny"
+      [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
+  ]
 
 unsafe def cases : List TestCase :=
   smallCases ++ tpchCases

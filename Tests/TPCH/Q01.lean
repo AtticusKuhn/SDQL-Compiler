@@ -37,8 +37,8 @@ unsafe def Q01 : SProg2 :=
 
     let l_h =
       sum(<i,_v> in range(lineitem.size))
-        if (lineitem.l_shipdate(i) <= date (19980902)) then
-          { < _1 = lineitem.l_returnflag(i), _2 = lineitem.l_linestatus(i) > ->
+        if (lineitem.l_shipdate(i) <= date(19980902)) then
+          { < lineitem.l_returnflag(i), lineitem.l_linestatus(i) > ->
              <
                _3 = lineitem.l_quantity(i),
                _4 = lineitem.l_extendedprice(i),
