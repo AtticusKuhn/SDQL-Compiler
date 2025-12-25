@@ -26,7 +26,8 @@ mutual
     | iteThen : {ctx : Nat} → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTerm' ctx
     | letin : {ctx : Nat} → UntypedTermLoc ctx → (UntypedTermLoc ctx.succ) → UntypedTerm' ctx
     | add : {ctx : Nat} → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTerm' ctx
-    | mul : {ctx : Nat} → SurfaceTy → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTerm' ctx
+    /-- Multiplication. Optional scalar annotation `*{S}` may be provided to disambiguate. -/
+    | mul : {ctx : Nat} → Option SurfaceTy → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTerm' ctx
     | projByName : {ctx : Nat} → String → UntypedTermLoc ctx → UntypedTerm' ctx
     | lookup : {ctx : Nat} → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTerm' ctx
     | sum : {ctx : Nat} → UntypedTermLoc ctx → (UntypedTermLoc (ctx + 2)) → UntypedTerm' ctx
@@ -80,4 +81,3 @@ namespace UntypedTermFields
     let sorted := list.toArray.qsort (fun (n1, _) (n2, _) => n1 < n2) |>.toList
     fromList sorted
 end UntypedTermFields
-

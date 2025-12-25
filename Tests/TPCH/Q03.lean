@@ -84,7 +84,7 @@ unsafe def Q03 : SProg2 :=
               o_orderdate = o_h(lineitem.l_orderkey(i))._1,
               o_shippriority = o_h(lineitem.l_orderkey(i))._2
             > ->
-             < revenue = lineitem.l_extendedprice(i) *{real} (1.0 - lineitem.l_discount(i)) >
+             < revenue = lineitem.l_extendedprice(i) * (1.0 - lineitem.l_discount(i)) >
           }
         in
 

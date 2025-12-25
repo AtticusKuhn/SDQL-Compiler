@@ -20,6 +20,7 @@ Latest changes:
 - Tests use `SProg2` throughout; TPCH Q01/Q02/Q03 compare against sdql-rs reference binaries.
 - Testing flow: `Tests/Main.lean` builds missing sdql-rs reference binaries on-demand (via `cargo build --release --bin ...`), and `sdql_runtime.rs` supports `TPCH_DATASET_PATH` rewriting for `datasets/tpch/...` paths.
 - Fixed a Rust precedence bug in the pretty-printer that could change program meaning (missing parentheses under `*`).
+- Surface DSL: multiplication no longer requires a scalar annotation (`*{real}`); the scalar is inferred from operand types, with the annotation still available to disambiguate.
 
 Next steps (proposed):
 

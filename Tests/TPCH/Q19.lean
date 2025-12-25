@@ -85,12 +85,10 @@ Source: sdql-rs/progs/tpch/19.sdql
 -- Stub SProg to keep module usable
 unsafe def Q19_stub : SProg2 := [SDQLProg2 { int }| 0 ]
 
--- Attempted port (placeholder; unsupported syntax likely)
-/-
-unsafe def Q19 : SProg :=
-  [SDQLProg { int }|
-    let lineitem = load[<l_orderkey: @vec {int -> int}, l_partkey: @vec {int -> int}, l_suppkey: @vec {int -> int}, l_linenumber: @vec {int -> int}, l_quantity: @vec {int -> real}, l_extendedprice: @vec {int -> real}, l_discount: @vec {int -> real}, l_tax: @vec {int -> real}, l_returnflag: @vec {int -> varchar(1)}, l_linestatus: @vec {int -> varchar(1)}, l_shipdate: @vec {int -> date}, l_commitdate: @vec {int -> date}, l_receiptdate: @vec {int -> date}, l_shipinstruct: @vec {int -> varchar(25)}, l_shipmode: @vec {int -> varchar(10)}, l_comment: @vec {int -> varchar(44)}, size: int>]("datasets/tpch/lineitem.tbl")
-    let part = load[<p_partkey: @vec {int -> int}, p_name: @vec {int -> varchar(55)}, p_mfgr: @vec {int -> varchar(25)}, p_brand: @vec {int -> varchar(10)}, p_type: @vec {int -> varchar(25)}, p_size: @vec {int -> int}, p_container: @vec {int -> varchar(10)}, p_retailprice: @vec {int -> real}, p_comment: @vec {int -> varchar(23)}, size: int>]("datasets/tpch/part.tbl")
+unsafe def Q19 : SProg2 :=
+  [SDQLProg2 { { < _1 : real > -> bool } }|
+    let lineitem = load[<l_orderkey: @vec {int -> int}, l_partkey: @vec {int -> int}, l_suppkey: @vec {int -> int}, l_linenumber: @vec {int -> int}, l_quantity: @vec {int -> real}, l_extendedprice: @vec {int -> real}, l_discount: @vec {int -> real}, l_tax: @vec {int -> real}, l_returnflag: @vec {int -> varchar(1)}, l_linestatus: @vec {int -> varchar(1)}, l_shipdate: @vec {int -> date}, l_commitdate: @vec {int -> date}, l_receiptdate: @vec {int -> date}, l_shipinstruct: @vec {int -> varchar(25)}, l_shipmode: @vec {int -> varchar(10)}, l_comment: @vec {int -> varchar(44)}, size: int>]("datasets/tpch/lineitem.tbl") in
+    let part = load[<p_partkey: @vec {int -> int}, p_name: @vec {int -> varchar(55)}, p_mfgr: @vec {int -> varchar(25)}, p_brand: @vec {int -> varchar(10)}, p_type: @vec {int -> varchar(25)}, p_size: @vec {int -> int}, p_container: @vec {int -> varchar(10)}, p_retailprice: @vec {int -> real}, p_comment: @vec {int -> varchar(23)}, size: int>]("datasets/tpch/part.tbl") in
 
     let p_h =
       sum(<i,_> <- range(part.size))
@@ -128,38 +126,39 @@ unsafe def Q19 : SProg :=
         ) then
           { unique(part.p_partkey(i)) ->
             <
-              p_brand = part.p_brand(i),
-              p_size = part.p_size(i),
-              p_container = part.p_container(i)
+              _1 = part.p_brand(i),
+              _2 = part.p_size(i),
+              _3 = part.p_container(i)
             >
-          }
+          } in
 
     let res =
       sum(<i,_> <- range(lineitem.size))
-        let p_brand = p_h(lineitem.l_partkey(i))(0)
         if(
           (dom(p_h)(lineitem.l_partkey(i)))
-          && ((lineitem.l_shipmode(i) == "AIR") || (lineitem.l_shipmode(i) == "AIR REG"))
-          && (lineitem.l_shipinstruct(i) == "DELIVER IN PERSON")
-          && (
-               (
-                 (p_brand == "Brand#12")
-                 && (1.0 <= lineitem.l_quantity(i)) && (lineitem.l_quantity(i) <= 11.0)
-               )
-               || (
-                 (p_brand == "Brand#23")
-                 && (10.0 <= lineitem.l_quantity(i)) && (lineitem.l_quantity(i) <= 20.0)
-               )
-               || (
-                 (p_brand == "Brand#34")
-                 && (20.0 <= lineitem.l_quantity(i)) && (lineitem.l_quantity(i) <= 30.0)
-               )
-          )
         ) then
-          lineitem.l_extendedprice(i) * (1.0 - lineitem.l_discount(i))
+          if(
+            ((lineitem.l_shipmode(i) == "AIR") || (lineitem.l_shipmode(i) == "AIR REG"))
+            && (lineitem.l_shipinstruct(i) == "DELIVER IN PERSON")
+            && (
+                 (
+                   ((p_h(lineitem.l_partkey(i)))._1 == "Brand#12")
+                   && (1.0 <= lineitem.l_quantity(i)) && (lineitem.l_quantity(i) <= 11.0)
+                 )
+                 || (
+                   ((p_h(lineitem.l_partkey(i)))._1 == "Brand#23")
+                   && (10.0 <= lineitem.l_quantity(i)) && (lineitem.l_quantity(i) <= 20.0)
+                 )
+                 || (
+                   ((p_h(lineitem.l_partkey(i)))._1 == "Brand#34")
+                   && (20.0 <= lineitem.l_quantity(i)) && (lineitem.l_quantity(i) <= 30.0)
+                 )
+            )
+          ) then
+            lineitem.l_extendedprice(i) * (1.0 - lineitem.l_discount(i))
+        in
 
-    { < revenue = res > -> true }
+    { < _1 = res > -> true }
   ]
--/
 
 end Tests.TPCH

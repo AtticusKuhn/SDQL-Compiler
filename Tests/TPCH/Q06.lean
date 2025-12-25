@@ -32,7 +32,7 @@ unsafe def Q06 : SProg2 :=
       if((0.05 <= lineitem.l_discount(i)) && (lineitem.l_discount(i) <= 0.07) &&
           (lineitem.l_quantity(i) < 24.0) && (date(19940101) <= lineitem.l_shipdate(i)) &&
           (lineitem.l_shipdate(i) < date(19950101))) then
-        lineitem.l_extendedprice(i) *{real} lineitem.l_discount(i)
+        lineitem.l_extendedprice(i) * lineitem.l_discount(i)
   ]
 
 

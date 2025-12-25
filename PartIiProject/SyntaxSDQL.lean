@@ -58,6 +58,7 @@ syntax "let" sdqlident "=" sdql "in" sdql : sdql
 -- binary ops (left-assoc precedence)
 syntax:60 sdql:60 "+" sdql:61 : sdql
 syntax:60 sdql:60 "-" sdql:61 : sdql
+syntax:55 sdql:55 "*" sdql:56 : sdql
 syntax:55 sdql:55 "*" "{" "int" "}" sdql:56 : sdql
 syntax:55 sdql:55 "*" "{" "bool" "}" sdql:56 : sdql
 syntax:55 sdql:55 "*" "{" "real" "}" sdql:56 : sdql
@@ -326,18 +327,22 @@ mutual
           let yy ← elabSDQLToLoad y
           wrapLoadWithStx stx (← `(LoadTerm'.builtinSub SurfaceTy.int (LoadTermLoc.mk (stx := $(← mkSourceLoc stx))
             (LoadTerm'.constRecord [("_1", $xx), ("_2", $yy)]))))
+      | `(sdql| $x:sdql * $y:sdql) => do
+          let xx ← elabSDQLToLoad x
+          let yy ← elabSDQLToLoad y
+          wrapLoadWithStx stx (← `(LoadTerm'.mul none $xx $yy))
       | `(sdql| $x:sdql *{int} $y:sdql) => do
           let xx ← elabSDQLToLoad x
           let yy ← elabSDQLToLoad y
-          wrapLoadWithStx stx (← `(LoadTerm'.mul SurfaceTy.int $xx $yy))
+          wrapLoadWithStx stx (← `(LoadTerm'.mul (some SurfaceTy.int) $xx $yy))
       | `(sdql| $x:sdql *{bool} $y:sdql) => do
           let xx ← elabSDQLToLoad x
           let yy ← elabSDQLToLoad y
-          wrapLoadWithStx stx (← `(LoadTerm'.mul SurfaceTy.bool $xx $yy))
+          wrapLoadWithStx stx (← `(LoadTerm'.mul (some SurfaceTy.bool) $xx $yy))
       | `(sdql| $x:sdql *{real} $y:sdql) => do
           let xx ← elabSDQLToLoad x
           let yy ← elabSDQLToLoad y
-          wrapLoadWithStx stx (← `(LoadTerm'.mul SurfaceTy.real $xx $yy))
+          wrapLoadWithStx stx (← `(LoadTerm'.mul (some SurfaceTy.real) $xx $yy))
       | `(sdql| $x:sdql && $y:sdql) => do
           let xx ← elabSDQLToLoad x
           let yy ← elabSDQLToLoad y

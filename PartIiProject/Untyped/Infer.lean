@@ -56,6 +56,29 @@ mutual
         STermFields2.cons (zeroOfSAddLoc (ctx := ctx) (ty := t) stx h) (zerosForSAddFields (ctx := ctx) stx rest tl)
 end
 
+private def mulScalarCandidates : List SurfaceTy :=
+  [SurfaceTy.bool, SurfaceTy.int, SurfaceTy.real]
+
+private unsafe def showScalarCandidates (cs : List SurfaceTy) : String :=
+  String.intercalate ", " (cs.map tyToString)
+
+private unsafe def inferMulScalar (stx : SourceLocation) (t1 t2 : SurfaceTy) : Except TypeError SurfaceTy := do
+  let ok :=
+    mulScalarCandidates.filterMap (fun sc =>
+      match synthSScale stx sc t1, synthSScale stx sc t2 with
+      | .ok _, .ok _ => some sc
+      | _, _ => none)
+  match ok with
+  | [sc] => pure sc
+  | [] =>
+      .error (stx,
+        s!"Cannot infer scalar for multiplication of {tyToString t1} and {tyToString t2}; annotate as " ++
+          "*{bool}, *{int}, or *{real}")
+  | _ =>
+      .error (stx,
+        s!"Ambiguous scalar for multiplication of {tyToString t1} and {tyToString t2}; candidates: [{showScalarCandidates ok}]. Annotate as " ++
+          "*{bool}, *{int}, or *{real} to disambiguate.")
+
 /-- Main type inference function for DeBruijn terms.
 
     Parameters:
@@ -168,9 +191,13 @@ unsafe def infer2 (ctx : List SurfaceTy)
       let addEv ← synthSAdd stx expectedTy
       pure (STermLoc2.mk stx (STerm2.add addEv term1 term2))
 
-  | .mul scTy e1 e2 => do
+  | .mul scOpt e1 e2 => do
       let ty1 ← typeof2 ctx e1
       let ty2 ← typeof2 ctx e2
+      let scTy ←
+        match scOpt with
+        | some sc => pure sc
+        | none => inferMulScalar stx ty1 ty2
       let resultTy := stensor ty1 ty2
       let term1 ← infer2 ctx ty1 e1
       let term2 ← infer2 ctx ty2 e2
@@ -356,4 +383,3 @@ unsafe def typeinferOpen2 (ctx : List SurfaceTy)
     (expectedTy : SurfaceTy) (e : UntypedTermLoc ctx.length)
     : Except TypeError (STermLoc2 ctx expectedTy) :=
   TypeInfer2.infer2 ctx expectedTy e
-

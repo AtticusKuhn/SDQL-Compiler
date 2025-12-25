@@ -42,8 +42,8 @@ unsafe def Q01 : SProg2 :=
              <
                _3 = lineitem.l_quantity(i),
                _4 = lineitem.l_extendedprice(i),
-               _5 = lineitem.l_extendedprice(i) *{real} (1.0 - lineitem.l_discount(i)),
-               _6 = (lineitem.l_extendedprice(i) *{real} (1.0 - lineitem.l_discount(i))) *{real} (1.0 + lineitem.l_tax(i)),
+               _5 = lineitem.l_extendedprice(i) * (1.0 - lineitem.l_discount(i)),
+               _6 = (lineitem.l_extendedprice(i) * (1.0 - lineitem.l_discount(i))) * (1.0 + lineitem.l_tax(i)),
                _7 = 1
              >
           }

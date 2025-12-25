@@ -26,7 +26,8 @@ mutual
     | iteThen : LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
     | letin : LoadTermLoc rep → (rep → LoadTermLoc rep) → LoadTerm' rep
     | add : LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
-    | mul : SurfaceTy → LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
+    /-- Multiplication. Optional scalar annotation `*{S}` may be provided to disambiguate. -/
+    | mul : Option SurfaceTy → LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
     | projByName : String → LoadTermLoc rep → LoadTerm' rep
     | lookup : LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
     | sum : LoadTermLoc rep → (rep → rep → LoadTermLoc rep) → LoadTerm' rep
@@ -61,4 +62,3 @@ end LoadTermLoc
 
 /-- A closed load term (polymorphic in rep) -/
 def LoadTerm := {rep : Type} → LoadTermLoc rep
-
