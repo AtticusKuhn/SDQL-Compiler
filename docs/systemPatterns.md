@@ -42,7 +42,7 @@ Surface syntax (mini‑DSL):
   - Records: positional `< e1, e2 >`, `< e1, e2, e3 >`, and named `< a = e1, b = e2, ... >` literals.
   - Dicts: singleton `{ k -> v }` and multi‑entry literals. (Typed empty dict moved to the program DSL.)
   - Lookup: `d(k)`; `sum`: `sum( <k, v> in d ) body`.
-  - Algebra: `e1 + e2`, `e1 *{int} e2`, `e1 *{bool} e2`; `if`, `not`, `let x = e1 in e2`.
+  - Algebra: `e1 + e2`, `e1 * e2` (scalar inferred, with optional `*{bool|int|real}` for disambiguation); `if`, `not`, `let x = e1 in e2`.
   - Boolean/builtin ops: `x && y`, `x || y`, `x == y`, `x <= y`, `x - y`, `dom(e)`, `range(e)`, `endsWith(x,y)`, plus record `concat`.
 - Type elaboration: `elabTy` sorts record fields alphabetically for canonical type representation. `elabTyPreserveOrder` preserves declaration order for load schemas, ensuring field positions match TBL column indices.
 - To build a typed program, use `[SDQLProg2 { T }| ... ]` (see `SyntaxSDQLProg.lean`) which runs the full pipeline to produce an `SProg2`.

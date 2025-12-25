@@ -198,4 +198,3 @@ where
     | .builtinRange arg => return .builtinRange (← transform depth pathToIndex arg)
     | .builtinDateLit yyyymmdd => pure (.builtinDateLit yyyymmdd)
     | .builtinConcat σ1 σ2 arg => return .builtinConcat σ1 σ2 (← transform depth pathToIndex arg)
-

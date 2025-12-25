@@ -123,4 +123,3 @@ where
         let ty ← typeof2 ctx e
         let restSchema ← typeofFields2 ctx rest
         pure ((name, ty) :: restSchema)
-

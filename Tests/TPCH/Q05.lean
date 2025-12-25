@@ -105,7 +105,7 @@ unsafe def Q05 : SProg2 :=
             (dom(o_h)(lineitem.l_orderkey(i)))
             && (dom(s_h)(< lineitem.l_suppkey(i),  o_h(lineitem.l_orderkey(i))(1) >))
           ) then
-          { o_h(lineitem.l_orderkey(i))(0) -> lineitem.l_extendedprice(i) *{real} (1.0 - lineitem.l_discount(i)) } in
+          { o_h(lineitem.l_orderkey(i))(0) -> lineitem.l_extendedprice(i) * (1.0 - lineitem.l_discount(i)) } in
 
     sum(<k,v> <- l_h)
       { unique(<k, v >) -> true }
