@@ -5,7 +5,7 @@ What works:
 - Typed core foundations: `bool`, `int`, `real`, `date`, `string`, `record`, `dict`, plus denotations and pretty-printing for values.
 - Semimodule structure: `AddM` (with zeros) and `ScaleM`; includes `AddM.realA` and `ScaleM.realS`; tensor-shaped multiply via `ScaleM.mulDenote`.
 - Source locations: `SourceLocation` threaded through the pipeline (`LoadTermLoc`, `UntypedTermLoc`, `STermLoc2`, `TermLoc2`) for better debugging/error reporting.
-- Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`, and builtins (`And`, `Or`, `Eq`, `Leq`, `Sub`, `StrEndsWith`, `Dom`, `Range`, `DateLit`, `Concat`).
+- Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`, and builtins (`And`, `Or`, `Eq`, `Leq`, `Sub`, `StrEndsWith`, `Dom`, `Range`, `DateLit`, `Year`, `Concat`).
 - Pretty-printing for records/dicts; numerous `#eval` demos.
 - SDQL DSL macros: `[SDQL| ... ]` elaborates to `LoadTermLoc`, supporting literals, records (positional and named), dict literals, lookup, `sum`, `let`, `if`, `not`, `+`, `*` (scalar inferred; optional `*{bool|int|real}`), boolean ops, and builtins (`dom`, `range`, `endsWith`, `date`, `concat`).
 - New program pipeline (DeBruijn): `[SDQLProg2 { T }| ... ]` elaborates to `LoadTermLoc` then runs `LoadTermLoc → UntypedTermLoc → STermLoc2` to produce an `SProg2` with an explicit typed context (`ctx : List SurfaceTy`) and `loadPaths`.
@@ -24,6 +24,7 @@ What works:
 - TPCH Q02: now tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q02_tiny`) using dynamic output comparison.
 - TPCH Q01: now tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q01_tiny`) using dynamic output comparison.
 - TPCH Q03: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q03_tiny`); relies on the `<` builtin (`Lt`/`ext_lt`) and `TPCH_DATASET_PATH` path rewriting for sources that use upstream `datasets/tpch/...` paths.
+- TPCH Q07: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q07_tiny`); relies on `year : date → int` (`year(e)` / `ext_year`).
 - Date type: added `Ty.date` primitive with `SDQLDate` wrapper (YYYYMMDD integer), `DateLit` builtin constructor, and `Leq` comparison. Rust codegen uses a simple `Date` struct.
 - Real number literals: added `constReal` for floating-point constants in the DSL.
 - Subtraction: added `Sub` builtin for arithmetic subtraction on int/real types.

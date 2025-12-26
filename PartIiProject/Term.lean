@@ -274,6 +274,7 @@ inductive BuiltinFn : Ty → Ty → Type
   | Dom : {dom range : Ty} → BuiltinFn (.dict dom range) (.dict dom Ty.bool)
   | Range : BuiltinFn Ty.int (Ty.dict Ty.int Ty.bool)
   | DateLit (yyyymmdd : Int) : BuiltinFn (Ty.record []) Ty.date
+  | Year : BuiltinFn Ty.date Ty.int
   | Concat (l1 l2 : List Ty) : BuiltinFn (Ty.record [.record l1, .record l2]) (Ty.record (l1 ++ l2))
 
 /-!

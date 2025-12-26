@@ -21,6 +21,8 @@ Latest changes:
 - Testing flow: `Tests/Main.lean` builds missing sdql-rs reference binaries on-demand (via `cargo build --release --bin ...`), and `sdql_runtime.rs` supports `TPCH_DATASET_PATH` rewriting for `datasets/tpch/...` paths.
 - Fixed a Rust precedence bug in the pretty-printer that could change program meaning (missing parentheses under `*`).
 - Surface DSL: multiplication no longer requires a scalar annotation (`*{real}`); the scalar is inferred from operand types, with the annotation still available to disambiguate.
+- Added date builtin `year : date → int` with surface syntax `year(e)`; Rust codegen targets `ext_year`, implemented in `sdql_runtime.rs`.
+- Enabled TPCH Q07 in `Tests/Cases.lean` (Q08/Q09 still blocked on real division and string substring ops).
 
 Next steps (proposed):
 
