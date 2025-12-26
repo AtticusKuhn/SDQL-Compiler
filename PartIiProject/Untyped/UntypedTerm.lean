@@ -41,6 +41,7 @@ mutual
     | builtinDom : {ctx : Nat} → SurfaceTy → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinRange : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinDateLit : {ctx : Nat} → Int → UntypedTerm' ctx
+    | builtinYear : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinConcat : {ctx : Nat} → Schema → Schema → UntypedTermLoc ctx → UntypedTerm' ctx
 
   /-- An UntypedTerm with source location for error reporting -/

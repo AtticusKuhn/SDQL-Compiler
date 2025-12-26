@@ -42,6 +42,7 @@ mutual
     | builtinDom : SurfaceTy → SurfaceTy → LoadTermLoc rep → LoadTerm' rep  -- dom, range
     | builtinRange : LoadTermLoc rep → LoadTerm' rep
     | builtinDateLit : Int → LoadTerm' rep  -- DateLit doesn't need an arg term
+    | builtinYear : LoadTermLoc rep → LoadTerm' rep
     | builtinConcat : Schema → Schema → LoadTermLoc rep → LoadTerm' rep
 
   /-- A LoadTerm with source location from the parser -/

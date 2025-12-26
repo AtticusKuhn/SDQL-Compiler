@@ -44,6 +44,7 @@ syntax "<" sepBy(sdqlident "=" sdql, ",") ">" : sdql
 syntax "{" sepBy(sdql "->" sdql, ",")  "}" : sdql
 
 syntax "date(" num ")" : sdql
+syntax "year(" sdql ")" : sdql
 
 -- lookup and projection
 syntax:70 sdql:70 "(" sdql ")" : sdql
@@ -390,6 +391,9 @@ mutual
       | `(sdql| unique($e:sdql)) => elabSDQLToLoad e
       | `(sdql| date($n:num)) =>
           wrapLoadWithStx stx (← `(LoadTerm'.builtinDateLit $n))
+      | `(sdql| year($e:sdql)) => do
+          let ee ← elabSDQLToLoad e
+          wrapLoadWithStx stx (← `(LoadTerm'.builtinYear $ee))
       | `(sdql| concat($x:sdql, $y:sdql)) => do
           let xx ← elabSDQLToLoad x
           let yy ← elabSDQLToLoad y

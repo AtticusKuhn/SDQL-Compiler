@@ -56,6 +56,7 @@ where
       | .builtinDom _ _ arg => go arg acc
       | .builtinRange arg => go arg acc
       | .builtinDateLit _ => acc
+      | .builtinYear arg => go arg acc
       | .builtinConcat _ _ arg => go arg acc
 
   dedup : List (String × SurfaceTy × SourceLocation) → List (String × SurfaceTy × SourceLocation)
@@ -197,4 +198,5 @@ where
     | .builtinDom dom range arg => return .builtinDom dom range (← transform depth pathToIndex arg)
     | .builtinRange arg => return .builtinRange (← transform depth pathToIndex arg)
     | .builtinDateLit yyyymmdd => pure (.builtinDateLit yyyymmdd)
+    | .builtinYear arg => return .builtinYear (← transform depth pathToIndex arg)
     | .builtinConcat σ1 σ2 arg => return .builtinConcat σ1 σ2 (← transform depth pathToIndex arg)

@@ -262,6 +262,9 @@ pub fn ext_str_ends_with(args: (String, String)) -> bool {
     s.ends_with(&suf)
 }
 
+/// Extract the year from a YYYYMMDD-encoded SDQL Date.
+pub fn ext_year(d: Date) -> i64 { d.0 / 10000 }
+
 /// Extract the domain (key set) of a dictionary.
 pub fn ext_dom<K: Ord + Clone, V>(m: &BTreeMap<K, V>) -> BTreeMap<K, bool> {
     let mut out = BTreeMap::new();

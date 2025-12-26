@@ -8,6 +8,7 @@ import Tests.TPCH.Q03
 import Tests.TPCH.Q04
 import Tests.TPCH.Q05
 import Tests.TPCH.Q06
+import Tests.TPCH.Q07
 import Tests.TPCH.Q10
 import Tests.TPCH.Q12
 import Tests.TPCH.Q18
@@ -86,6 +87,8 @@ unsafe def tpchCases : List TestCase :=
   , TestCase.programRef "tpch_q05" TPCH.Q05 "sdql-rs/target/release/tpch_q05_tiny"
       [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
   , TestCase.programRef "tpch_q06" TPCH.Q06 "sdql-rs/target/release/tpch_q06_tiny"
+      [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
+  , TestCase.programRef "tpch_q07" TPCH.Q07 "sdql-rs/target/release/tpch_q07_tiny"
       [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
   , TestCase.programRef "tpch_q10" TPCH.Q10 "sdql-rs/target/release/tpch_q10_tiny"
       [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]

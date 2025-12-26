@@ -76,6 +76,7 @@ def compileBuiltin {argTy resTy : _root_.Ty} (b : _root_.BuiltinFn argTy resTy) 
   | .Dom => .call "ext_dom" [ExprLoc.withUnknownLoc (Rust.Expr.borrow argExpr)]
   | .Range => .call "ext_range" [argExpr]
   | .DateLit yyyymmdd => .litDate yyyymmdd
+  | .Year => .call "ext_year" [argExpr]
   | .Concat l1 l2 => .call "ext_concat" [argExpr]
 end Compile
 

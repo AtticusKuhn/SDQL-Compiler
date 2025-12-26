@@ -15,7 +15,7 @@ Architecture overview:
 - Terms:
   - Core (DeBruijn): `TermLoc2`/`Term2` in `PartIiProject/Term2.lean`, indexed by `ctx : List Ty` and using `Mem ty ctx` for variables; includes records/dicts, `not`, `if`, `let`, `add`, `mul`, `sum`, `lookup`, and positional record projection `proj`.
   - Surface (DeBruijn): `STermLoc2`/`STerm2` in `PartIiProject/SurfaceCore2.lean`, with named record projection via `HasField`.
-  - Builtins: `BuiltinFn` (core) and `SBuiltin` (surface) cover `And`, `Or`, `Eq`, `Leq`, `Sub`, `StrEndsWith`, `Dom`, `Range`, `DateLit`, and `Concat`.
+  - Builtins: `BuiltinFn` (core) and `SBuiltin` (surface) cover `And`, `Or`, `Eq`, `Leq`, `Sub`, `StrEndsWith`, `Dom`, `Range`, `DateLit`, `Year`, and `Concat`.
 - Utilities:
   - `HList`: heterogeneous lists with `hmap`, `hmap2`, `dmap` helpers.
   - `Dict`: wrapper with `empty/insert/find?/mapValues` and `Ord` plumbed via a stored comparator.
@@ -43,7 +43,7 @@ Surface syntax (mini‑DSL):
   - Dicts: singleton `{ k -> v }` and multi‑entry literals. (Typed empty dict moved to the program DSL.)
   - Lookup: `d(k)`; `sum`: `sum( <k, v> in d ) body`.
   - Algebra: `e1 + e2`, `e1 * e2` (scalar inferred, with optional `*{bool|int|real}` for disambiguation); `if`, `not`, `let x = e1 in e2`.
-  - Boolean/builtin ops: `x && y`, `x || y`, `x == y`, `x <= y`, `x - y`, `dom(e)`, `range(e)`, `endsWith(x,y)`, plus record `concat`.
+  - Boolean/builtin ops: `x && y`, `x || y`, `x == y`, `x <= y`, `x - y`, `dom(e)`, `range(e)`, `endsWith(x,y)`, `date(n)`, `year(e)`, plus record `concat`.
 - Type elaboration: `elabTy` sorts record fields alphabetically for canonical type representation. `elabTyPreserveOrder` preserves declaration order for load schemas, ensuring field positions match TBL column indices.
 - To build a typed program, use `[SDQLProg2 { T }| ... ]` (see `SyntaxSDQLProg.lean`) which runs the full pipeline to produce an `SProg2`.
 
@@ -69,7 +69,7 @@ Testing infrastructure:
   - Core types: `Real` (Ord-capable f64 wrapper), `Date` (YYYYMMDD integer)
   - Semimodule trait: `SdqlAdd` with implementations for bool (XOR), i64, Real, Date, String, BTreeMap, and tuples up to arity 8
   - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`
-  - Extension functions: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_sub`, `ext_str_ends_with`, `ext_dom`, `ext_range`
+  - Extension functions: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_sub`, `ext_str_ends_with`, `ext_dom`, `ext_range`, `ext_year`
   - TBL loaders: `FromTblField` trait for type-directed parsing (i64, String, Real, bool, Date), `build_col<T>` for extracting typed columns, `load_tbl` for parsing pipe-delimited TBL files
   - TPCH dataset path override: `load_tbl` rewrites paths under `datasets/tpch/` using `TPCH_DATASET_PATH` (e.g. pointing to `datasets/tpch-tiny`) so SDQL sources can keep upstream paths while tests swap datasets.
   - Printing: `SDQLShow` trait for ints, bools, strings (quoted), tuples (up to arity 8), and `BTreeMap`

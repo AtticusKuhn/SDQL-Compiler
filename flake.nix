@@ -4,9 +4,8 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-parts.url = "github:hercules-ci/flake-parts";
-    # Use local git repo (requires committing changes)
-    lean4-nix.url = "git+file:///home/atticusk/coding/part_ii_project/lean4nix/lean4-nix";
-    # lean4-nix.url = "github:lenianiva/lean4-nix";
+    lean4-nix.url = "github:lenianiva/lean4-nix";
+    lean4-nix.inputs.nixpkgs.follows = "nixpkgs";
     # Rust nightly via oxalica/rust-overlay
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
@@ -39,22 +38,16 @@
               (import rust-overlay)
             ];
           };
-          lake = (lean4-nix.lake { inherit pkgs; });
+          lake = pkgs.callPackage lean4-nix.lake { };
 
           # Rust toolchain for sdql-rs
           rustToolchain = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
 
           # Build the test executable via lake-manifest integration
-          sdqlTests = (lake.mkPackage {
+          sdqlTests = lake.mkPackage {
+            name = "sdql-tests";
             src = ./.;
-            # Explicit roots to avoid auto-capitalization from manifest name
-            roots = [
-              # Build the library part too so tests can import it
-              { mod = "PartIiProject"; glob = "andSubmodules"; }
-              # Ensure auxiliary modules are included explicitly
-              "Tests.Main"
-            ];
-          }).executable;
+          };
 
           # Wrapper script that sets up datasets for tests and runs the Lean test runner.
           # TPCH reference binaries are built on-demand by `Tests/Main.lean`.
@@ -77,7 +70,7 @@
               fi
 
               # Run tests from the current directory
-              exec ${sdqlTests}/bin/part_ii_project "$@"
+              exec ${sdqlTests}/bin/sdql-tests "$@"
             '';
           };
           # Runtime tools shared by sdql reference test runners
@@ -178,9 +171,7 @@
             sdql-reference-tpch-1 = sdqlRefTPCH1;
           };
 
-          # The executable name defaults to the lowercased manifest name
-          # (see lean4-nix buildLeanPackage), which for this repo is
-          # "part_ii_project".
+          # `lake.mkPackage` copies `.lake/build/bin` into `$out/bin`.
           apps = {
             default = {
               type = "app";
@@ -192,7 +183,7 @@
             };
             sdql-tests-bare = {
               type = "app";
-              program = "${sdqlTests}/bin/part_ii_project";
+              program = "${sdqlTests}/bin/sdql-tests";
             };
             sdql-ref-tests = {
               type = "app";

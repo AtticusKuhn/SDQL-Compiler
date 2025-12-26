@@ -346,7 +346,13 @@ unsafe def infer2 (ctx : List SurfaceTy)
         STermLoc2.mk stx (STerm2.builtin (SBuiltin.DateLit yyyymmdd) emptyRec)
       checkTyEq2 stx .date expectedTy builtinTerm
 
-  | .builtinConcat σ1 σ2 arg => do
+  | .builtinYear arg => do
+      let argTerm ← infer2 ctx .date arg
+      let builtinTerm : STermLoc2 ctx .int :=
+        STermLoc2.mk stx (STerm2.builtin SBuiltin.Year argTerm)
+      checkTyEq2 stx .int expectedTy builtinTerm
+
+  | .builtinConcat _ _ arg => do
       let argTy ← typeof2 ctx arg
       match argTy with
       | .record [("_1", .record σ1), ("_2", .record σ2)] => do

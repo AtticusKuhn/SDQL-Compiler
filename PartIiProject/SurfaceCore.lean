@@ -77,6 +77,7 @@ inductive SBuiltin : SurfaceTy → SurfaceTy → Type where
   | Dom {dom range : SurfaceTy} : SBuiltin (.dict dom range) (.dict dom .bool)
   | Range : SBuiltin .int (.dict .int .bool)
   | DateLit (yyyymmdd : Int) : SBuiltin (.record []) .date
+  | Year : SBuiltin .date .int
   | Concat (σ1 σ2 : Schema) :
       SBuiltin (.record [("_1", .record σ1), ("_2", .record σ2)]) (.record (σ1 ++ σ2))
 
