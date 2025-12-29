@@ -40,6 +40,7 @@ mutual
     | builtinStrEndsWith : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinDom : {ctx : Nat} → SurfaceTy → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinRange : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
+    | builtinSize : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinDateLit : {ctx : Nat} → Int → UntypedTerm' ctx
     | builtinYear : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinConcat : {ctx : Nat} → Schema → Schema → UntypedTermLoc ctx → UntypedTerm' ctx
@@ -79,6 +80,16 @@ namespace UntypedTermFields
   /-- Sort fields by name and return as UntypedTermFields -/
   unsafe def sortByName {ctx : Nat} (fields : UntypedTermFields ctx) : UntypedTermFields ctx :=
     let list := toList fields
-    let sorted := list.toArray.qsort (fun (n1, _) (n2, _) => n1 < n2) |>.toList
+    -- Sort by name, but preserve original order for ties (stable sort).
+    -- This matters for SDQL records that intentionally reuse the "_" field name (tuple-like records).
+    let rec enumerate (i : Nat) : List (String × UntypedTermLoc ctx) → List (String × Nat × UntypedTermLoc ctx)
+      | [] => []
+      | (nm, term) :: rest => (nm, i, term) :: enumerate (i + 1) rest
+    let indexed : Array (String × Nat × UntypedTermLoc ctx) :=
+      (enumerate 0 list).toArray
+    let sorted :=
+      indexed.qsort (fun a b => if a.1 == b.1 then a.2.1 < b.2.1 else a.1 < b.1)
+        |>.toList
+        |>.map (fun (nm, (_i, term)) => (nm, term))
     fromList sorted
 end UntypedTermFields

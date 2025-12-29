@@ -108,6 +108,11 @@ unsafe def typeof2 (ctx : List SurfaceTy) (e : UntypedTermLoc ctx.length) : Exce
         | .dict domTy _ => pure (.dict domTy .bool)
         | other => .error (stx, s!"dom expects a dictionary argument, got {tyToString other}")
     | .builtinRange _ => pure (.dict .int .bool)
+    | .builtinSize arg => do
+        let argTy ← typeof2 ctx arg
+        match argTy with
+        | .dict _ _ => pure .int
+        | other => .error (stx, s!"size expects a dictionary argument, got {tyToString other}")
     | .builtinDateLit _ => pure .date
     | .builtinYear arg => do
         let argTy ← typeof2 ctx arg

@@ -412,6 +412,8 @@ mutual
         | @SBuiltin.Dom dom range =>
             Term2.builtin (BuiltinFn.Dom (dom := ty dom) (range := ty range)) (trLoc2 a)
         | SBuiltin.Range => Term2.builtin BuiltinFn.Range (trLoc2 a)
+        | @SBuiltin.Size dom range =>
+            Term2.builtin (BuiltinFn.Size (dom := ty dom) (range := ty range)) (trLoc2 a)
         | SBuiltin.DateLit yyyymmdd => Term2.builtin (BuiltinFn.DateLit yyyymmdd) (trLoc2 a)
         | SBuiltin.Year => Term2.builtin BuiltinFn.Year (trLoc2 a)
         | @SBuiltin.Concat σ1 σ2 =>

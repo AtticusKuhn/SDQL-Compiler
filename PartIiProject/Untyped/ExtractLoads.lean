@@ -55,6 +55,7 @@ where
       | .builtinStrEndsWith arg => go arg acc
       | .builtinDom _ _ arg => go arg acc
       | .builtinRange arg => go arg acc
+      | .builtinSize arg => go arg acc
       | .builtinDateLit _ => acc
       | .builtinYear arg => go arg acc
       | .builtinConcat _ _ arg => go arg acc
@@ -197,6 +198,7 @@ where
     | .builtinStrEndsWith arg => return .builtinStrEndsWith (← transform depth pathToIndex arg)
     | .builtinDom dom range arg => return .builtinDom dom range (← transform depth pathToIndex arg)
     | .builtinRange arg => return .builtinRange (← transform depth pathToIndex arg)
+    | .builtinSize arg => return .builtinSize (← transform depth pathToIndex arg)
     | .builtinDateLit yyyymmdd => pure (.builtinDateLit yyyymmdd)
     | .builtinYear arg => return .builtinYear (← transform depth pathToIndex arg)
     | .builtinConcat σ1 σ2 arg => return .builtinConcat σ1 σ2 (← transform depth pathToIndex arg)

@@ -29,6 +29,7 @@ valid Lean binder identifier when building the HOAS `LoadTermLoc` AST.
 declare_syntax_cat sdqlident
 syntax ident : sdqlident
 syntax "_"   : sdqlident
+syntax "size" : sdqlident
 
 -- atoms
 syntax num                              : sdql
@@ -72,6 +73,7 @@ syntax:59 sdql:59 "<" sdql:60 : sdql
 -- builtins/functions
 syntax "dom" "(" sdql ")" : sdql
 syntax "range" "(" sdql ")" : sdql
+syntax (priority := high) "size" "(" sdql ")" : sdql
 syntax "endsWith" "(" sdql "," sdql ")" : sdql
 syntax "unique" "(" sdql ")" : sdql
 syntax "concat" "(" sdql "," sdql ")" : sdql
@@ -106,12 +108,14 @@ private def sdqlIdentToLeanIdent (x : TSyntax `sdqlident) : MacroM (TSyntax `ide
   match x with
   | `(sdqlident| $i:ident) => pure i
   | `(sdqlident| _) => pure <| mkIdentFrom x sdqlBlankBinderName
+  | `(sdqlident| size) => pure <| mkIdentFrom x (Name.mkSimple "size")
   | _ => Macro.throwErrorAt x "unexpected SDQL identifier"
 
 private def sdqlIdentToString (x : TSyntax `sdqlident) : MacroM String := do
   match x with
   | `(sdqlident| $i:ident) => pure i.getId.toString
   | `(sdqlident| _) => pure "_"
+  | `(sdqlident| size) => pure "size"
   | _ => Macro.throwErrorAt x "unexpected SDQL identifier"
 
 /-- Helper to elaborate a record type with a given field ordering. -/
@@ -122,7 +126,12 @@ partial def elabRecordTy (stx : TSyntax `sdqlty) (ns : Array (TSyntax `sdqlident
   let mut pairs : Array (String × Nat) := #[]
   for i in [:ns.size] do
     pairs := pairs.push ((← sdqlIdentToString (ns[i]!)), i)
-  let orderedPairs := if sortFields then pairs.qsort (fun a b => a.fst < b.fst) else pairs
+  -- Sort by field name, but preserve original order for ties (e.g. duplicate "_" fields in TPC-H).
+  let orderedPairs :=
+    if sortFields then
+      pairs.qsort (fun a b => if a.fst == b.fst then a.snd < b.snd else a.fst < b.fst)
+    else
+      pairs
   let mut elems : Array (TSyntax `term) := #[]
   for (nm, idx) in orderedPairs do
     let sNm := Syntax.mkStrLit nm
@@ -382,6 +391,9 @@ mutual
       | `(sdql| range($e:sdql)) => do
           let ee ← elabSDQLToLoad e
           wrapLoadWithStx stx (← `(LoadTerm'.builtinRange $ee))
+      | `(sdql| size($e:sdql)) => do
+          let ee ← elabSDQLToLoad e
+          wrapLoadWithStx stx (← `(LoadTerm'.builtinSize $ee))
       | `(sdql| endsWith($x:sdql, $y:sdql)) => do
           let xx ← elabSDQLToLoad x
           let yy ← elabSDQLToLoad y

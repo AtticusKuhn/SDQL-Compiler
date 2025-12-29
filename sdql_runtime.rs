@@ -91,7 +91,7 @@ macro_rules! date {
 // ============================================================================
 
 /// Trait for SDQL's additive structure.
-/// - bool: XOR
+/// - bool: OR
 /// - numeric types: standard addition
 /// - Date: takes rhs (overwrite semantics)
 /// - String: concatenation
@@ -102,7 +102,7 @@ pub trait SdqlAdd {
 }
 
 impl SdqlAdd for bool {
-    fn sdql_add(&self, other: &Self) -> Self { *self ^ *other }
+    fn sdql_add(&self, other: &Self) -> Self { *self || *other }
 }
 
 impl SdqlAdd for i64 {
@@ -274,6 +274,11 @@ pub fn ext_dom<K: Ord + Clone, V>(m: &BTreeMap<K, V>) -> BTreeMap<K, bool> {
     out
 }
 
+/// Return the number of entries in a dictionary.
+pub fn ext_size<K: Ord, V>(m: &BTreeMap<K, V>) -> i64 {
+    m.len() as i64
+}
+
 /// Generate a range dictionary {0 -> true, 1 -> true, ..., n-1 -> true}.
 pub fn ext_range(n: i64) -> BTreeMap<i64, bool> {
     let mut out = BTreeMap::new();
@@ -301,138 +306,63 @@ impl<B> Concat<B> for () {
     fn concat(self, other: B) -> Self::Output { other }
 }
 
-// Concatenation implementations for tuples up to arity 5 on each side
-// (T1,) ++ (U1,) = (T1, U1)
-impl<T1, U1> Concat<(U1,)> for (T1,) {
-    type Output = (T1, U1);
-    fn concat(self, other: (U1,)) -> Self::Output { (self.0, other.0) }
+macro_rules! impl_concat_tuple {
+    ([$($T:ident : $t:ident),+], [$($U:ident : $u:ident),*]) => {
+        impl<$($T,)* $($U,)*> Concat<($($U,)*)> for ($($T,)*) {
+            type Output = ($($T,)* $($U,)*);
+            fn concat(self, other: ($($U,)*)) -> Self::Output {
+                let ($($t,)*) = self;
+                let ($($u,)*) = other;
+                ($($t,)* $($u,)*)
+            }
+        }
+    };
 }
 
-// (T1,) ++ (U1, U2) = (T1, U1, U2)
-impl<T1, U1, U2> Concat<(U1, U2)> for (T1,) {
-    type Output = (T1, U1, U2);
-    fn concat(self, other: (U1, U2)) -> Self::Output { (self.0, other.0, other.1) }
-}
+// Concatenation implementations for tuples up to total arity 8.
+impl_concat_tuple!([T1: t1], []);
+impl_concat_tuple!([T1: t1], [U1: u1]);
+impl_concat_tuple!([T1: t1], [U1: u1, U2: u2]);
+impl_concat_tuple!([T1: t1], [U1: u1, U2: u2, U3: u3]);
+impl_concat_tuple!([T1: t1], [U1: u1, U2: u2, U3: u3, U4: u4]);
+impl_concat_tuple!([T1: t1], [U1: u1, U2: u2, U3: u3, U4: u4, U5: u5]);
+impl_concat_tuple!([T1: t1], [U1: u1, U2: u2, U3: u3, U4: u4, U5: u5, U6: u6]);
+impl_concat_tuple!([T1: t1], [U1: u1, U2: u2, U3: u3, U4: u4, U5: u5, U6: u6, U7: u7]);
 
-// (T1,) ++ (U1, U2, U3) = (T1, U1, U2, U3)
-impl<T1, U1, U2, U3> Concat<(U1, U2, U3)> for (T1,) {
-    type Output = (T1, U1, U2, U3);
-    fn concat(self, other: (U1, U2, U3)) -> Self::Output { (self.0, other.0, other.1, other.2) }
-}
+impl_concat_tuple!([T1: t1, T2: t2], []);
+impl_concat_tuple!([T1: t1, T2: t2], [U1: u1]);
+impl_concat_tuple!([T1: t1, T2: t2], [U1: u1, U2: u2]);
+impl_concat_tuple!([T1: t1, T2: t2], [U1: u1, U2: u2, U3: u3]);
+impl_concat_tuple!([T1: t1, T2: t2], [U1: u1, U2: u2, U3: u3, U4: u4]);
+impl_concat_tuple!([T1: t1, T2: t2], [U1: u1, U2: u2, U3: u3, U4: u4, U5: u5]);
+impl_concat_tuple!([T1: t1, T2: t2], [U1: u1, U2: u2, U3: u3, U4: u4, U5: u5, U6: u6]);
 
-// (T1,) ++ (U1, U2, U3, U4) = (T1, U1, U2, U3, U4)
-impl<T1, U1, U2, U3, U4> Concat<(U1, U2, U3, U4)> for (T1,) {
-    type Output = (T1, U1, U2, U3, U4);
-    fn concat(self, other: (U1, U2, U3, U4)) -> Self::Output { (self.0, other.0, other.1, other.2, other.3) }
-}
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3], []);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3], [U1: u1]);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3], [U1: u1, U2: u2]);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3], [U1: u1, U2: u2, U3: u3]);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3], [U1: u1, U2: u2, U3: u3, U4: u4]);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3], [U1: u1, U2: u2, U3: u3, U4: u4, U5: u5]);
 
-// (T1,) ++ (U1, U2, U3, U4, U5) = (T1, U1, U2, U3, U4, U5)
-impl<T1, U1, U2, U3, U4, U5> Concat<(U1, U2, U3, U4, U5)> for (T1,) {
-    type Output = (T1, U1, U2, U3, U4, U5);
-    fn concat(self, other: (U1, U2, U3, U4, U5)) -> Self::Output { (self.0, other.0, other.1, other.2, other.3, other.4) }
-}
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4], []);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4], [U1: u1]);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4], [U1: u1, U2: u2]);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4], [U1: u1, U2: u2, U3: u3]);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4], [U1: u1, U2: u2, U3: u3, U4: u4]);
 
-// (T1, T2) ++ (U1,) = (T1, T2, U1)
-impl<T1, T2, U1> Concat<(U1,)> for (T1, T2) {
-    type Output = (T1, T2, U1);
-    fn concat(self, other: (U1,)) -> Self::Output { (self.0, self.1, other.0) }
-}
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4, T5: t5], []);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4, T5: t5], [U1: u1]);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4, T5: t5], [U1: u1, U2: u2]);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4, T5: t5], [U1: u1, U2: u2, U3: u3]);
 
-// (T1, T2) ++ (U1, U2) = (T1, T2, U1, U2)
-impl<T1, T2, U1, U2> Concat<(U1, U2)> for (T1, T2) {
-    type Output = (T1, T2, U1, U2);
-    fn concat(self, other: (U1, U2)) -> Self::Output { (self.0, self.1, other.0, other.1) }
-}
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4, T5: t5, T6: t6], []);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4, T5: t5, T6: t6], [U1: u1]);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4, T5: t5, T6: t6], [U1: u1, U2: u2]);
 
-// (T1, T2) ++ (U1, U2, U3) = (T1, T2, U1, U2, U3)
-impl<T1, T2, U1, U2, U3> Concat<(U1, U2, U3)> for (T1, T2) {
-    type Output = (T1, T2, U1, U2, U3);
-    fn concat(self, other: (U1, U2, U3)) -> Self::Output { (self.0, self.1, other.0, other.1, other.2) }
-}
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4, T5: t5, T6: t6, T7: t7], []);
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4, T5: t5, T6: t6, T7: t7], [U1: u1]);
 
-// (T1, T2) ++ (U1, U2, U3, U4) = (T1, T2, U1, U2, U3, U4)
-impl<T1, T2, U1, U2, U3, U4> Concat<(U1, U2, U3, U4)> for (T1, T2) {
-    type Output = (T1, T2, U1, U2, U3, U4);
-    fn concat(self, other: (U1, U2, U3, U4)) -> Self::Output { (self.0, self.1, other.0, other.1, other.2, other.3) }
-}
-
-// (T1, T2) ++ (U1, U2, U3, U4, U5) = (T1, T2, U1, U2, U3, U4, U5)
-impl<T1, T2, U1, U2, U3, U4, U5> Concat<(U1, U2, U3, U4, U5)> for (T1, T2) {
-    type Output = (T1, T2, U1, U2, U3, U4, U5);
-    fn concat(self, other: (U1, U2, U3, U4, U5)) -> Self::Output { (self.0, self.1, other.0, other.1, other.2, other.3, other.4) }
-}
-
-// (T1, T2, T3) ++ (U1,) = (T1, T2, T3, U1)
-impl<T1, T2, T3, U1> Concat<(U1,)> for (T1, T2, T3) {
-    type Output = (T1, T2, T3, U1);
-    fn concat(self, other: (U1,)) -> Self::Output { (self.0, self.1, self.2, other.0) }
-}
-
-// (T1, T2, T3) ++ (U1, U2) = (T1, T2, T3, U1, U2)
-impl<T1, T2, T3, U1, U2> Concat<(U1, U2)> for (T1, T2, T3) {
-    type Output = (T1, T2, T3, U1, U2);
-    fn concat(self, other: (U1, U2)) -> Self::Output { (self.0, self.1, self.2, other.0, other.1) }
-}
-
-// (T1, T2, T3) ++ (U1, U2, U3) = (T1, T2, T3, U1, U2, U3)
-impl<T1, T2, T3, U1, U2, U3> Concat<(U1, U2, U3)> for (T1, T2, T3) {
-    type Output = (T1, T2, T3, U1, U2, U3);
-    fn concat(self, other: (U1, U2, U3)) -> Self::Output { (self.0, self.1, self.2, other.0, other.1, other.2) }
-}
-
-// (T1, T2, T3) ++ (U1, U2, U3, U4) = (T1, T2, T3, U1, U2, U3, U4)
-impl<T1, T2, T3, U1, U2, U3, U4> Concat<(U1, U2, U3, U4)> for (T1, T2, T3) {
-    type Output = (T1, T2, T3, U1, U2, U3, U4);
-    fn concat(self, other: (U1, U2, U3, U4)) -> Self::Output { (self.0, self.1, self.2, other.0, other.1, other.2, other.3) }
-}
-
-// (T1, T2, T3) ++ (U1, U2, U3, U4, U5) = (T1, T2, T3, U1, U2, U3, U4, U5)
-impl<T1, T2, T3, U1, U2, U3, U4, U5> Concat<(U1, U2, U3, U4, U5)> for (T1, T2, T3) {
-    type Output = (T1, T2, T3, U1, U2, U3, U4, U5);
-    fn concat(self, other: (U1, U2, U3, U4, U5)) -> Self::Output { (self.0, self.1, self.2, other.0, other.1, other.2, other.3, other.4) }
-}
-
-// (T1, T2, T3, T4) ++ (U1,) = (T1, T2, T3, T4, U1)
-impl<T1, T2, T3, T4, U1> Concat<(U1,)> for (T1, T2, T3, T4) {
-    type Output = (T1, T2, T3, T4, U1);
-    fn concat(self, other: (U1,)) -> Self::Output { (self.0, self.1, self.2, self.3, other.0) }
-}
-
-// (T1, T2, T3, T4) ++ (U1, U2) = (T1, T2, T3, T4, U1, U2)
-impl<T1, T2, T3, T4, U1, U2> Concat<(U1, U2)> for (T1, T2, T3, T4) {
-    type Output = (T1, T2, T3, T4, U1, U2);
-    fn concat(self, other: (U1, U2)) -> Self::Output { (self.0, self.1, self.2, self.3, other.0, other.1) }
-}
-
-// (T1, T2, T3, T4) ++ (U1, U2, U3) = (T1, T2, T3, T4, U1, U2, U3)
-impl<T1, T2, T3, T4, U1, U2, U3> Concat<(U1, U2, U3)> for (T1, T2, T3, T4) {
-    type Output = (T1, T2, T3, T4, U1, U2, U3);
-    fn concat(self, other: (U1, U2, U3)) -> Self::Output { (self.0, self.1, self.2, self.3, other.0, other.1, other.2) }
-}
-
-// (T1, T2, T3, T4) ++ (U1, U2, U3, U4) = (T1, T2, T3, T4, U1, U2, U3, U4)
-impl<T1, T2, T3, T4, U1, U2, U3, U4> Concat<(U1, U2, U3, U4)> for (T1, T2, T3, T4) {
-    type Output = (T1, T2, T3, T4, U1, U2, U3, U4);
-    fn concat(self, other: (U1, U2, U3, U4)) -> Self::Output { (self.0, self.1, self.2, self.3, other.0, other.1, other.2, other.3) }
-}
-
-// (T1, T2, T3, T4, T5) ++ (U1,) = (T1, T2, T3, T4, T5, U1)
-impl<T1, T2, T3, T4, T5, U1> Concat<(U1,)> for (T1, T2, T3, T4, T5) {
-    type Output = (T1, T2, T3, T4, T5, U1);
-    fn concat(self, other: (U1,)) -> Self::Output { (self.0, self.1, self.2, self.3, self.4, other.0) }
-}
-
-// (T1, T2, T3, T4, T5) ++ (U1, U2) = (T1, T2, T3, T4, T5, U1, U2)
-impl<T1, T2, T3, T4, T5, U1, U2> Concat<(U1, U2)> for (T1, T2, T3, T4, T5) {
-    type Output = (T1, T2, T3, T4, T5, U1, U2);
-    fn concat(self, other: (U1, U2)) -> Self::Output { (self.0, self.1, self.2, self.3, self.4, other.0, other.1) }
-}
-
-// (T1, T2, T3, T4, T5) ++ (U1, U2, U3) = (T1, T2, T3, T4, T5, U1, U2, U3)
-impl<T1, T2, T3, T4, T5, U1, U2, U3> Concat<(U1, U2, U3)> for (T1, T2, T3, T4, T5) {
-    type Output = (T1, T2, T3, T4, T5, U1, U2, U3);
-    fn concat(self, other: (U1, U2, U3)) -> Self::Output { (self.0, self.1, self.2, self.3, self.4, other.0, other.1, other.2) }
-}
+impl_concat_tuple!([T1: t1, T2: t2, T3: t3, T4: t4, T5: t5, T6: t6, T7: t7, T8: t8], []);
 
 /// Concatenate two records (tuples).
 /// args: a pair of tuples

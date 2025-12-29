@@ -58,7 +58,7 @@ How to run:
 
 Notes/constraints:
 
-- Boolean addition is currently XOR by design; aligning with SDQL would switch to OR. Boolean scaling remains AND.
+- Boolean addition uses OR (matching SDQL); boolean scaling remains AND.
 - Codegen uses placeholder helpers (`sdql_mul`, `dict_add`, `tuple_add`). Execution path for tests relies on embedded runtime shims (`map_insert`, `lookup_or_default`, `SDQLShow`) in the generated program.
 - Rust iteration uses `.into_iter()` in the printed `for` loops to match ownership in helpers.
 - Kinds and scalar promotion are not modeled yet; scalars implemented include `bool`, `int`, and now `real` in the core.
