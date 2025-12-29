@@ -339,6 +339,17 @@ unsafe def infer2 (ctx : List SurfaceTy)
         STermLoc2.mk stx (STerm2.builtin SBuiltin.Range argTerm)
       checkTyEq2 stx (.dict .int .bool) expectedTy builtinTerm
 
+  | .builtinSize arg => do
+      let argTy ← typeof2 ctx arg
+      match argTy with
+      | .dict dom range => do
+          let argTerm ← infer2 ctx (.dict dom range) arg
+          let builtinTerm : STermLoc2 ctx .int :=
+            STermLoc2.mk stx (STerm2.builtin SBuiltin.Size argTerm)
+          checkTyEq2 stx .int expectedTy builtinTerm
+      | other =>
+          .error (stx, s!"size expects a dictionary argument, got {tyToString other}")
+
   | .builtinDateLit yyyymmdd => do
       let emptyRec : STermLoc2 ctx (.record []) :=
         STermLoc2.mk stx (STerm2.constRecord STermFields2.nil)

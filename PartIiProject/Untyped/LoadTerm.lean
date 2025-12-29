@@ -41,6 +41,7 @@ mutual
     | builtinStrEndsWith : LoadTermLoc rep → LoadTerm' rep
     | builtinDom : SurfaceTy → SurfaceTy → LoadTermLoc rep → LoadTerm' rep  -- dom, range
     | builtinRange : LoadTermLoc rep → LoadTerm' rep
+    | builtinSize : LoadTermLoc rep → LoadTerm' rep
     | builtinDateLit : Int → LoadTerm' rep  -- DateLit doesn't need an arg term
     | builtinYear : LoadTermLoc rep → LoadTerm' rep
     | builtinConcat : Schema → Schema → LoadTermLoc rep → LoadTerm' rep

@@ -51,7 +51,7 @@ def freshName (pfx : String) : FreshM String := do
 /-- Compile addition based on the additive monoid evidence. -/
 def compileAdd {ty : _root_.Ty} (a : _root_.AddM ty) (lhs rhs : Rust.ExprLoc) : Rust.Expr :=
   match a with
-  | .boolA => .binop .bitXor lhs rhs
+  | .boolA => .binop .bitOr lhs rhs
   | .realA => .binop .add lhs rhs
   | .dateA => rhs.expr  -- date "addition" just takes rhs (overwrite)
   | .intA => .binop .add lhs rhs
@@ -75,6 +75,7 @@ def compileBuiltin {argTy resTy : _root_.Ty} (b : _root_.BuiltinFn argTy resTy) 
   | .StrEndsWith => .call "ext_str_ends_with" [argExpr]
   | .Dom => .call "ext_dom" [ExprLoc.withUnknownLoc (Rust.Expr.borrow argExpr)]
   | .Range => .call "ext_range" [argExpr]
+  | .Size => .call "ext_size" [ExprLoc.withUnknownLoc (Rust.Expr.borrow argExpr)]
   | .DateLit yyyymmdd => .litDate yyyymmdd
   | .Year => .call "ext_year" [argExpr]
   | .Concat l1 l2 => .call "ext_concat" [argExpr]

@@ -182,7 +182,7 @@ mutual
         HList.cons (AddM.denote fh xh yh) (addHList ft xt yt)
 
   unsafe def AddM.denote {t : Ty} : AddM t → t.denote → t.denote → t.denote
-    | .boolA, x, y => Bool.xor x y
+    | .boolA, x, y => x || y
     | .realA, x, y => x + y
     | .dateA, _x, y => y  -- date "addition" overwrites (like sdql-rs AddAssign)
     | .intA, x, y => Int.add x y
@@ -273,6 +273,7 @@ inductive BuiltinFn : Ty → Ty → Type
   | StrEndsWith : BuiltinFn (Ty.record [.string, .string]) Ty.bool
   | Dom : {dom range : Ty} → BuiltinFn (.dict dom range) (.dict dom Ty.bool)
   | Range : BuiltinFn Ty.int (Ty.dict Ty.int Ty.bool)
+  | Size : {dom range : Ty} → BuiltinFn (.dict dom range) Ty.int
   | DateLit (yyyymmdd : Int) : BuiltinFn (Ty.record []) Ty.date
   | Year : BuiltinFn Ty.date Ty.int
   | Concat (l1 l2 : List Ty) : BuiltinFn (Ty.record [.record l1, .record l2]) (Ty.record (l1 ++ l2))

@@ -13,6 +13,7 @@ import Tests.TPCH.Q10
 import Tests.TPCH.Q12
 import Tests.TPCH.Q18
 import Tests.TPCH.Q19
+import Tests.TPCH.Q21
 
 
 namespace Tests
@@ -98,10 +99,53 @@ unsafe def tpchCases : List TestCase :=
       [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
   , TestCase.programRef "tpch_q19" TPCH.Q19 "sdql-rs/target/release/tpch_q19_tiny"
       [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
+  , TestCase.programRef "tpch_q21" TPCH.Q21 "sdql-rs/target/release/tpch_q21_tiny"
+      [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
+  ]
+
+def tpchTinyPrefix : String := "datasets/tpch-tiny/"
+
+def rewriteTpchTinyLoadPathToGeneric (path : String) : String :=
+  if path.startsWith tpchTinyPrefix then
+    "datasets/tpch/" ++ path.drop tpchTinyPrefix.length
+  else
+    path
+
+unsafe def rewriteTpchTinyLoadPathsToGeneric (p : SProg2) : SProg2 :=
+  { p with loadPaths := p.loadPaths.map rewriteTpchTinyLoadPathToGeneric }
+
+/- Same TPCH queries, but run against the scale factor 0.01 dataset. -/
+unsafe def tpchCasesSF001 : List TestCase :=
+  let sf001Env : List (String × String) :=
+    [("TPCH_DATASET_PATH", "sdql-rs/datasets/tpch_datasets/SF_0.01")]
+  [ TestCase.programRef "tpch_q01_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q01)
+      "sdql-rs/target/release/tpch_q01_tiny" sf001Env
+  , TestCase.programRef "tpch_q02_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q02)
+      "sdql-rs/target/release/tpch_q02_tiny" sf001Env
+  , TestCase.programRef "tpch_q03_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q03)
+      "sdql-rs/target/release/tpch_q03_tiny" sf001Env
+  , TestCase.programRef "tpch_q04_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q04)
+      "sdql-rs/target/release/tpch_q04_tiny" sf001Env
+  , TestCase.programRef "tpch_q05_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q05)
+      "sdql-rs/target/release/tpch_q05_tiny" sf001Env
+  , TestCase.programRef "tpch_q06_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q06)
+      "sdql-rs/target/release/tpch_q06_tiny" sf001Env
+  , TestCase.programRef "tpch_q07_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q07)
+      "sdql-rs/target/release/tpch_q07_tiny" sf001Env
+  , TestCase.programRef "tpch_q10_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q10)
+      "sdql-rs/target/release/tpch_q10_tiny" sf001Env
+  , TestCase.programRef "tpch_q12_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q12)
+      "sdql-rs/target/release/tpch_q12_tiny" sf001Env
+  , TestCase.programRef "tpch_q18_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q18)
+      "sdql-rs/target/release/tpch_q18_tiny" sf001Env
+  , TestCase.programRef "tpch_q19_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q19)
+      "sdql-rs/target/release/tpch_q19_tiny" sf001Env
+  , TestCase.programRef "tpch_q21_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q21)
+      "sdql-rs/target/release/tpch_q21_tiny" sf001Env
   ]
 
 unsafe def cases : List TestCase :=
-  smallCases ++ tpchCases
+  smallCases ++ tpchCases ++ tpchCasesSF001
 
 end Cases
 end Tests

@@ -202,7 +202,7 @@ mutual
         | [] => "()"
         | [e] => s!"({showExprLoc e indent config},)"
         | _ => paren <| String.intercalate ", " (es.map (fun e => showExprLoc e indent config))
-    | .tupleProj e idx => s!"({showExprLoc e indent config}.clone()).{idx}"
+    | .tupleProj e idx => s!"({showExprLoc e indent config}).{idx}"
     | .borrow e => s!"&{paren (showExprLoc e indent config)}"
     | .mapEmpty => "std::collections::BTreeMap::new()"
     | .mapInsert m k v => s!"map_insert({showExprLoc m indent config}, {showExprLoc k indent config}, {showExprLoc v indent config})"
