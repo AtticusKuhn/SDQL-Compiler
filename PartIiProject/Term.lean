@@ -270,6 +270,7 @@ inductive BuiltinFn : Ty → Ty → Type
   | Leq (t : Ty) : BuiltinFn (Ty.record [t, t]) Ty.bool
   | Lt (t : Ty) : BuiltinFn (Ty.record [t, t]) Ty.bool
   | Sub (t : Ty) : BuiltinFn (Ty.record [t, t]) t
+  | Div : BuiltinFn (Ty.record [.real, .real]) Ty.real
   | StrEndsWith : BuiltinFn (Ty.record [.string, .string]) Ty.bool
   | Dom : {dom range : Ty} → BuiltinFn (.dict dom range) (.dict dom Ty.bool)
   | Range : BuiltinFn Ty.int (Ty.dict Ty.int Ty.bool)

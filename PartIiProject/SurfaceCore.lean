@@ -73,6 +73,7 @@ inductive SBuiltin : SurfaceTy → SurfaceTy → Type where
   | Leq {t : SurfaceTy} : SBuiltin (.record [("_1", t), ("_2", t)]) .bool
   | Lt {t : SurfaceTy} : SBuiltin (.record [("_1", t), ("_2", t)]) .bool
   | Sub {t : SurfaceTy} : SBuiltin (.record [("_1", t), ("_2", t)]) t
+  | Div : SBuiltin (.record [("_1", .real), ("_2", .real)]) .real
   | StrEndsWith : SBuiltin (.record [("_1", .string), ("_2", .string)]) .bool
   | Dom {dom range : SurfaceTy} : SBuiltin (.dict dom range) (.dict dom .bool)
   | Range : SBuiltin .int (.dict .int .bool)

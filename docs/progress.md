@@ -6,17 +6,17 @@ What works:
 - Semimodule structure: `AddM` (with zeros) and `ScaleM`; includes `AddM.realA` and `ScaleM.realS`; tensor-shaped multiply via `ScaleM.mulDenote`.
 - Boolean addition now matches SDQL/reference semantics (OR), fixing set-style aggregations like TPCH Q04’s `l_h`.
 - Source locations: `SourceLocation` threaded through the pipeline (`LoadTermLoc`, `UntypedTermLoc`, `STermLoc2`, `TermLoc2`) for better debugging/error reporting.
-- Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`, and builtins (`And`, `Or`, `Eq`, `Leq`, `Sub`, `StrEndsWith`, `Dom`, `Range`, `Size`, `DateLit`, `Year`, `Concat`).
+- Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`, and builtins (`And`, `Or`, `Eq`, `Leq`, `Sub`, `Div`, `StrEndsWith`, `Dom`, `Range`, `Size`, `DateLit`, `Year`, `Concat`).
 - Pretty-printing for records/dicts; numerous `#eval` demos.
-- SDQL DSL macros: `[SDQL| ... ]` elaborates to `LoadTermLoc`, supporting literals, records (positional and named), dict literals, lookup, `sum`, `let`, `if`, `not`, `+`, `*` (scalar inferred; optional `*{bool|int|real}`), boolean ops, and builtins (`dom`, `range`, `size`, `endsWith`, `date`, `concat`).
+- SDQL DSL macros: `[SDQL| ... ]` elaborates to `LoadTermLoc`, supporting literals, records (positional and named), dict literals, lookup, `sum`, `let`, `if`, `not`, `+`, `-`, `*` (scalar inferred; optional `*{bool|int|real}`), `/`, boolean ops, and builtins (`dom`, `range`, `size`, `endsWith`, `date`, `concat`).
 - New program pipeline (DeBruijn): `[SDQLProg2 { T }| ... ]` elaborates to `LoadTermLoc` then runs `LoadTermLoc → UntypedTermLoc → STermLoc2` to produce an `SProg2` with an explicit typed context (`ctx : List SurfaceTy`) and `loadPaths`.
-- Rust codegen: renders expressions, let-blocks, conditionals, dict ops, lookup-with-default, and `sum` as a loop with an accumulator; open-term functions with typed parameters. Supports `real` zeros/addition and maps builtins to external helpers (`ext_and`, `ext_or`, `ext_eq`, `ext_str_ends_with`, `ext_dom`, `ext_range`, `ext_size`).
+- Rust codegen: renders expressions, let-blocks, conditionals, dict ops, lookup-with-default, and `sum` as a loop with an accumulator; open-term functions with typed parameters. Supports `real` zeros/addition and maps builtins to external helpers (`ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_lt`, `ext_sub`, `ext_div`, `ext_str_ends_with`, `ext_dom`, `ext_range`, `ext_size`).
 - Program-level Rust codegen: `renderRustProg2Shown` compiles a core `Prog2` to a standalone Rust program. Generated programs import `sdql_runtime.rs` (a standalone file with helpers, loaders, and printing) via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`. The runtime includes:
   - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`
   - Core types: `Real` (Ord-capable f64), `Date` (YYYYMMDD integer)
   - Traits: `SdqlAdd` for semimodule addition, `FromTblField` for TBL parsing, `SDQLShow` for printing
   - TBL loaders: `build_col<T>`, `load_tbl`
-  - Extension functions: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_sub`, `ext_str_ends_with`, `ext_dom`, `ext_range`, `ext_size`
+  - Extension functions: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_lt`, `ext_sub`, `ext_div`, `ext_str_ends_with`, `ext_dom`, `ext_range`, `ext_size`, `ext_year`
 - Generic table loading: For each table parameter, `genTableLoader` generates inline Rust code that uses `load_tbl` to parse the TBL file and `build_col<T>` to extract typed columns. The `elabTyPreserveOrder` function in the DSL preserves field declaration order for load schemas, ensuring column indices match TBL file order.
 - Testing: Lean test executable `sdql-tests` compiles SDQL→Rust, builds with `rustc`, runs programs, and compares outputs. Supports two modes:
   - `TestCase.program`: compares against hardcoded expected strings
@@ -26,6 +26,7 @@ What works:
 - TPCH Q01: now tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q01_tiny`) using dynamic output comparison.
 - TPCH Q03: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q03_tiny`); relies on the `<` builtin (`Lt`/`ext_lt`) and `TPCH_DATASET_PATH` path rewriting for sources that use upstream `datasets/tpch/...` paths.
 - TPCH Q07: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q07_tiny`); relies on `year : date → int` (`year(e)` / `ext_year`).
+- TPCH Q17: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q17_tiny`); relies on real division `/ : real → real → real` (`ext_div`).
 - TPCH Q21: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q21_tiny`); relies on `size : {K -> V} → int` (`size(d)` / `ext_size`).
 - Date type: added `Ty.date` primitive with `SDQLDate` wrapper (YYYYMMDD integer), `DateLit` builtin constructor, and `Leq` comparison. Rust codegen uses a simple `Date` struct.
 - Real number literals: added `constReal` for floating-point constants in the DSL.

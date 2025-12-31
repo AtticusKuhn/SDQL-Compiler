@@ -38,6 +38,7 @@ mutual
     | builtinLeq : SurfaceTy → LoadTermLoc rep → LoadTerm' rep
     | builtinLt : SurfaceTy → LoadTermLoc rep → LoadTerm' rep
     | builtinSub : SurfaceTy → LoadTermLoc rep → LoadTerm' rep
+    | builtinDiv : LoadTermLoc rep → LoadTerm' rep
     | builtinStrEndsWith : LoadTermLoc rep → LoadTerm' rep
     | builtinDom : SurfaceTy → SurfaceTy → LoadTermLoc rep → LoadTerm' rep  -- dom, range
     | builtinRange : LoadTermLoc rep → LoadTerm' rep

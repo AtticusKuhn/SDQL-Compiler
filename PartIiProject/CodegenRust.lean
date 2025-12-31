@@ -72,6 +72,7 @@ def compileBuiltin {argTy resTy : _root_.Ty} (b : _root_.BuiltinFn argTy resTy) 
   | .Leq _ => .call "ext_leq" [argExpr]
   | .Lt _ => .call "ext_lt" [argExpr]
   | .Sub _ => .call "ext_sub" [argExpr]
+  | .Div => .call "ext_div" [argExpr]
   | .StrEndsWith => .call "ext_str_ends_with" [argExpr]
   | .Dom => .call "ext_dom" [ExprLoc.withUnknownLoc (Rust.Expr.borrow argExpr)]
   | .Range => .call "ext_range" [argExpr]
