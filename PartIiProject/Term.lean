@@ -272,6 +272,11 @@ inductive BuiltinFn : Ty → Ty → Type
   | Sub (t : Ty) : BuiltinFn (Ty.record [t, t]) t
   | Div : BuiltinFn (Ty.record [.real, .real]) Ty.real
   | StrEndsWith : BuiltinFn (Ty.record [.string, .string]) Ty.bool
+  | StrStartsWith : BuiltinFn (Ty.record [.string, .string]) Ty.bool
+  | StrContains : BuiltinFn (Ty.record [.string, .string]) Ty.bool
+  | FirstIndex : BuiltinFn (Ty.record [.string, .string]) Ty.int
+  | LastIndex : BuiltinFn (Ty.record [.string, .string]) Ty.int
+  | SubString : BuiltinFn (Ty.record [.string, .int, .int]) Ty.string
   | Dom : {dom range : Ty} → BuiltinFn (.dict dom range) (.dict dom Ty.bool)
   | Range : BuiltinFn Ty.int (Ty.dict Ty.int Ty.bool)
   | Size : {dom range : Ty} → BuiltinFn (.dict dom range) Ty.int

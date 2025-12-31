@@ -57,6 +57,53 @@ Source: sdql-rs/progs/tpch/9.sdql
 -- Stub SProg to keep module usable
 unsafe def Q09_stub : SProg2 := [SDQLProg2 { int }| 0 ]
 
+unsafe def Q09 : SProg2 :=
+  [SDQLProg2 { { < _1 : varchar(25), _2 : int, _3 : real > -> bool } }|
+    let part = load[<p_partkey: @vec {int -> int}, p_name: @vec {int -> varchar(55)}, p_mfgr: @vec {int -> varchar(25)}, p_brand: @vec {int -> varchar(10)}, p_type: @vec {int -> varchar(25)}, p_size: @vec {int -> int}, p_container: @vec {int -> varchar(10)}, p_retailprice: @vec {int -> real}, p_comment: @vec {int -> varchar(23)}, size: int>]("datasets/tpch/part.tbl") in
+    let supplier = load[<s_suppkey: @vec {int -> int}, s_name: @vec {int -> varchar(25)}, s_address: @vec {int -> varchar(40)}, s_nationkey: @vec {int -> int}, s_phone: @vec {int -> varchar(15)}, s_acctbal: @vec {int -> real}, s_comment: @vec {int -> varchar(101)}, size: int>]("datasets/tpch/supplier.tbl") in
+    let lineitem = load[<l_orderkey: @vec {int -> int}, l_partkey: @vec {int -> int}, l_suppkey: @vec {int -> int}, l_linenumber: @vec {int -> int}, l_quantity: @vec {int -> real}, l_extendedprice: @vec {int -> real}, l_discount: @vec {int -> real}, l_tax: @vec {int -> real}, l_returnflag: @vec {int -> varchar(1)}, l_linestatus: @vec {int -> varchar(1)}, l_shipdate: @vec {int -> date}, l_commitdate: @vec {int -> date}, l_receiptdate: @vec {int -> date}, l_shipinstruct: @vec {int -> varchar(25)}, l_shipmode: @vec {int -> varchar(10)}, l_comment: @vec {int -> varchar(44)}, size: int>]("datasets/tpch/lineitem.tbl") in
+    let partsupp = load[<ps_partkey: @vec {int -> int}, ps_suppkey: @vec {int -> int}, ps_availqty: @vec {int -> real}, ps_supplycost: @vec {int -> real}, ps_comment: @vec {int -> varchar(199)}, size: int>]("datasets/tpch/partsupp.tbl") in
+    let orders = load[<o_orderkey: @vec {int -> int}, o_custkey: @vec {int -> int}, o_orderstatus: @vec {int -> varchar(1)}, o_totalprice: @vec {int -> real}, o_orderdate: @vec {int -> date}, o_orderpriority: @vec {int -> varchar(15)}, o_clerk: @vec {int -> varchar(15)}, o_shippriority: @vec {int -> int}, o_comment: @vec {int -> varchar(79)}, size: int>]("datasets/tpch/orders.tbl") in
+    let nation = load[<n_nationkey: @vec {int -> int}, n_name: @vec {int -> varchar(25)}, n_regionkey: @vec {int -> int}, n_comment: @vec {int -> varchar(152)}, size: int>]("datasets/tpch/nation.tbl") in
+
+    let n_h =
+      sum(<i,_> <- range(nation.size))
+        { unique(nation.n_nationkey(i)) -> < _1 = nation.n_name(i) > } in
+
+    let s_h =
+      sum(<i,_> <- range(supplier.size))
+        { unique(supplier.s_suppkey(i)) -> (n_h(supplier.s_nationkey(i)))._1 } in
+
+    let p_h =
+      sum(<i,_> <- range(part.size))
+        if(StrContains(part.p_name(i), "green")) then
+          { unique(part.p_partkey(i)) -> true } in
+
+    let ps_h =
+      sum(<i,_> <- range(partsupp.size))
+        if(dom(p_h)(partsupp.ps_partkey(i))) then
+          {
+            unique(< _1 = partsupp.ps_partkey(i), _2 = partsupp.ps_suppkey(i) >) ->
+            < _1 = s_h(partsupp.ps_suppkey(i)), _2 = partsupp.ps_supplycost(i) >
+          } in
+
+    let o_h =
+      sum(<i,_> <- range(orders.size))
+        { orders.o_orderkey(i) -> orders.o_orderdate(i) } in
+
+    let l_h =
+      sum(<i,_> <- range(lineitem.size))
+        let key = < _1 = lineitem.l_partkey(i), _2 = lineitem.l_suppkey(i) > in
+        if(dom(ps_h)(key)) then
+          {
+            < _1 = (ps_h(key))._1, _2 = year(o_h(lineitem.l_orderkey(i))) > ->
+             < _3 = lineitem.l_extendedprice(i) * (1.0 - lineitem.l_discount(i)) - (ps_h(key))._2 * lineitem.l_quantity(i) >
+          } in
+
+    sum(<k,v> <- l_h)
+      { unique(concat(k,v)) -> true }
+  ]
+
 -- Attempted port (placeholder; unsupported syntax likely)
 /-
 unsafe def Q09 : SProg :=

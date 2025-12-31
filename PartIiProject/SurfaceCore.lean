@@ -75,6 +75,11 @@ inductive SBuiltin : SurfaceTy → SurfaceTy → Type where
   | Sub {t : SurfaceTy} : SBuiltin (.record [("_1", t), ("_2", t)]) t
   | Div : SBuiltin (.record [("_1", .real), ("_2", .real)]) .real
   | StrEndsWith : SBuiltin (.record [("_1", .string), ("_2", .string)]) .bool
+  | StrStartsWith : SBuiltin (.record [("_1", .string), ("_2", .string)]) .bool
+  | StrContains : SBuiltin (.record [("_1", .string), ("_2", .string)]) .bool
+  | FirstIndex : SBuiltin (.record [("_1", .string), ("_2", .string)]) .int
+  | LastIndex : SBuiltin (.record [("_1", .string), ("_2", .string)]) .int
+  | SubString : SBuiltin (.record [("_1", .string), ("_2", .int), ("_3", .int)]) .string
   | Dom {dom range : SurfaceTy} : SBuiltin (.dict dom range) (.dict dom .bool)
   | Range : SBuiltin .int (.dict .int .bool)
   | Size {dom range : SurfaceTy} : SBuiltin (.dict dom range) .int

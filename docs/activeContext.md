@@ -24,10 +24,21 @@ Latest changes:
 - Added date builtin `year : date → int` with surface syntax `year(e)`; Rust codegen targets `ext_year`, implemented in `sdql_runtime.rs`.
 - Added dictionary builtin `size(d) : int`; Rust codegen targets `ext_size`, implemented in `sdql_runtime.rs`.
 - Added real division builtin `/ : real → real → real`; Rust codegen targets `ext_div`, implemented in `sdql_runtime.rs`.
-- Enabled TPCH Q07 in `Tests/Cases.lean` (Q08/Q09 still blocked on string substring ops).
+- Added string builtins and surface syntax:
+  - `StrStartsWith(s, pre) : bool`, `StrContains(s, sub) : bool`, `FirstIndex(s, pat) : int`, `LastIndex(s, pat) : int`, `SubString(s, start, end) : string`
+  - Rust codegen targets `ext_str_starts_with`, `ext_str_contains`, `ext_first_index`, `ext_last_index`, `ext_sub_string`, implemented in `sdql_runtime.rs`.
+- Enabled TPCH Q07 in `Tests/Cases.lean` (Q08 still pending).
+- Enabled TPCH Q11 in `Tests/Cases.lean` (tiny + SF=0.01).
+- Enabled TPCH Q15 in `Tests/Cases.lean` (tiny only; SF=0.01 still needs `promote[max_prod]` / max-semirings support).
 - Enabled TPCH Q17 in `Tests/Cases.lean` (was blocked on real division).
 - Enabled TPCH Q21 in `Tests/Cases.lean` (was blocked on `size`).
+- Enabled TPCH Q09/Q13/Q14/Q16/Q20/Q22 in `Tests/Cases.lean` (tiny + SF=0.01), unblocking additional TPC-H coverage that depends on string functions.
+- Fixed SDQL operator precedence in the DSL so `*` and `/` bind tighter than `+` and `-` (this affects expressions like `a*b - c*d` in TPCH Q09).
 - Fixed TPCH Q04 on SF=0.01 by (1) making record-field sorting stable for duplicate field names like `_`, and (2) aligning boolean addition with SDQL/reference semantics (OR).
+- Fixed Rust backend issues surfaced by Q11/Q15:
+  - `sdql_runtime.rs`: `tuple_add*` now uses `SdqlAdd` (so tuple fields like `BTreeMap` can be added).
+  - `PartIiProject/Rust.lean`: generated `for` loops iterate via `.clone().into_iter()` to avoid moving maps used more than once.
+- Refactored the Rust AST to be DeBruijn-indexed (`Expr : Nat → Type`, vars are `Fin ctx`) and replaced stringly-typed runtime calls with `RuntimeFn`; updated `PartIiProject/CodegenRust.lean` accordingly.
 
 Next steps (proposed):
 

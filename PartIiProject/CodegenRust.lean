@@ -20,66 +20,57 @@ def coreTyToRustTy : _root_.Ty → Rust.Ty
 
 /- Zeros for additive monoids (used for lookup defaults and sum inits). -/
 mutual
-  def zerosForHListLoc : {l : List _root_.Ty} → _root_.HList _root_.AddM l → List Rust.ExprLoc
-    | [], .nil => []
-    | _ :: _, .cons h t => zeroOfAddMLoc h :: zerosForHListLoc t
+  def zerosForHListLoc {ctx : Nat} : {l : List _root_.Ty} → _root_.HList _root_.AddM l → Rust.Exprs ctx
+    | [], .nil => .nil
+    | _ :: _, .cons h t =>
+        .cons (zeroOfAddMLoc (ctx := ctx) h) (zerosForHListLoc (ctx := ctx) t)
 
-  def zeroOfAddMLoc : {t : _root_.Ty} → _root_.AddM t → Rust.ExprLoc
+  def zeroOfAddMLoc {ctx : Nat} : {t : _root_.Ty} → _root_.AddM t → Rust.ExprLoc ctx
     | .bool, .boolA => ExprLoc.withUnknownLoc (.litBool false)
     | .real, .realA => ExprLoc.withUnknownLoc (.litReal 0.0)
     | .date, .dateA => ExprLoc.withUnknownLoc (.litDate 10101)  -- dummy date (0001-01-01)
     | .int, .intA => ExprLoc.withUnknownLoc (.litInt 0)
     | .string, .stringA => ExprLoc.withUnknownLoc (.litString "")
     | .dict _ _, @_root_.AddM.dictA _ _ _ => ExprLoc.withUnknownLoc .mapEmpty
-    | .record _, @_root_.AddM.recordA _ fields => ExprLoc.withUnknownLoc (.tuple (zerosForHListLoc fields))
+    | .record _, @_root_.AddM.recordA _ fields => ExprLoc.withUnknownLoc (.tuple (zerosForHListLoc (ctx := ctx) fields))
 end
 
 /- Compilation from core terms to Rust simplified AST -------------------- -/
 namespace Compile
 
-/-- State monad for fresh name generation. -/
-abbrev FreshM := StateM Nat
-
-/-- Get a fresh identifier suffix, incrementing the counter. -/
-def fresh : FreshM Nat := modifyGet fun n => (n, n + 1)
-
-/-- Generate a fresh variable name with the given prefix. -/
-def freshName (pfx : String) : FreshM String := do
-  let n ← fresh
-  return s!"{pfx}{n}"
-
 /-- Compile addition based on the additive monoid evidence. -/
-def compileAdd {ty : _root_.Ty} (a : _root_.AddM ty) (lhs rhs : Rust.ExprLoc) : Rust.Expr :=
+def compileAdd {ctx : Nat} {ty : _root_.Ty} (a : _root_.AddM ty) (lhs rhs : Rust.ExprLoc ctx) : Rust.Expr ctx :=
   match a with
   | .boolA => .binop .bitOr lhs rhs
   | .realA => .binop .add lhs rhs
   | .dateA => rhs.expr  -- date "addition" just takes rhs (overwrite)
   | .intA => .binop .add lhs rhs
   | .stringA => .binop .add lhs rhs
-  | @_root_.AddM.dictA _ _ _ => .call "dict_add" [lhs, rhs]
-  | @_root_.AddM.recordA l _ =>
-      let fname := match l.length with
-        | 0 => "tuple_add0" | 1 => "tuple_add" | 2 => "tuple_add2"
-        | 3 => "tuple_add3" | 4 => "tuple_add4" | _ => "tuple_add5"
-      .call fname [lhs, rhs]
+  | @_root_.AddM.dictA _ _ _ => .callRuntimeFn .dictAdd (Rust.Exprs.ofList [lhs, rhs])
+  | @_root_.AddM.recordA l _ => .callRuntimeFn (.tupleAdd l.length) (Rust.Exprs.ofList [lhs, rhs])
 
 /-- Compile a builtin function application. -/
-def compileBuiltin {argTy resTy : _root_.Ty} (b : _root_.BuiltinFn argTy resTy) (argExpr : Rust.ExprLoc) : Rust.Expr :=
+def compileBuiltin {ctx : Nat} {argTy resTy : _root_.Ty} (b : _root_.BuiltinFn argTy resTy) (argExpr : Rust.ExprLoc ctx) : Rust.Expr ctx :=
   match b with
-  | .And => .call "ext_and" [argExpr]
-  | .Or => .call "ext_or" [argExpr]
-  | .Eq _ => .call "ext_eq" [argExpr]
-  | .Leq _ => .call "ext_leq" [argExpr]
-  | .Lt _ => .call "ext_lt" [argExpr]
-  | .Sub _ => .call "ext_sub" [argExpr]
-  | .Div => .call "ext_div" [argExpr]
-  | .StrEndsWith => .call "ext_str_ends_with" [argExpr]
-  | .Dom => .call "ext_dom" [ExprLoc.withUnknownLoc (Rust.Expr.borrow argExpr)]
-  | .Range => .call "ext_range" [argExpr]
-  | .Size => .call "ext_size" [ExprLoc.withUnknownLoc (Rust.Expr.borrow argExpr)]
+  | .And => .callRuntimeFn .extAnd (Rust.Exprs.singleton argExpr)
+  | .Or => .callRuntimeFn .extOr (Rust.Exprs.singleton argExpr)
+  | .Eq _ => .callRuntimeFn .extEq (Rust.Exprs.singleton argExpr)
+  | .Leq _ => .callRuntimeFn .extLeq (Rust.Exprs.singleton argExpr)
+  | .Lt _ => .callRuntimeFn .extLt (Rust.Exprs.singleton argExpr)
+  | .Sub _ => .callRuntimeFn .extSub (Rust.Exprs.singleton argExpr)
+  | .Div => .callRuntimeFn .extDiv (Rust.Exprs.singleton argExpr)
+  | .StrEndsWith => .callRuntimeFn .extStrEndsWith (Rust.Exprs.singleton argExpr)
+  | .StrStartsWith => .callRuntimeFn .extStrStartsWith (Rust.Exprs.singleton argExpr)
+  | .StrContains => .callRuntimeFn .extStrContains (Rust.Exprs.singleton argExpr)
+  | .FirstIndex => .callRuntimeFn .extFirstIndex (Rust.Exprs.singleton argExpr)
+  | .LastIndex => .callRuntimeFn .extLastIndex (Rust.Exprs.singleton argExpr)
+  | .SubString => .callRuntimeFn .extSubString (Rust.Exprs.singleton argExpr)
+  | .Dom => .callRuntimeFn .extDom (Rust.Exprs.singleton (ExprLoc.withUnknownLoc (Rust.Expr.borrow argExpr)))
+  | .Range => .callRuntimeFn .extRange (Rust.Exprs.singleton argExpr)
+  | .Size => .callRuntimeFn .extSize (Rust.Exprs.singleton (ExprLoc.withUnknownLoc (Rust.Expr.borrow argExpr)))
   | .DateLit yyyymmdd => .litDate yyyymmdd
-  | .Year => .call "ext_year" [argExpr]
-  | .Concat l1 l2 => .call "ext_concat" [argExpr]
+  | .Year => .callRuntimeFn .extYear (Rust.Exprs.singleton argExpr)
+  | .Concat l1 l2 => .callRuntimeFn .extConcat (Rust.Exprs.singleton argExpr)
 end Compile
 
 /- Entry points ---------------------------------------------------------- -/
@@ -103,102 +94,107 @@ def rustRuntimeHeader : String :=
 
 namespace Compile2
 
-/-- A name environment for DeBruijn terms: a list of Rust variable names,
-    indexed from most recent binding (head) to oldest (tail). -/
-abbrev NameEnv := List String
+def memIdx {α : Type} {a : α} {ctx : List α} : Mem a ctx → Nat
+  | .head _ => 0
+  | .tail _ m => memIdx m + 1
 
-/-- Look up the Rust variable name for a DeBruijn Mem proof by computing the index -/
-def lookupMem {ty : _root_.Ty} {ctx : List _root_.Ty} (m : Mem ty ctx) (env : NameEnv) : String :=
-  let idx := memIdx m
-  env.getD idx "???"
-where
-  memIdx : {ty : _root_.Ty} → {ctx : List _root_.Ty} → Mem ty ctx → Nat
-    | _, _ :: _, .head _ => 0
-    | _, _ :: _, .tail _ m' => memIdx m' + 1
+theorem memIdx_lt_length {α : Type} {a : α} {ctx : List α} (m : Mem a ctx) : memIdx m < ctx.length := by
+  induction m with
+  | head as =>
+      simp [memIdx]
+  | tail b m ih =>
+      simpa [memIdx] using Nat.succ_lt_succ ih
+
+def memToFin {α : Type} {a : α} {ctx : List α} (m : Mem a ctx) : Fin ctx.length :=
+  ⟨memIdx m, memIdx_lt_length m⟩
 
 mutual
   /-- Compile a DeBruijn located term into a Rust located expression. -/
   def compileLoc2 {ctx : List _root_.Ty} {ty : _root_.Ty}
-      (env : NameEnv)
-      (t : TermLoc2 ctx ty) : Compile.FreshM Rust.ExprLoc := do
+      (t : TermLoc2 ctx ty) : Rust.ExprLoc ctx.length :=
     let ⟨loc, inner⟩ := t
-    let expr ← compile2 env loc inner
-    return Rust.ExprLoc.mk loc expr
+    Rust.ExprLoc.mk loc (compile2 loc inner)
 
   /-- Compile a DeBruijn term into a Rust expression. -/
   def compile2 {ctx : List _root_.Ty} {ty : _root_.Ty}
-      (env : NameEnv) (loc : SourceLocation)
-      (t : Term2 ctx ty) : Compile.FreshM Rust.Expr := do
+      (loc : SourceLocation)
+      (t : Term2 ctx ty) : Rust.Expr ctx.length :=
     match t with
-    | .var m => return .var (lookupMem m env)
-    | .constInt n => return .litInt n
-    | .constReal r => return .litReal r
-    | .constBool b => return .litBool b
-    | .constString s => return .litString s
-    | .constRecord fields => return .tuple (← compileFields2 env fields)
-    | .emptyDict => return .mapEmpty
+    | .var m => .var (memToFin m)
+    | .constInt n => .litInt n
+    | .constReal r => .litReal r
+    | .constBool b => .litBool b
+    | .constString s => .litString s
+    | .constRecord fields => .tuple (compileFields2 fields)
+    | .emptyDict => .mapEmpty
     | .dictInsert k v d =>
-        return .mapInsert (← compileLoc2 env d) (← compileLoc2 env k) (← compileLoc2 env v)
-    | .not t => return .not (← compileLoc2 env t)
-    | .ite c t f => return .ite (← compileLoc2 env c) (← compileLoc2 env t) (← compileLoc2 env f)
+        .mapInsert (compileLoc2 d) (compileLoc2 k) (compileLoc2 v)
+    | .not t => .not (compileLoc2 t)
+    | .ite c t f => .ite (compileLoc2 c) (compileLoc2 t) (compileLoc2 f)
     | @Term2.letin _ ty₁ _ bound body =>
-        let boundExpr ← compileLoc2 env bound
-        let binderName ← Compile.freshName "x"
-        let extEnv := binderName :: env
-        let bodyExpr ← compileLoc2 extEnv body
-        return .block [Rust.StmtLoc.mk loc (.letDecl false binderName (some boundExpr))] bodyExpr
+        .letIn (compileLoc2 bound) (compileLoc2 body)
     | .add a t1 t2 =>
-        let lhs ← compileLoc2 env t1
-        let rhs ← compileLoc2 env t2
-        return Compile.compileAdd a lhs rhs
+        Compile.compileAdd a (compileLoc2 t1) (compileLoc2 t2)
     | @Term2.mul _ _ _ _ s1 s2 e1 e2 =>
-        let lhs ← compileLoc2 env e1
-        let rhs ← compileLoc2 env e2
+        let lhs := compileLoc2 e1
+        let rhs := compileLoc2 e2
         match s1, s2 with
-        | .realS, .realS => return .binop .mul lhs rhs
-        | .intS, .intS => return .binop .mul lhs rhs
+        | .realS, .realS => .binop .mul lhs rhs
+        | .intS, .intS => .binop .mul lhs rhs
         | .boolS, .boolS =>
-            let arg := ExprLoc.withUnknownLoc (.tuple [lhs, rhs])
-            return .call "ext_and" [arg]
+            let arg := ExprLoc.withUnknownLoc (.tuple (Rust.Exprs.ofList [lhs, rhs]))
+            .callRuntimeFn .extAnd (Rust.Exprs.singleton arg)
         | _, _ =>
-            return .call "sdql_mul" [lhs, rhs]
+            .callRuntimeFn .sdqlMul (Rust.Exprs.ofList [lhs, rhs])
     | .lookup aRange d k =>
-        return .lookupOrDefault (← compileLoc2 env d) (← compileLoc2 env k) (zeroOfAddMLoc aRange)
+        .lookupOrDefault (compileLoc2 d) (compileLoc2 k) (zeroOfAddMLoc (ctx := ctx.length) aRange)
     | @Term2.sum _ dom range _ a d body =>
-        let de ← compileLoc2 env d
-        let accName ← Compile.freshName "acc"
-        let kName ← Compile.freshName "k"
-        let vName ← Compile.freshName "v"
-        -- Extend environment for sum body: dom :: range :: ctx
-        -- DeBruijn: first bound variable (dom/key) has index 0, second (range/val) has index 1
-        let extEnv := kName :: vName :: env
-        let bodyExpr ← compileLoc2 extEnv body
-        let accVar := ExprLoc.withUnknownLoc (.var accName)
-        let updated := Compile.compileAdd a accVar bodyExpr
-        let loop := Rust.StmtLoc.mk loc (.forKV kName vName de [Rust.StmtLoc.mk loc (.assign accName (ExprLoc.withUnknownLoc updated))])
-        return .block
-          [ Rust.StmtLoc.mk loc (.letDecl true accName (some (zeroOfAddMLoc a)))
-          , loop ]
-          (ExprLoc.withUnknownLoc (.var accName))
-    | .proj _ r i => return .tupleProj (← compileLoc2 env r) i
+        let n := ctx.length
+        let accInit : Rust.ExprLoc n := zeroOfAddMLoc (ctx := n) a
+        let accDecl : Rust.StmtLoc n (n+1) := Rust.StmtLoc.mk loc (.letDecl true (.some accInit))
+        let de : Rust.ExprLoc (n+1) :=
+          Rust.Rename1.exprLoc (ctx := n) Fin.succ (compileLoc2 d)
+
+        let shiftAfter2 : Fin (n + 2) → Fin (n + 3) := fun i =>
+          if h : i.1 < 2 then
+            ⟨i.1, by omega⟩
+          else
+            ⟨i.1 + 1, by omega⟩
+
+        let bodyDomRange : Rust.ExprLoc (n+2) := compileLoc2 body
+        let bodyLoop : Rust.ExprLoc (n+3) :=
+          Rust.Rename1.exprLoc (ctx := n+2) shiftAfter2 bodyDomRange
+
+        let accIdx : Fin (n + 3) :=
+          ⟨2, by omega⟩
+        -- let accIdx : Fin (n + 3) :=
+
+        let accVar : Rust.ExprLoc (n+3) := Rust.ExprLoc.withUnknownLoc (.var accIdx)
+        let updated : Rust.Expr (n+3) := Compile.compileAdd a accVar bodyLoop
+        let assignAcc : Rust.StmtLoc (n+3) (n+3) :=
+          Rust.StmtLoc.mk loc (.assign accIdx (Rust.ExprLoc.withUnknownLoc updated))
+
+        let loopBody : Rust.StmtSeq (n+3) (n+3) :=
+          Rust.StmtSeq.cons assignAcc Rust.StmtSeq.nil
+        let loopStmt : Rust.StmtLoc (n+1) (n+1) := Rust.StmtLoc.mk loc (.forKV de loopBody)
+
+        let stmts : Rust.StmtSeq n (n+1) :=
+          Rust.StmtSeq.cons accDecl (Rust.StmtSeq.cons loopStmt Rust.StmtSeq.nil)
+        let accResult : Rust.ExprLoc (n+1) :=
+          Rust.ExprLoc.withUnknownLoc (.var ⟨0, Nat.succ_pos n⟩)
+        .block stmts accResult
+    | .proj _ r i => .tupleProj (compileLoc2 r) i
     | .builtin b a =>
-        let argExpr ← compileLoc2 env a
-        return Compile.compileBuiltin b argExpr
+        Compile.compileBuiltin b (compileLoc2 a)
 
   /-- Compile DeBruijn record fields to a list of Rust expressions. -/
   def compileFields2 {ctx : List _root_.Ty}
-      (env : NameEnv)
-      : {l : List _root_.Ty} → TermFields2 ctx l → Compile.FreshM (List Rust.ExprLoc)
-    | [], .nil => return []
-    | _, .cons h t => return (← compileLoc2 env h) :: (← compileFields2 env t)
+      : {l : List _root_.Ty} → TermFields2 ctx l → Rust.Exprs ctx.length
+    | [], .nil => .nil
+    | _, .cons h t => .cons (compileLoc2 h) (compileFields2 t)
 end
 
-/-- Compile a DeBruijn term to a Rust expression (runs the state monad). -/
-def compileLocRun {ctx : List _root_.Ty} {ty : _root_.Ty}
-    (env : NameEnv)
-    (t : TermLoc2 ctx ty) : Rust.ExprLoc :=
-  (compileLoc2 env t).run' 0
-
+#check Fin.succ
 end Compile2
 
 /- Program-level codegen (PHOAS - kept for compatibility) ---------------- -/
@@ -255,7 +251,7 @@ def genTableLoader (ty : _root_.Ty) (path : String) : String :=
 
 /-- Build a name environment from a context.
     Each position in the context gets a name like "arg0", "arg1", etc. -/
-def mkLoadEnv (ctx : List _root_.Ty) : Compile2.NameEnv :=
+def mkLoadEnv (ctx : List _root_.Ty) : Rust.NameEnv :=
   (List.range ctx.length).map (fun i => s!"arg{i}")
 
 /-- Render a Rust program from a `Prog2` (DeBruijn indexed).
@@ -281,9 +277,9 @@ def renderRustProg2Shown (p : Prog2) (config : Rust.ShowConfig := Rust.defaultCo
         s!"let {nm}: {tyStr} = {loaderExpr};" :: genLoaders restCtx restPaths (idx + 1)
     | _, _ => []  -- Mismatched lengths, shouldn't happen
   let paramDecls := genLoaders p.ctx p.loadPaths 0
-  -- Compile the term with the name environment
-  let expr := Compile2.compileLocRun env p.term
-  let bodyExpr := Rust.showExprLoc expr 1 config
+  -- Compile the term to a DeBruijn-indexed Rust AST, and pretty-print using `env`
+  let expr := Compile2.compileLoc2 p.term
+  let bodyExpr := Rust.showExprLocRun env expr 1 config
   let loadsStr := String.intercalate "\n" (paramDecls.map (fun s => "  " ++ s))
   let mainBody :=
     "fn main() {\n" ++

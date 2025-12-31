@@ -60,11 +60,11 @@ syntax "let" sdqlident "=" sdql "in" sdql : sdql
 -- binary ops (left-assoc precedence)
 syntax:60 sdql:60 "+" sdql:61 : sdql
 syntax:60 sdql:60 "-" sdql:61 : sdql
-syntax:55 sdql:55 "*" sdql:56 : sdql
-syntax:55 sdql:55 "*" "{" "int" "}" sdql:56 : sdql
-syntax:55 sdql:55 "*" "{" "bool" "}" sdql:56 : sdql
-syntax:55 sdql:55 "*" "{" "real" "}" sdql:56 : sdql
-syntax:55 sdql:55 "/" sdql:56 : sdql
+syntax:65 sdql:65 "*" sdql:66 : sdql
+syntax:65 sdql:65 "*" "{" "int" "}" sdql:66 : sdql
+syntax:65 sdql:65 "*" "{" "bool" "}" sdql:66 : sdql
+syntax:65 sdql:65 "*" "{" "real" "}" sdql:66 : sdql
+syntax:65 sdql:65 "/" sdql:66 : sdql
 syntax:58 sdql:58 "&&" sdql:59 : sdql
 syntax:57 sdql:57 "||" sdql:58 : sdql
 syntax:59 sdql:59 "==" sdql:60 : sdql
@@ -76,6 +76,11 @@ syntax "dom" "(" sdql ")" : sdql
 syntax "range" "(" sdql ")" : sdql
 syntax (priority := high) "size" "(" sdql ")" : sdql
 syntax "endsWith" "(" sdql "," sdql ")" : sdql
+syntax "StrStartsWith" "(" sdql "," sdql ")" : sdql
+syntax "StrContains" "(" sdql "," sdql ")" : sdql
+syntax "FirstIndex" "(" sdql "," sdql ")" : sdql
+syntax "LastIndex" "(" sdql "," sdql ")" : sdql
+syntax "SubString" "(" sdql "," sdql "," sdql ")" : sdql
 syntax "unique" "(" sdql ")" : sdql
 syntax "concat" "(" sdql "," sdql ")" : sdql
 
@@ -407,6 +412,38 @@ mutual
           let loc ← mkSourceLoc stx
           let arg := (← `(LoadTermLoc.mk (stx := $loc) (LoadTerm'.constRecord [("_1", $xx), ("_2", $yy)])))
           wrapLoadWithStx stx (← `(LoadTerm'.builtinStrEndsWith $arg))
+      | `(sdql| StrStartsWith($x:sdql, $y:sdql)) => do
+          let xx ← elabSDQLToLoad x
+          let yy ← elabSDQLToLoad y
+          let loc ← mkSourceLoc stx
+          let arg := (← `(LoadTermLoc.mk (stx := $loc) (LoadTerm'.constRecord [("_1", $xx), ("_2", $yy)])))
+          wrapLoadWithStx stx (← `(LoadTerm'.builtinStrStartsWith $arg))
+      | `(sdql| StrContains($x:sdql, $y:sdql)) => do
+          let xx ← elabSDQLToLoad x
+          let yy ← elabSDQLToLoad y
+          let loc ← mkSourceLoc stx
+          let arg := (← `(LoadTermLoc.mk (stx := $loc) (LoadTerm'.constRecord [("_1", $xx), ("_2", $yy)])))
+          wrapLoadWithStx stx (← `(LoadTerm'.builtinStrContains $arg))
+      | `(sdql| FirstIndex($x:sdql, $y:sdql)) => do
+          let xx ← elabSDQLToLoad x
+          let yy ← elabSDQLToLoad y
+          let loc ← mkSourceLoc stx
+          let arg := (← `(LoadTermLoc.mk (stx := $loc) (LoadTerm'.constRecord [("_1", $xx), ("_2", $yy)])))
+          wrapLoadWithStx stx (← `(LoadTerm'.builtinFirstIndex $arg))
+      | `(sdql| LastIndex($x:sdql, $y:sdql)) => do
+          let xx ← elabSDQLToLoad x
+          let yy ← elabSDQLToLoad y
+          let loc ← mkSourceLoc stx
+          let arg := (← `(LoadTermLoc.mk (stx := $loc) (LoadTerm'.constRecord [("_1", $xx), ("_2", $yy)])))
+          wrapLoadWithStx stx (← `(LoadTerm'.builtinLastIndex $arg))
+      | `(sdql| SubString($x:sdql, $y:sdql, $z:sdql)) => do
+          let xx ← elabSDQLToLoad x
+          let yy ← elabSDQLToLoad y
+          let zz ← elabSDQLToLoad z
+          let loc ← mkSourceLoc stx
+          let arg := (← `(LoadTermLoc.mk (stx := $loc)
+            (LoadTerm'.constRecord [("_1", $xx), ("_2", $yy), ("_3", $zz)])))
+          wrapLoadWithStx stx (← `(LoadTerm'.builtinSubString $arg))
       | `(sdql| unique($e:sdql)) => elabSDQLToLoad e
       | `(sdql| date($n:num)) =>
           wrapLoadWithStx stx (← `(LoadTerm'.builtinDateLit $n))

@@ -30,6 +30,25 @@ Source: sdql-rs/progs/tpch/13.sdql
 -- Stub SProg to keep module usable
 unsafe def Q13_stub : SProg2 := [SDQLProg2 { int }| 0 ]
 
+unsafe def Q13 : SProg2 :=
+  [SDQLProg2 { { < _1 : int, _2 : int > -> bool } }|
+    let orders = load[<o_orderkey: @vec {int -> int}, o_custkey: @vec {int -> int}, o_orderstatus: @vec {int -> varchar(1)}, o_totalprice: @vec {int -> real}, o_orderdate: @vec {int -> date}, o_orderpriority: @vec {int -> varchar(15)}, o_clerk: @vec {int -> varchar(15)}, o_shippriority: @vec {int -> int}, o_comment: @vec {int -> varchar(79)}, size: int>]("datasets/tpch/orders.tbl") in
+    let customer = load[<c_custkey: @vec {int -> int}, c_name: @vec {int -> varchar(25)}, c_address: @vec {int -> varchar(40)}, c_nationkey: @vec {int -> int}, c_phone: @vec {int -> varchar(15)}, c_acctbal: @vec {int -> real}, c_mktsegment: @vec {int -> varchar(10)}, c_comment: @vec {int -> varchar(117)}, size: int>]("datasets/tpch/customer.tbl") in
+
+    let o_h =
+      sum(<i,_> <- range(orders.size))
+        let idx_special = FirstIndex(orders.o_comment(i), "special") in
+        if((idx_special == (0 - 1)) || (LastIndex(orders.o_comment(i), "requests") < (idx_special + 7))) then
+          { orders.o_custkey(i) -> 1 } in
+
+    let c_h =
+      sum(<i,_> <- range(customer.size))
+        { < _1 = if(dom(o_h)(customer.c_custkey(i))) then o_h(customer.c_custkey(i)) else 0 > -> < _2 = 1 > } in
+
+    sum(<k,v> <- c_h)
+      { unique(concat(k, v)) -> true }
+  ]
+
 -- Attempted port (placeholder; unsupported syntax likely)
 /-
 unsafe def Q13 : SProg :=

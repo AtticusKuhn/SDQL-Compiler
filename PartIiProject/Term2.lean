@@ -410,6 +410,11 @@ mutual
         | @SBuiltin.Sub st => Term2.builtin (BuiltinFn.Sub (ty st)) (trLoc2 a)
         | SBuiltin.Div => Term2.builtin BuiltinFn.Div (trLoc2 a)
         | SBuiltin.StrEndsWith => Term2.builtin BuiltinFn.StrEndsWith (trLoc2 a)
+        | SBuiltin.StrStartsWith => Term2.builtin BuiltinFn.StrStartsWith (trLoc2 a)
+        | SBuiltin.StrContains => Term2.builtin BuiltinFn.StrContains (trLoc2 a)
+        | SBuiltin.FirstIndex => Term2.builtin BuiltinFn.FirstIndex (trLoc2 a)
+        | SBuiltin.LastIndex => Term2.builtin BuiltinFn.LastIndex (trLoc2 a)
+        | SBuiltin.SubString => Term2.builtin BuiltinFn.SubString (trLoc2 a)
         | @SBuiltin.Dom dom range =>
             Term2.builtin (BuiltinFn.Dom (dom := ty dom) (range := ty range)) (trLoc2 a)
         | SBuiltin.Range => Term2.builtin BuiltinFn.Range (trLoc2 a)
