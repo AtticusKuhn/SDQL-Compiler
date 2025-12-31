@@ -58,6 +58,48 @@ Source: sdql-rs/progs/tpch/16.sdql
 -- Stub SProg to keep module usable
 unsafe def Q16_stub : SProg2 := [SDQLProg2 { int }| 0 ]
 
+unsafe def Q16 : SProg2 :=
+  [SDQLProg2 { { < _1 : varchar(10), _2 : varchar(25), _3 : int, _4 : int > -> bool } }|
+    let partsupp = load[<ps_partkey: @vec {int -> int}, ps_suppkey: @vec {int -> int}, ps_availqty: @vec {int -> real}, ps_supplycost: @vec {int -> real}, ps_comment: @vec {int -> varchar(199)}, size: int>]("datasets/tpch/partsupp.tbl") in
+    let part = load[<p_partkey: @vec {int -> int}, p_name: @vec {int -> varchar(55)}, p_mfgr: @vec {int -> varchar(25)}, p_brand: @vec {int -> varchar(10)}, p_type: @vec {int -> varchar(25)}, p_size: @vec {int -> int}, p_container: @vec {int -> varchar(10)}, p_retailprice: @vec {int -> real}, p_comment: @vec {int -> varchar(23)}, size: int>]("datasets/tpch/part.tbl") in
+    let supplier = load[<s_suppkey: @vec {int -> int}, s_name: @vec {int -> varchar(25)}, s_address: @vec {int -> varchar(40)}, s_nationkey: @vec {int -> int}, s_phone: @vec {int -> varchar(15)}, s_acctbal: @vec {int -> real}, s_comment: @vec {int -> varchar(101)}, size: int>]("datasets/tpch/supplier.tbl") in
+
+    let p_h =
+      sum(<i,_> <- range(part.size))
+        if(
+          (not (part.p_brand(i) == "Brand#45")) &&
+          (not StrStartsWith(part.p_type(i), "MEDIUM POLISHED")) &&
+          (
+            (part.p_size(i) == 49) ||
+            (part.p_size(i) == 14) ||
+            (part.p_size(i) == 23) ||
+            (part.p_size(i) == 45) ||
+            (part.p_size(i) == 19) ||
+            (part.p_size(i) == 3) ||
+            (part.p_size(i) == 36) ||
+            (part.p_size(i) == 9)
+          )
+        ) then
+          { unique(part.p_partkey(i)) -> < _1 = part.p_brand(i), _2 = part.p_type(i), _3 = part.p_size(i) > } in
+
+    let s_h =
+      sum(<i,_> <- range(supplier.size))
+        let idx_customer = FirstIndex(supplier.s_comment(i), "Customer") in
+        if((not (idx_customer == (0 - 1))) && (idx_customer + 8 <= FirstIndex(supplier.s_comment(i), "Complaints"))) then
+          { unique(supplier.s_suppkey(i)) -> true } in
+
+    let ps_h =
+      sum(<i,_> <- range(partsupp.size))
+        if((dom(p_h)(partsupp.ps_partkey(i))) && (not (dom(s_h)(partsupp.ps_suppkey(i))))) then
+          {
+            (p_h(partsupp.ps_partkey(i))) ->
+            { partsupp.ps_suppkey(i) -> 1 }
+          } in
+
+    sum(<k,v_hashmap> <- ps_h)
+      { unique(concat(k, < _4 = size(v_hashmap) >)) -> true }
+  ]
+
 -- Attempted port (placeholder; unsupported syntax likely)
 /-
 unsafe def Q16 : SProg :=

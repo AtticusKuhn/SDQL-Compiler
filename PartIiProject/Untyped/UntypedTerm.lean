@@ -39,6 +39,11 @@ mutual
     | builtinSub : {ctx : Nat} → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinDiv : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinStrEndsWith : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
+    | builtinStrStartsWith : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
+    | builtinStrContains : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
+    | builtinFirstIndex : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
+    | builtinLastIndex : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
+    | builtinSubString : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinDom : {ctx : Nat} → SurfaceTy → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinRange : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinSize : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx

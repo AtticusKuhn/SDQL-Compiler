@@ -108,6 +108,11 @@ unsafe def typeof2 (ctx : List SurfaceTy) (e : UntypedTermLoc ctx.length) : Exce
         | other =>
             .error (stx, s!"/ expects a pair of reals, got {tyToString other}")
     | .builtinStrEndsWith _ => pure .bool
+    | .builtinStrStartsWith _ => pure .bool
+    | .builtinStrContains _ => pure .bool
+    | .builtinFirstIndex _ => pure .int
+    | .builtinLastIndex _ => pure .int
+    | .builtinSubString _ => pure .string
     | .builtinDom _ _ arg => do
         let argTy ← typeof2 ctx arg
         match argTy with

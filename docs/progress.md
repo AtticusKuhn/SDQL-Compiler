@@ -6,11 +6,11 @@ What works:
 - Semimodule structure: `AddM` (with zeros) and `ScaleM`; includes `AddM.realA` and `ScaleM.realS`; tensor-shaped multiply via `ScaleM.mulDenote`.
 - Boolean addition now matches SDQL/reference semantics (OR), fixing set-style aggregations like TPCH Q04’s `l_h`.
 - Source locations: `SourceLocation` threaded through the pipeline (`LoadTermLoc`, `UntypedTermLoc`, `STermLoc2`, `TermLoc2`) for better debugging/error reporting.
-- Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`, and builtins (`And`, `Or`, `Eq`, `Leq`, `Sub`, `Div`, `StrEndsWith`, `Dom`, `Range`, `Size`, `DateLit`, `Year`, `Concat`).
+- Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`, and builtins (`And`, `Or`, `Eq`, `Leq`, `Sub`, `Div`, `StrEndsWith`, `StrStartsWith`, `StrContains`, `FirstIndex`, `LastIndex`, `SubString`, `Dom`, `Range`, `Size`, `DateLit`, `Year`, `Concat`).
 - Pretty-printing for records/dicts; numerous `#eval` demos.
 - SDQL DSL macros: `[SDQL| ... ]` elaborates to `LoadTermLoc`, supporting literals, records (positional and named), dict literals, lookup, `sum`, `let`, `if`, `not`, `+`, `-`, `*` (scalar inferred; optional `*{bool|int|real}`), `/`, boolean ops, and builtins (`dom`, `range`, `size`, `endsWith`, `date`, `concat`).
 - New program pipeline (DeBruijn): `[SDQLProg2 { T }| ... ]` elaborates to `LoadTermLoc` then runs `LoadTermLoc → UntypedTermLoc → STermLoc2` to produce an `SProg2` with an explicit typed context (`ctx : List SurfaceTy`) and `loadPaths`.
-- Rust codegen: renders expressions, let-blocks, conditionals, dict ops, lookup-with-default, and `sum` as a loop with an accumulator; open-term functions with typed parameters. Supports `real` zeros/addition and maps builtins to external helpers (`ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_lt`, `ext_sub`, `ext_div`, `ext_str_ends_with`, `ext_dom`, `ext_range`, `ext_size`).
+- Rust codegen: compiles into a DeBruijn-indexed Rust AST (`Expr : Nat → Type`, vars are `Fin ctx`) and renders expressions/blocks/loops; `sum` becomes a block with a mutable accumulator and a `for (k,v) in map.clone().into_iter()` loop. Runtime calls are represented by `RuntimeFn` (no stringly-typed function names).
 - Program-level Rust codegen: `renderRustProg2Shown` compiles a core `Prog2` to a standalone Rust program. Generated programs import `sdql_runtime.rs` (a standalone file with helpers, loaders, and printing) via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`. The runtime includes:
   - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`
   - Core types: `Real` (Ord-capable f64), `Date` (YYYYMMDD integer)
@@ -26,8 +26,16 @@ What works:
 - TPCH Q01: now tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q01_tiny`) using dynamic output comparison.
 - TPCH Q03: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q03_tiny`); relies on the `<` builtin (`Lt`/`ext_lt`) and `TPCH_DATASET_PATH` path rewriting for sources that use upstream `datasets/tpch/...` paths.
 - TPCH Q07: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q07_tiny`); relies on `year : date → int` (`year(e)` / `ext_year`).
+- TPCH Q09: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q09_tiny`); relies on `StrContains` (`StrContains(s, sub)` / `ext_str_contains`).
+- TPCH Q11: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q11_tiny`).
+- TPCH Q15: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q15_tiny`) on the tiny dataset (SF=0.01 still needs `promote[max_prod]` / max-semirings support).
 - TPCH Q17: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q17_tiny`); relies on real division `/ : real → real → real` (`ext_div`).
 - TPCH Q21: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q21_tiny`); relies on `size : {K -> V} → int` (`size(d)` / `ext_size`).
+- TPCH Q13: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q13_tiny`); relies on `FirstIndex`/`LastIndex`.
+- TPCH Q14: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q14_tiny`); relies on `StrStartsWith`.
+- TPCH Q16: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q16_tiny`); relies on `StrStartsWith` and `FirstIndex`.
+- TPCH Q20: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q20_tiny`); relies on `StrStartsWith`.
+- TPCH Q22: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q22_tiny`); relies on `StrStartsWith` and `SubString`.
 - Date type: added `Ty.date` primitive with `SDQLDate` wrapper (YYYYMMDD integer), `DateLit` builtin constructor, and `Leq` comparison. Rust codegen uses a simple `Date` struct.
 - Real number literals: added `constReal` for floating-point constants in the DSL.
 - Subtraction: added `Sub` builtin for arithmetic subtraction on int/real types.
@@ -54,5 +62,6 @@ Known issues / caveats:
 - `lookup` returns additive identity on misses; sparse representation may elide zero-valued entries.
 - Codegen depends on helpers/traits included in generated files; multiplication is not yet wired end-to-end for programs (helpers exist for addition/tuples, and stubs for loaders).
 - Rust printing for tuples (records) is implemented for arities up to 5; extend as needed.
+- Rust loop codegen clones maps before iterating (`.clone().into_iter()`) to avoid moving shared intermediates.
 - `nix build` may fail to resolve newly-added Lean modules unless the lean4‑nix manifest mapping is updated; `lake build` remains authoritative and succeeds.
 - The DeBruijn pipeline is the only supported term/program representation (older PHOAS layers have been removed).

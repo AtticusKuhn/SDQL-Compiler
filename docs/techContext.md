@@ -60,7 +60,7 @@ Notes/constraints:
 
 - Boolean addition uses OR (matching SDQL); boolean scaling remains AND.
 - Codegen uses placeholder helpers (`sdql_mul`, `dict_add`, `tuple_add`). Execution path for tests relies on embedded runtime shims (`map_insert`, `lookup_or_default`, `SDQLShow`) in the generated program.
-- Rust iteration uses `.into_iter()` in the printed `for` loops to match ownership in helpers.
+- Rust iteration uses `.clone().into_iter()` in printed `for` loops to avoid moving maps that are reused later.
 - Kinds and scalar promotion are not modeled yet; scalars implemented include `bool`, `int`, and now `real` in the core.
 - Surface multiplication uses `stensor` and casts via `ty_stensor_eq2`/`tyFields_map_stensor2` during surface→core lowering; these are currently `unsafe` (termination not proven).
 - Nix caveat: adding new modules (like `PartIiProject/SyntaxSDQL.lean`) can require the flake’s lean4‑nix manifest mapping to include them. Lake builds work; if `nix build` reports a missing module attribute, update manifests/lock or bump to the matching lean manifest (v4.24).

@@ -15,7 +15,7 @@ Architecture overview:
 - Terms:
   - Core (DeBruijn): `TermLoc2`/`Term2` in `PartIiProject/Term2.lean`, indexed by `ctx : List Ty` and using `Mem ty ctx` for variables; includes records/dicts, `not`, `if`, `let`, `add`, `mul`, `sum`, `lookup`, and positional record projection `proj`.
   - Surface (DeBruijn): `STermLoc2`/`STerm2` in `PartIiProject/SurfaceCore2.lean`, with named record projection via `HasField`.
-  - Builtins: `BuiltinFn` (core) and `SBuiltin` (surface) cover `And`, `Or`, `Eq`, `Leq`, `Sub`, `Div`, `StrEndsWith`, `Dom`, `Range`, `Size`, `DateLit`, `Year`, and `Concat`.
+  - Builtins: `BuiltinFn` (core) and `SBuiltin` (surface) cover `And`, `Or`, `Eq`, `Leq`, `Sub`, `Div`, `StrEndsWith`, `StrStartsWith`, `StrContains`, `FirstIndex`, `LastIndex`, `SubString`, `Dom`, `Range`, `Size`, `DateLit`, `Year`, and `Concat`.
 - Utilities:
   - `HList`: heterogeneous lists with `hmap`, `hmap2`, `dmap` helpers.
   - `Dict`: wrapper with `empty/insert/find?/mapValues` and `Ord` plumbed via a stored comparator.
@@ -68,12 +68,12 @@ Testing infrastructure:
   - Standalone file imported via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`
   - Core types: `Real` (Ord-capable f64 wrapper), `Date` (YYYYMMDD integer)
   - Semimodule trait: `SdqlAdd` with implementations for bool (OR), i64, Real, Date, String, BTreeMap, and tuples up to arity 8
-  - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`
-  - Extension functions: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_lt`, `ext_sub`, `ext_div`, `ext_str_ends_with`, `ext_dom`, `ext_range`, `ext_size`, `ext_year`
+  - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5` (record/tuple addition via `SdqlAdd`)
+  - Extension functions: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_lt`, `ext_sub`, `ext_div`, `ext_str_ends_with`, `ext_str_starts_with`, `ext_str_contains`, `ext_first_index`, `ext_last_index`, `ext_sub_string`, `ext_dom`, `ext_range`, `ext_size`, `ext_year`
   - TBL loaders: `FromTblField` trait for type-directed parsing (i64, String, Real, bool, Date), `build_col<T>` for extracting typed columns, `load_tbl` for parsing pipe-delimited TBL files
   - TPCH dataset path override: `load_tbl` rewrites paths under `datasets/tpch/` using `TPCH_DATASET_PATH` (e.g. pointing to `datasets/tpch-tiny`) so SDQL sources can keep upstream paths while tests swap datasets.
   - Printing: `SDQLShow` trait for ints, bools, strings (quoted), tuples (up to arity 8), and `BTreeMap`
-  - The Rust AST printer emits `map_insert(...)` and iterates maps with `.into_iter()` to match the runtime helpers
+  - The Rust AST printer emits `map_insert(...)` and iterates maps with `.clone().into_iter()` to avoid moving maps that are reused later
   - Table loading: `genTableLoader` generates inline loader code for each table parameter, using `load_tbl` and `build_col` with column indices derived from the table schema type
   - Test runner copies `sdql_runtime.rs` to the output directory (`.sdql-test-out/`) before compiling
 
@@ -84,12 +84,17 @@ Code generation integration:
 
 Code generation:
 
-- `PartIiProject/Rust.lean`: a tiny Rust-like AST (`Expr`, `Stmt`, `Ty`) and pretty-printer.
+- `PartIiProject/Rust.lean`: a tiny Rust-like AST (`Expr`, `Stmt`, `Ty`) with DeBruijn indexing:
+  - `Expr : (ctx : Nat) → Type` and `Stmt : (ctxIn ctxOut : Nat) → Type`
+  - variables are `Fin ctx` (no stringly-typed variable names)
+  - block sequencing uses `StmtSeq` to track context growth via `letDecl`
+  - runtime calls go through `RuntimeFn` (no stringly-typed function names)
+  - pretty-printer takes an initial `NameEnv` for free vars and generates fresh binder names for `letDecl` / `forKV`
 - `PartIiProject/CodegenRust.lean`: compiles core terms/programs to this AST.
   - Maps basic ops (`+`, `|` for bool OR, `not`, `if`, `let`).
-  - `lookup` compiles to `lookup_or_default(m,k,zero)`; `sum` becomes a block with an accumulator and `for (k,v) in map.iter()` loop.
+  - `lookup` compiles to `lookup_or_default(m,k,zero)`; `sum` becomes a block with an accumulator and a `for (k,v) in map.clone().into_iter()` loop.
   - `mul` emits a placeholder call `sdql_mul(e1, e2)`; record/dict addition use helper calls `tuple_add` and `dict_add`.
-  - Builtins compile to external helpers: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_sub`, `ext_str_ends_with`, `ext_dom`, `ext_range`, `ext_size`, plus record concat support.
+  - Builtins compile to external helpers: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_sub`, `ext_div`, `ext_str_ends_with`, `ext_str_starts_with`, `ext_str_contains`, `ext_first_index`, `ext_last_index`, `ext_sub_string`, `ext_dom`, `ext_range`, `ext_size`, `ext_year`, plus record concat support.
   - Program support: `renderRustProg2Shown` renders a complete `main` from a `Prog2`, including table loaders for `loadPaths` and optional `SourceLocation` comments.
 
 Notable patterns:

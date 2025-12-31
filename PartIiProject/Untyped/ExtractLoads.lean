@@ -54,6 +54,11 @@ where
       | .builtinSub _ arg => go arg acc
       | .builtinDiv arg => go arg acc
       | .builtinStrEndsWith arg => go arg acc
+      | .builtinStrStartsWith arg => go arg acc
+      | .builtinStrContains arg => go arg acc
+      | .builtinFirstIndex arg => go arg acc
+      | .builtinLastIndex arg => go arg acc
+      | .builtinSubString arg => go arg acc
       | .builtinDom _ _ arg => go arg acc
       | .builtinRange arg => go arg acc
       | .builtinSize arg => go arg acc
@@ -198,6 +203,11 @@ where
     | .builtinSub t arg => return .builtinSub t (← transform depth pathToIndex arg)
     | .builtinDiv arg => return .builtinDiv (← transform depth pathToIndex arg)
     | .builtinStrEndsWith arg => return .builtinStrEndsWith (← transform depth pathToIndex arg)
+    | .builtinStrStartsWith arg => return .builtinStrStartsWith (← transform depth pathToIndex arg)
+    | .builtinStrContains arg => return .builtinStrContains (← transform depth pathToIndex arg)
+    | .builtinFirstIndex arg => return .builtinFirstIndex (← transform depth pathToIndex arg)
+    | .builtinLastIndex arg => return .builtinLastIndex (← transform depth pathToIndex arg)
+    | .builtinSubString arg => return .builtinSubString (← transform depth pathToIndex arg)
     | .builtinDom dom range arg => return .builtinDom dom range (← transform depth pathToIndex arg)
     | .builtinRange arg => return .builtinRange (← transform depth pathToIndex arg)
     | .builtinSize arg => return .builtinSize (← transform depth pathToIndex arg)

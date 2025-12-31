@@ -328,6 +328,36 @@ unsafe def infer2 (ctx : List SurfaceTy)
         STermLoc2.mk stx (STerm2.builtin SBuiltin.StrEndsWith argTerm)
       checkTyEq2 stx .bool expectedTy builtinTerm
 
+  | .builtinStrStartsWith arg => do
+      let argTerm ← infer2 ctx (.record [("_1", .string), ("_2", .string)]) arg
+      let builtinTerm : STermLoc2 ctx .bool :=
+        STermLoc2.mk stx (STerm2.builtin SBuiltin.StrStartsWith argTerm)
+      checkTyEq2 stx .bool expectedTy builtinTerm
+
+  | .builtinStrContains arg => do
+      let argTerm ← infer2 ctx (.record [("_1", .string), ("_2", .string)]) arg
+      let builtinTerm : STermLoc2 ctx .bool :=
+        STermLoc2.mk stx (STerm2.builtin SBuiltin.StrContains argTerm)
+      checkTyEq2 stx .bool expectedTy builtinTerm
+
+  | .builtinFirstIndex arg => do
+      let argTerm ← infer2 ctx (.record [("_1", .string), ("_2", .string)]) arg
+      let builtinTerm : STermLoc2 ctx .int :=
+        STermLoc2.mk stx (STerm2.builtin SBuiltin.FirstIndex argTerm)
+      checkTyEq2 stx .int expectedTy builtinTerm
+
+  | .builtinLastIndex arg => do
+      let argTerm ← infer2 ctx (.record [("_1", .string), ("_2", .string)]) arg
+      let builtinTerm : STermLoc2 ctx .int :=
+        STermLoc2.mk stx (STerm2.builtin SBuiltin.LastIndex argTerm)
+      checkTyEq2 stx .int expectedTy builtinTerm
+
+  | .builtinSubString arg => do
+      let argTerm ← infer2 ctx (.record [("_1", .string), ("_2", .int), ("_3", .int)]) arg
+      let builtinTerm : STermLoc2 ctx .string :=
+        STermLoc2.mk stx (STerm2.builtin SBuiltin.SubString argTerm)
+      checkTyEq2 stx .string expectedTy builtinTerm
+
   | .builtinDom _ _ arg => do
       -- First infer the type of the argument to get actual dom/range
       let argTy ← typeof2 ctx arg

@@ -61,6 +61,56 @@ Source: sdql-rs/progs/tpch/22.sdql
 -- Stub SProg to keep module usable
 unsafe def Q22_stub : SProg2 := [SDQLProg2 { int }| 0 ]
 
+unsafe def Q22 : SProg2 :=
+  [SDQLProg2 { { < _1 : varchar(2), _2 : int, _3 : real > -> bool } }|
+    let customer = load[<c_custkey: @vec {int -> int}, c_name: @vec {int -> varchar(25)}, c_address: @vec {int -> varchar(40)}, c_nationkey: @vec {int -> int}, c_phone: @vec {int -> varchar(15)}, c_acctbal: @vec {int -> real}, c_mktsegment: @vec {int -> varchar(10)}, c_comment: @vec {int -> varchar(117)}, size: int>]("datasets/tpch/customer.tbl") in
+    let orders = load[<o_orderkey: @vec {int -> int}, o_custkey: @vec {int -> int}, o_orderstatus: @vec {int -> varchar(1)}, o_totalprice: @vec {int -> real}, o_orderdate: @vec {int -> date}, o_orderpriority: @vec {int -> varchar(15)}, o_clerk: @vec {int -> varchar(15)}, o_shippriority: @vec {int -> int}, o_comment: @vec {int -> varchar(79)}, size: int>]("datasets/tpch/orders.tbl") in
+
+    let o_h =
+      sum(<i,_> <- range(orders.size))
+        { orders.o_custkey(i) -> true } in
+
+    let fused =
+      sum(<i,_> <- range(customer.size))
+        let cond =
+          (0.0 < customer.c_acctbal(i)) &&
+          (
+            StrStartsWith(customer.c_phone(i), "13") ||
+            StrStartsWith(customer.c_phone(i), "31") ||
+            StrStartsWith(customer.c_phone(i), "23") ||
+            StrStartsWith(customer.c_phone(i), "29") ||
+            StrStartsWith(customer.c_phone(i), "30") ||
+            StrStartsWith(customer.c_phone(i), "18") ||
+            StrStartsWith(customer.c_phone(i), "17")
+          ) in
+        < total = if cond then customer.c_acctbal(i) else 0.0, count = if cond then 1.0 else 0.0 > in
+
+    let avg = fused.total / fused.count in
+
+    let res =
+      sum(<i,_> <- range(customer.size))
+        if(
+          (avg < customer.c_acctbal(i)) &&
+          (o_h(customer.c_custkey(i)) == false) &&
+          (
+            StrStartsWith(customer.c_phone(i), "13") ||
+            StrStartsWith(customer.c_phone(i), "31") ||
+            StrStartsWith(customer.c_phone(i), "23") ||
+            StrStartsWith(customer.c_phone(i), "29") ||
+            StrStartsWith(customer.c_phone(i), "30") ||
+            StrStartsWith(customer.c_phone(i), "18") ||
+            StrStartsWith(customer.c_phone(i), "17")
+          )
+        ) then
+          {
+            < _1 = SubString(customer.c_phone(i), 0, 2) > ->
+            < _2 = 1, _3 = customer.c_acctbal(i) >
+          } in
+
+    sum(<k,v> <- res)
+      { unique(concat(k,v)) -> true }
+  ]
+
 -- Attempted port (placeholder; unsupported syntax likely)
 /-
 unsafe def Q22 : SProg :=

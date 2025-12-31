@@ -40,6 +40,11 @@ mutual
     | builtinSub : SurfaceTy → LoadTermLoc rep → LoadTerm' rep
     | builtinDiv : LoadTermLoc rep → LoadTerm' rep
     | builtinStrEndsWith : LoadTermLoc rep → LoadTerm' rep
+    | builtinStrStartsWith : LoadTermLoc rep → LoadTerm' rep
+    | builtinStrContains : LoadTermLoc rep → LoadTerm' rep
+    | builtinFirstIndex : LoadTermLoc rep → LoadTerm' rep
+    | builtinLastIndex : LoadTermLoc rep → LoadTerm' rep
+    | builtinSubString : LoadTermLoc rep → LoadTerm' rep
     | builtinDom : SurfaceTy → SurfaceTy → LoadTermLoc rep → LoadTerm' rep  -- dom, range
     | builtinRange : LoadTermLoc rep → LoadTerm' rep
     | builtinSize : LoadTermLoc rep → LoadTerm' rep

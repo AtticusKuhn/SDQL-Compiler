@@ -217,28 +217,28 @@ pub fn dict_add<K: Ord + Clone, V: SdqlAdd + Clone>(a: BTreeMap<K, V>, b: BTreeM
 pub fn tuple_add0(a: (), _b: ()) -> () { a }
 
 /// Tuple/record addition for arity 1.
-pub fn tuple_add<T1: Add<Output = T1>>(a: (T1,), b: (T1,)) -> (T1,) {
-    (a.0 + b.0,)
+pub fn tuple_add<T1: SdqlAdd>(a: (T1,), b: (T1,)) -> (T1,) {
+    (a.0.sdql_add(&b.0),)
 }
 
 /// Tuple/record addition for arity 2.
-pub fn tuple_add2<T1: Add<Output = T1>, T2: Add<Output = T2>>(a: (T1, T2), b: (T1, T2)) -> (T1, T2) {
-    (a.0 + b.0, a.1 + b.1)
+pub fn tuple_add2<T1: SdqlAdd, T2: SdqlAdd>(a: (T1, T2), b: (T1, T2)) -> (T1, T2) {
+    (a.0.sdql_add(&b.0), a.1.sdql_add(&b.1))
 }
 
 /// Tuple/record addition for arity 3.
-pub fn tuple_add3<T1: Add<Output = T1>, T2: Add<Output = T2>, T3: Add<Output = T3>>(a: (T1, T2, T3), b: (T1, T2, T3)) -> (T1, T2, T3) {
-    (a.0 + b.0, a.1 + b.1, a.2 + b.2)
+pub fn tuple_add3<T1: SdqlAdd, T2: SdqlAdd, T3: SdqlAdd>(a: (T1, T2, T3), b: (T1, T2, T3)) -> (T1, T2, T3) {
+    (a.0.sdql_add(&b.0), a.1.sdql_add(&b.1), a.2.sdql_add(&b.2))
 }
 
 /// Tuple/record addition for arity 4.
-pub fn tuple_add4<T1: Add<Output = T1>, T2: Add<Output = T2>, T3: Add<Output = T3>, T4: Add<Output = T4>>(a: (T1, T2, T3, T4), b: (T1, T2, T3, T4)) -> (T1, T2, T3, T4) {
-    (a.0 + b.0, a.1 + b.1, a.2 + b.2, a.3 + b.3)
+pub fn tuple_add4<T1: SdqlAdd, T2: SdqlAdd, T3: SdqlAdd, T4: SdqlAdd>(a: (T1, T2, T3, T4), b: (T1, T2, T3, T4)) -> (T1, T2, T3, T4) {
+    (a.0.sdql_add(&b.0), a.1.sdql_add(&b.1), a.2.sdql_add(&b.2), a.3.sdql_add(&b.3))
 }
 
 /// Tuple/record addition for arity 5.
-pub fn tuple_add5<T1: Add<Output = T1>, T2: Add<Output = T2>, T3: Add<Output = T3>, T4: Add<Output = T4>, T5: Add<Output = T5>>(a: (T1, T2, T3, T4, T5), b: (T1, T2, T3, T4, T5)) -> (T1, T2, T3, T4, T5) {
-    (a.0 + b.0, a.1 + b.1, a.2 + b.2, a.3 + b.3, a.4 + b.4)
+pub fn tuple_add5<T1: SdqlAdd, T2: SdqlAdd, T3: SdqlAdd, T4: SdqlAdd, T5: SdqlAdd>(a: (T1, T2, T3, T4, T5), b: (T1, T2, T3, T4, T5)) -> (T1, T2, T3, T4, T5) {
+    (a.0.sdql_add(&b.0), a.1.sdql_add(&b.1), a.2.sdql_add(&b.2), a.3.sdql_add(&b.3), a.4.sdql_add(&b.4))
 }
 
 // ============================================================================
@@ -262,6 +262,42 @@ pub fn ext_div(args: (Real, Real)) -> Real { Real(args.0.0 / args.1.0) }
 pub fn ext_str_ends_with(args: (String, String)) -> bool {
     let (s, suf) = args;
     s.ends_with(&suf)
+}
+
+pub fn ext_str_starts_with(args: (String, String)) -> bool {
+    let (s, pre) = args;
+    s.starts_with(&pre)
+}
+
+pub fn ext_str_contains(args: (String, String)) -> bool {
+    let (s, sub) = args;
+    s.contains(&sub)
+}
+
+pub fn ext_first_index(args: (String, String)) -> i64 {
+    let (s, pat) = args;
+    s.find(&pat).map(|i| i as i64).unwrap_or(-1)
+}
+
+pub fn ext_last_index(args: (String, String)) -> i64 {
+    let (s, pat) = args;
+    s.rfind(&pat).map(|i| i as i64).unwrap_or(-1)
+}
+
+/// Return the substring `s[start..end]` (byte indices, end exclusive).
+///
+/// This matches the sdql-rs backend behavior for `ext(\`SubString\`, s, start, end)`.
+pub fn ext_sub_string(args: (String, i64, i64)) -> String {
+    let (s, start, end) = args;
+    let bytes = s.as_bytes();
+    let start: usize = if start <= 0 { 0 } else { (start as u64).min(usize::MAX as u64) as usize };
+    let end: usize = if end <= 0 { 0 } else { (end as u64).min(usize::MAX as u64) as usize };
+    let start = start.min(bytes.len());
+    let end = end.min(bytes.len());
+    if start >= end {
+        return String::new();
+    }
+    String::from_utf8_lossy(&bytes[start..end]).into_owned()
 }
 
 /// Extract the year from a YYYYMMDD-encoded SDQL Date.
