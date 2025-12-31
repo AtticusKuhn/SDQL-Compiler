@@ -37,6 +37,7 @@ mutual
     | builtinLeq : {ctx : Nat} → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinLt : {ctx : Nat} → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinSub : {ctx : Nat} → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
+    | builtinDiv : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinStrEndsWith : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinDom : {ctx : Nat} → SurfaceTy → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
     | builtinRange : {ctx : Nat} → UntypedTermLoc ctx → UntypedTerm' ctx

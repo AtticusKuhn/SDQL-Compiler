@@ -23,7 +23,9 @@ Latest changes:
 - Surface DSL: multiplication no longer requires a scalar annotation (`*{real}`); the scalar is inferred from operand types, with the annotation still available to disambiguate.
 - Added date builtin `year : date → int` with surface syntax `year(e)`; Rust codegen targets `ext_year`, implemented in `sdql_runtime.rs`.
 - Added dictionary builtin `size(d) : int`; Rust codegen targets `ext_size`, implemented in `sdql_runtime.rs`.
-- Enabled TPCH Q07 in `Tests/Cases.lean` (Q08/Q09 still blocked on real division and string substring ops).
+- Added real division builtin `/ : real → real → real`; Rust codegen targets `ext_div`, implemented in `sdql_runtime.rs`.
+- Enabled TPCH Q07 in `Tests/Cases.lean` (Q08/Q09 still blocked on string substring ops).
+- Enabled TPCH Q17 in `Tests/Cases.lean` (was blocked on real division).
 - Enabled TPCH Q21 in `Tests/Cases.lean` (was blocked on `size`).
 - Fixed TPCH Q04 on SF=0.01 by (1) making record-field sorting stable for duplicate field names like `_`, and (2) aligning boolean addition with SDQL/reference semantics (OR).
 

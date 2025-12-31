@@ -52,6 +52,7 @@ where
       | .builtinLeq _ arg => go arg acc
       | .builtinLt _ arg => go arg acc
       | .builtinSub _ arg => go arg acc
+      | .builtinDiv arg => go arg acc
       | .builtinStrEndsWith arg => go arg acc
       | .builtinDom _ _ arg => go arg acc
       | .builtinRange arg => go arg acc
@@ -195,6 +196,7 @@ where
     | .builtinLeq t arg => return .builtinLeq t (← transform depth pathToIndex arg)
     | .builtinLt t arg => return .builtinLt t (← transform depth pathToIndex arg)
     | .builtinSub t arg => return .builtinSub t (← transform depth pathToIndex arg)
+    | .builtinDiv arg => return .builtinDiv (← transform depth pathToIndex arg)
     | .builtinStrEndsWith arg => return .builtinStrEndsWith (← transform depth pathToIndex arg)
     | .builtinDom dom range arg => return .builtinDom dom range (← transform depth pathToIndex arg)
     | .builtinRange arg => return .builtinRange (← transform depth pathToIndex arg)

@@ -316,6 +316,12 @@ unsafe def infer2 (ctx : List SurfaceTy)
           checkTyEq2 stx t1 expectedTy builtinTerm
       | other => .error (stx, s!"- expects a pair record argument, got {tyToString other}")
 
+  | .builtinDiv arg => do
+      let argTerm ← infer2 ctx (.record [("_1", .real), ("_2", .real)]) arg
+      let builtinTerm : STermLoc2 ctx .real :=
+        STermLoc2.mk stx (STerm2.builtin SBuiltin.Div argTerm)
+      checkTyEq2 stx .real expectedTy builtinTerm
+
   | .builtinStrEndsWith arg => do
       let argTerm ← infer2 ctx (.record [("_1", .string), ("_2", .string)]) arg
       let builtinTerm : STermLoc2 ctx .bool :=

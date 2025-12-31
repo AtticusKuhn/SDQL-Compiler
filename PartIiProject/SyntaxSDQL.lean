@@ -64,6 +64,7 @@ syntax:55 sdql:55 "*" sdql:56 : sdql
 syntax:55 sdql:55 "*" "{" "int" "}" sdql:56 : sdql
 syntax:55 sdql:55 "*" "{" "bool" "}" sdql:56 : sdql
 syntax:55 sdql:55 "*" "{" "real" "}" sdql:56 : sdql
+syntax:55 sdql:55 "/" sdql:56 : sdql
 syntax:58 sdql:58 "&&" sdql:59 : sdql
 syntax:57 sdql:57 "||" sdql:58 : sdql
 syntax:59 sdql:59 "==" sdql:60 : sdql
@@ -337,6 +338,12 @@ mutual
           let yy ← elabSDQLToLoad y
           wrapLoadWithStx stx (← `(LoadTerm'.builtinSub SurfaceTy.int (LoadTermLoc.mk (stx := $(← mkSourceLoc stx))
             (LoadTerm'.constRecord [("_1", $xx), ("_2", $yy)]))))
+      | `(sdql| $x:sdql / $y:sdql) => do
+          let xx ← elabSDQLToLoad x
+          let yy ← elabSDQLToLoad y
+          let loc ← mkSourceLoc stx
+          let arg := (← `(LoadTermLoc.mk (stx := $loc) (LoadTerm'.constRecord [("_1", $xx), ("_2", $yy)])))
+          wrapLoadWithStx stx (← `(LoadTerm'.builtinDiv $arg))
       | `(sdql| $x:sdql * $y:sdql) => do
           let xx ← elabSDQLToLoad x
           let yy ← elabSDQLToLoad y

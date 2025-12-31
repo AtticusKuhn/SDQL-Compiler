@@ -101,6 +101,12 @@ unsafe def typeof2 (ctx : List SurfaceTy) (e : UntypedTermLoc ctx.length) : Exce
               .error (stx, s!"- expects both operands to have the same type, got {tyToString t1} and {tyToString t2}")
         | other =>
             .error (stx, s!"- expects a pair record argument, got {tyToString other}")
+    | .builtinDiv arg => do
+        let argTy ← typeof2 ctx arg
+        match argTy with
+        | .record [("_1", .real), ("_2", .real)] => pure .real
+        | other =>
+            .error (stx, s!"/ expects a pair of reals, got {tyToString other}")
     | .builtinStrEndsWith _ => pure .bool
     | .builtinDom _ _ arg => do
         let argTy ← typeof2 ctx arg

@@ -257,6 +257,8 @@ pub fn ext_lt<T: PartialOrd>(args: (T, T)) -> bool { args.0 < args.1 }
 
 pub fn ext_sub<T: std::ops::Sub<Output = T>>(args: (T, T)) -> T { args.0 - args.1 }
 
+pub fn ext_div(args: (Real, Real)) -> Real { Real(args.0.0 / args.1.0) }
+
 pub fn ext_str_ends_with(args: (String, String)) -> bool {
     let (s, suf) = args;
     s.ends_with(&suf)
