@@ -32,6 +32,8 @@ mutual
     | add : {ctx : List SurfaceTy} → {ty : SurfaceTy} → (a : SAdd ty) → STermLoc2 ctx ty → STermLoc2 ctx ty → STerm2 ctx ty
     | mul : {ctx : List SurfaceTy} → {sc t1 t2 : SurfaceTy} → (s1 : SScale sc t1) → (s2 : SScale sc t2)
         → STermLoc2 ctx t1 → STermLoc2 ctx t2 → STerm2 ctx (stensor t1 t2)
+    | promote : {ctx : List SurfaceTy} → {fromType toType : SurfaceTy}
+        → STermLoc2 ctx fromType → STerm2 ctx toType
     | emptyDict : {ctx : List SurfaceTy} → {domain ran : SurfaceTy} → STerm2 ctx (SurfaceTy.dict domain ran)
     | dictInsert : {ctx : List SurfaceTy} → {dom range : SurfaceTy} → STermLoc2 ctx dom → STermLoc2 ctx range → STermLoc2 ctx (SurfaceTy.dict dom range) → STerm2 ctx (SurfaceTy.dict dom range)
     | lookup : {ctx : List SurfaceTy} → {dom range : SurfaceTy} → (aRange : SAdd range) → STermLoc2 ctx (SurfaceTy.dict dom range) → STermLoc2 ctx dom → STerm2 ctx range

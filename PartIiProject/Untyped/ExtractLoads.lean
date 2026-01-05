@@ -38,6 +38,7 @@ where
           go (body ()) boundLoads  -- dummy Nat for PHOAS traversal
       | .add e1 e2 => go e2 (go e1 acc)
       | .mul _ e1 e2 => go e2 (go e1 acc)
+      | .promote _ e => go e acc
       | .projByName _ e => go e acc
       | .lookup d k => go k (go d acc)
       | .sum d body =>
@@ -123,10 +124,7 @@ where
       .error (stx, s!"internal error: index {i} out of bounds for context size {n}")
 
   levelToIndex (stx : SourceLocation) (currentDepth : Nat) (level : Nat) : Except TypeError (Fin currentDepth) := do
-    if level < currentDepth then
       mkFin stx currentDepth (currentDepth - 1 - level)
-    else
-      .error (stx, s!"internal error: ill-scoped PHOAS variable (level={level}, depth={currentDepth})")
 
   -- Transform LoadTermLoc (PHOAS) to UntypedTermLoc (DeBruijn)
   transform (depth : Nat) (pathToIndex : List (String × Nat))
@@ -172,6 +170,8 @@ where
         return .add (← transform depth pathToIndex e1) (← transform depth pathToIndex e2)
     | .mul sc e1 e2 =>
         return .mul sc (← transform depth pathToIndex e1) (← transform depth pathToIndex e2)
+    | .promote toTy e =>
+        return .promote toTy (← transform depth pathToIndex e)
     | .projByName name e =>
         return .projByName name (← transform depth pathToIndex e)
     | .lookup d k =>

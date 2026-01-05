@@ -18,6 +18,7 @@ inductive Ty : Type where
   | bool : Ty
   | i64 : Ty
   | real : Ty  -- SDQL real, maps to an Ord-capable f64 wrapper
+  | maxProduct : Ty  -- SDQL max-product semiring over reals
   | date : Ty  -- SDQL date, represented as YYYYMMDD integer
   | str : Ty
   | tuple : List Ty → Ty
@@ -33,6 +34,11 @@ inductive RuntimeFn : Type where
   | dictAdd : RuntimeFn
   | tupleAdd : (arity : Nat) → RuntimeFn
   | sdqlMul : RuntimeFn
+  | maxProductAdd : RuntimeFn
+  | promoteMaxProduct : RuntimeFn
+  | demoteMaxProduct : RuntimeFn
+  | promoteIntToReal : RuntimeFn
+  | promoteIntToMaxProduct : RuntimeFn
   | extAnd : RuntimeFn
   | extOr : RuntimeFn
   | extEq : RuntimeFn
@@ -64,6 +70,11 @@ def runtimeFnName : RuntimeFn → String
       | 4 => "tuple_add4"
       | _ => "tuple_add5"
   | .sdqlMul => "sdql_mul"
+  | .maxProductAdd => "max_product_add"
+  | .promoteMaxProduct => "promote_max_product"
+  | .demoteMaxProduct => "demote_max_product"
+  | .promoteIntToReal => "promote_int_to_real"
+  | .promoteIntToMaxProduct => "promote_int_to_max_product"
   | .extAnd => "ext_and"
   | .extOr => "ext_or"
   | .extEq => "ext_eq"
@@ -237,6 +248,7 @@ partial def showTy : Ty → String
   | .bool => "bool"
   | .i64 => "i64"
   | .real => "Real"  -- Uses our Ord-capable f64 wrapper
+  | .maxProduct => "MaxProduct"
   | .date => "Date"  -- SDQL Date wrapper
   | .str => "String"
   | .tuple ts =>

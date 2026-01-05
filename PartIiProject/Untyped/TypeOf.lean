@@ -54,6 +54,7 @@ unsafe def typeof2 (ctx : List SurfaceTy) (e : UntypedTermLoc ctx.length) : Exce
         let t1 ← typeof2 ctx e1
         let t2 ← typeof2 ctx e2
         pure (stensor t1 t2)
+    | .promote toTy _ => pure toTy
     | .projByName name inner => do
         let ty ← typeof2 ctx inner
         match ty with

@@ -12,6 +12,7 @@ open Rust
 def coreTyToRustTy : _root_.Ty → Rust.Ty
   | .bool => .bool
   | .real => .real
+  | .maxProduct => .maxProduct
   | .date => .date
   | .int => .i64
   | .string => .str
@@ -28,6 +29,8 @@ mutual
   def zeroOfAddMLoc {ctx : Nat} : {t : _root_.Ty} → _root_.AddM t → Rust.ExprLoc ctx
     | .bool, .boolA => ExprLoc.withUnknownLoc (.litBool false)
     | .real, .realA => ExprLoc.withUnknownLoc (.litReal 0.0)
+    | .maxProduct, .maxProductA =>
+        ExprLoc.withUnknownLoc (.callRuntimeFn .promoteMaxProduct (Rust.Exprs.singleton (ExprLoc.withUnknownLoc (.litReal 0.0))))
     | .date, .dateA => ExprLoc.withUnknownLoc (.litDate 10101)  -- dummy date (0001-01-01)
     | .int, .intA => ExprLoc.withUnknownLoc (.litInt 0)
     | .string, .stringA => ExprLoc.withUnknownLoc (.litString "")
@@ -43,6 +46,7 @@ def compileAdd {ctx : Nat} {ty : _root_.Ty} (a : _root_.AddM ty) (lhs rhs : Rust
   match a with
   | .boolA => .binop .bitOr lhs rhs
   | .realA => .binop .add lhs rhs
+  | .maxProductA => .callRuntimeFn .maxProductAdd (Rust.Exprs.ofList [lhs, rhs])
   | .dateA => rhs.expr  -- date "addition" just takes rhs (overwrite)
   | .intA => .binop .add lhs rhs
   | .stringA => .binop .add lhs rhs
@@ -140,12 +144,21 @@ mutual
         let rhs := compileLoc2 e2
         match s1, s2 with
         | .realS, .realS => .binop .mul lhs rhs
+        | .maxProductS, .maxProductS => .binop .mul lhs rhs
         | .intS, .intS => .binop .mul lhs rhs
         | .boolS, .boolS =>
             let arg := ExprLoc.withUnknownLoc (.tuple (Rust.Exprs.ofList [lhs, rhs]))
             .callRuntimeFn .extAnd (Rust.Exprs.singleton arg)
         | _, _ =>
             .callRuntimeFn .sdqlMul (Rust.Exprs.ofList [lhs, rhs])
+    | @Term2.promote _ fromType toType e =>
+        let inner := compileLoc2 e
+        match fromType, toType with
+        | .int, .real => .callRuntimeFn .promoteIntToReal (Rust.Exprs.singleton inner)
+        | .int, .maxProduct => .callRuntimeFn .promoteIntToMaxProduct (Rust.Exprs.singleton inner)
+        | .real, .maxProduct => .callRuntimeFn .promoteMaxProduct (Rust.Exprs.singleton inner)
+        | .maxProduct, .real => .callRuntimeFn .demoteMaxProduct (Rust.Exprs.singleton inner)
+        | _, _ => inner.expr
     | .lookup aRange d k =>
         .lookupOrDefault (compileLoc2 d) (compileLoc2 k) (zeroOfAddMLoc (ctx := ctx.length) aRange)
     | @Term2.sum _ dom range _ a d body =>

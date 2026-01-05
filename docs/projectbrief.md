@@ -19,4 +19,4 @@ Primary objectives:
 Out of scope for now:
 
 - Full kinding system and cross-semirings promotion proofs.
-- Verified optimization passes and end-to-end performance tooling.
+- Verified optimization passes and more sophisticated performance tooling (multi-run statistics, profiling).

@@ -28,7 +28,7 @@ What works:
 - TPCH Q07: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q07_tiny`); relies on `year : date → int` (`year(e)` / `ext_year`).
 - TPCH Q09: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q09_tiny`); relies on `StrContains` (`StrContains(s, sub)` / `ext_str_contains`).
 - TPCH Q11: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q11_tiny`).
-- TPCH Q15: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q15_tiny`) on the tiny dataset (SF=0.01 still needs `promote[max_prod]` / max-semirings support).
+- TPCH Q15: compiles and is tested against the sdql-rs reference implementation on the SF=0.01 dataset (`tpch_q15_sf001`), using `promote[max_prod](...)` and the `max_prod` semiring.
 - TPCH Q17: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q17_tiny`); relies on real division `/ : real → real → real` (`ext_div`).
 - TPCH Q21: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q21_tiny`); relies on `size : {K -> V} → int` (`size(d)` / `ext_size`).
 - TPCH Q13: compiles and is tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q13_tiny`); relies on `FirstIndex`/`LastIndex`.
@@ -41,13 +41,14 @@ What works:
 - Subtraction: added `Sub` builtin for arithmetic subtraction on int/real types.
 - CI: GitHub Actions workflow builds the project and runs the test executable on pushes/PRs.
 - `nix run` support: wrapper script ensures datasets are present and runs tests with proper environment setup; reference binaries are built on-demand by the Lean test runner when missing.
+- Performance comparison: `Performance.lean` executable `performanceComparsion` benchmarks runtime (ms) of `sdql-rs` reference binaries vs Lean-generated Rust binaries.
 - Surface/core terms are DeBruijn-indexed: surface terms in `SurfaceCore2.lean`, core terms in `Term2.lean`, with lowering in `ToCore2`.
 
 What's left to build:
 
 - **TPCH benchmark completion**:
   - Q03-Q22: not yet implemented; will require additional builtins and potentially more complex aggregation patterns.
-- Promotion and additional scalar semirings beyond `bool`/`int`.
+- Additional scalar semirings and broader promotion rules beyond `max_prod` (promotion infrastructure exists).
 - Replace unsafe `stensor` and rewrite lemmas with total, proven definitions (or otherwise structure recursion so Lean accepts termination), and clean up any remaining `unsafe` markers.
 - Surface sugar for sets, arrays, `dom`, `range`.
 - Program EDSL polish: configurable load-variable assignment policy (first occurrence vs alphabetical), duplicate-path type consistency checks, and integration hooks for codegen inputs.

@@ -67,6 +67,17 @@ impl Mul for Real {
     fn mul(self, rhs: Self) -> Self { Real(self.0 * rhs.0) }
 }
 
+/// SDQL max-product semiring scalar type.
+///
+/// Underlying carrier is `Real`, but addition is `max` (not `+`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MaxProduct(pub Real);
+
+impl Mul for MaxProduct {
+    type Output = Self;
+    fn mul(self, rhs: Self) -> Self { MaxProduct(self.0 * rhs.0) }
+}
+
 /// SDQL Date type: stored as YYYYMMDD integer for ordering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Hash)]
 pub struct Date(pub i64);
@@ -111,6 +122,10 @@ impl SdqlAdd for i64 {
 
 impl SdqlAdd for Real {
     fn sdql_add(&self, other: &Self) -> Self { Real(self.0 + other.0) }
+}
+
+impl SdqlAdd for MaxProduct {
+    fn sdql_add(&self, other: &Self) -> Self { std::cmp::max(*self, *other) }
 }
 
 impl SdqlAdd for Date {
@@ -240,6 +255,20 @@ pub fn tuple_add4<T1: SdqlAdd, T2: SdqlAdd, T3: SdqlAdd, T4: SdqlAdd>(a: (T1, T2
 pub fn tuple_add5<T1: SdqlAdd, T2: SdqlAdd, T3: SdqlAdd, T4: SdqlAdd, T5: SdqlAdd>(a: (T1, T2, T3, T4, T5), b: (T1, T2, T3, T4, T5)) -> (T1, T2, T3, T4, T5) {
     (a.0.sdql_add(&b.0), a.1.sdql_add(&b.1), a.2.sdql_add(&b.2), a.3.sdql_add(&b.3), a.4.sdql_add(&b.4))
 }
+
+// ============================================================================
+// Scalar Promotion + MaxProduct helpers
+// ============================================================================
+
+pub fn promote_max_product(x: Real) -> MaxProduct { MaxProduct(x) }
+
+pub fn demote_max_product(x: MaxProduct) -> Real { x.0 }
+
+pub fn promote_int_to_real(x: i64) -> Real { Real::new(x as f64) }
+
+pub fn promote_int_to_max_product(x: i64) -> MaxProduct { MaxProduct(promote_int_to_real(x)) }
+
+pub fn max_product_add(a: MaxProduct, b: MaxProduct) -> MaxProduct { std::cmp::max(a, b) }
 
 // ============================================================================
 // Extension Functions (Builtins)
@@ -433,6 +462,10 @@ impl FromTblField for Real {
     fn from_tbl_field(s: &str) -> Self { Real::new(s.parse().unwrap_or(0.0)) }
 }
 
+impl FromTblField for MaxProduct {
+    fn from_tbl_field(s: &str) -> Self { MaxProduct(Real::from_tbl_field(s)) }
+}
+
 impl FromTblField for bool {
     fn from_tbl_field(s: &str) -> Self { s == "true" || s == "1" }
 }
@@ -520,6 +553,10 @@ impl SDQLShow for i64 {
 
 impl SDQLShow for Real {
     fn show(&self) -> String { self.0.to_string() }
+}
+
+impl SDQLShow for MaxProduct {
+    fn show(&self) -> String { self.0.show() }
 }
 
 impl SDQLShow for Date {

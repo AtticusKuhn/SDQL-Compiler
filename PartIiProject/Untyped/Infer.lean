@@ -39,6 +39,9 @@ mutual
     | .bool, .boolA => STermLoc2.mk stx (STerm2.constBool false)
     | .int, .intA => STermLoc2.mk stx (STerm2.constInt 0)
     | .real, .realA => STermLoc2.mk stx (STerm2.constReal 0.0)
+    | .maxProduct, .maxProductA =>
+        let zReal : STermLoc2 ctx .real := STermLoc2.mk stx (STerm2.constReal 0.0)
+        STermLoc2.mk stx (STerm2.promote (fromType := .real) (toType := .maxProduct) zReal)
     | .date, .dateA =>
         let emptyRec : STermLoc2 ctx (.record []) :=
           STermLoc2.mk stx (STerm2.constRecord STermFields2.nil)
@@ -57,7 +60,7 @@ mutual
 end
 
 private def mulScalarCandidates : List SurfaceTy :=
-  [SurfaceTy.bool, SurfaceTy.int, SurfaceTy.real]
+  [SurfaceTy.bool, SurfaceTy.int, SurfaceTy.real, SurfaceTy.maxProduct]
 
 private unsafe def showScalarCandidates (cs : List SurfaceTy) : String :=
   String.intercalate ", " (cs.map tyToString)
@@ -73,11 +76,22 @@ private unsafe def inferMulScalar (stx : SourceLocation) (t1 t2 : SurfaceTy) : E
   | [] =>
       .error (stx,
         s!"Cannot infer scalar for multiplication of {tyToString t1} and {tyToString t2}; annotate as " ++
-          "*{bool}, *{int}, or *{real}")
+          "*{bool}, *{int}, *{real}, or *{max_prod}")
   | _ =>
       .error (stx,
         s!"Ambiguous scalar for multiplication of {tyToString t1} and {tyToString t2}; candidates: [{showScalarCandidates ok}]. Annotate as " ++
-          "*{bool}, *{int}, or *{real} to disambiguate.")
+          "*{bool}, *{int}, *{real}, or *{max_prod} to disambiguate.")
+
+private unsafe def canPromote : SurfaceTy → SurfaceTy → Bool
+  | fromTy, toTy =>
+      if tyEq fromTy toTy then true
+      else
+        match fromTy, toTy with
+        | .int, .real => true
+        | .int, .maxProduct => true
+        | .real, .maxProduct => true
+        | .maxProduct, .real => true
+        | _, _ => false
 
 /-- Main type inference function for DeBruijn terms.
 
@@ -206,6 +220,16 @@ unsafe def infer2 (ctx : List SurfaceTy)
       let mulTerm : STermLoc2 ctx resultTy :=
         STermLoc2.mk stx (STerm2.mul s1 s2 term1 term2)
       checkTyEq2 stx resultTy expectedTy mulTerm
+
+  | .promote toTy inner => do
+      let fromTy ← typeof2 ctx inner
+      if !canPromote fromTy toTy then
+        .error (stx, s!"Cannot promote {tyToString fromTy} to {tyToString toTy}")
+      else do
+        let innerTerm ← infer2 ctx fromTy inner
+        let promoted : STermLoc2 ctx toTy :=
+          STermLoc2.mk stx (STerm2.promote (fromType := fromTy) (toType := toTy) innerTerm)
+        checkTyEq2 stx toTy expectedTy promoted
 
   | .projByName name inner => do
       let innerTy ← typeof2 ctx inner

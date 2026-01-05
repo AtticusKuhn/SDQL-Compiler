@@ -28,6 +28,8 @@ mutual
     | add : LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
     /-- Multiplication. Optional scalar annotation `*{S}` may be provided to disambiguate. -/
     | mul : Option SurfaceTy → LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
+    /-- Scalar promotion: `promote[T](e)` changes the scalar type annotation. -/
+    | promote : SurfaceTy → LoadTermLoc rep → LoadTerm' rep
     | projByName : String → LoadTermLoc rep → LoadTerm' rep
     | lookup : LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
     | sum : LoadTermLoc rep → (rep → rep → LoadTermLoc rep) → LoadTerm' rep
