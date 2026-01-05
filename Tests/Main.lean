@@ -99,7 +99,8 @@ private unsafe def rustLitHList : {l : List Ty} → HList Ty.denote l → List S
 private unsafe def rustLit : {t : Ty} → t.denote → String
   | .int, n => toString n
   | .bool, b => if b then "true" else "false"
-  | .real, n => toString n
+  | .real, n => s!"Real::new({n})"
+  | .maxProduct, n => s!"promote_max_product(Real::new({n}))"
   | .date, d => s!"Date::new({d.yyyymmdd})"
   | .string, s => s!"String::from(\"{s}\")"
   | .record l, r =>

@@ -17,6 +17,7 @@ inductive SurfaceTy : Type where
   | bool : SurfaceTy
   | int : SurfaceTy
   | real : SurfaceTy
+  | maxProduct : SurfaceTy
   | date : SurfaceTy
   | string : SurfaceTy
   | dict : SurfaceTy → SurfaceTy → SurfaceTy
@@ -43,6 +44,7 @@ inductive SAdd : SurfaceTy → Type where
   | boolA   : SAdd .bool
   | intA    : SAdd .int
   | realA   : SAdd .real
+  | maxProductA : SAdd .maxProduct
   | dateA   : SAdd .date
   | stringA : SAdd .string
   | dictA   {k v : SurfaceTy} (av : SAdd v) : SAdd (.dict k v)
@@ -52,6 +54,7 @@ inductive SScale : SurfaceTy → SurfaceTy → Type where
   | boolS : SScale .bool .bool
   | intS : SScale .int .int
   | realS : SScale .real .real
+  | maxProductS : SScale .maxProduct .maxProduct
   | dictS {sc dom range : SurfaceTy} (sRange : SScale sc range) : SScale sc (.dict dom range)
   | recordS {sc : SurfaceTy} {σ : Schema}
       (fields : (p : String × SurfaceTy) → Mem p σ → SScale sc p.snd) :

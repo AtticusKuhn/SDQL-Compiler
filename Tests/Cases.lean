@@ -112,8 +112,6 @@ unsafe def tpchCases : List TestCase :=
       [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
   , TestCase.programRef "tpch_q14" TPCH.Q14 "sdql-rs/target/release/tpch_q14_tiny"
       [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
-  , TestCase.programRef "tpch_q15" TPCH.Q15 "sdql-rs/target/release/tpch_q15_tiny"
-      [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
   , TestCase.programRef "tpch_q16" TPCH.Q16 "sdql-rs/target/release/tpch_q16_tiny"
       [("TPCH_DATASET_PATH", "datasets/tpch-tiny")]
   , TestCase.programRef "tpch_q17" TPCH.Q17 "sdql-rs/target/release/tpch_q17_tiny"
@@ -171,6 +169,8 @@ unsafe def tpchCasesSF001 : List TestCase :=
       "sdql-rs/target/release/tpch_q13_tiny" sf001Env
   , TestCase.programRef "tpch_q14_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q14)
       "sdql-rs/target/release/tpch_q14_tiny" sf001Env
+  , TestCase.programRef "tpch_q15_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q15)
+      "sdql-rs/target/release/tpch_q15_tiny" sf001Env
   , TestCase.programRef "tpch_q16_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q16)
       "sdql-rs/target/release/tpch_q16_tiny" sf001Env
   , TestCase.programRef "tpch_q17_sf001" (rewriteTpchTinyLoadPathsToGeneric TPCH.Q17)

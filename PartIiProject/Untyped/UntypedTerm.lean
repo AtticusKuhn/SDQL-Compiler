@@ -28,6 +28,8 @@ mutual
     | add : {ctx : Nat} → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTerm' ctx
     /-- Multiplication. Optional scalar annotation `*{S}` may be provided to disambiguate. -/
     | mul : {ctx : Nat} → Option SurfaceTy → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTerm' ctx
+    /-- Scalar promotion: `promote[T](e)` changes the scalar type annotation. -/
+    | promote : {ctx : Nat} → SurfaceTy → UntypedTermLoc ctx → UntypedTerm' ctx
     | projByName : {ctx : Nat} → String → UntypedTermLoc ctx → UntypedTerm' ctx
     | lookup : {ctx : Nat} → UntypedTermLoc ctx → UntypedTermLoc ctx → UntypedTerm' ctx
     | sum : {ctx : Nat} → UntypedTermLoc ctx → (UntypedTermLoc (ctx + 2)) → UntypedTerm' ctx

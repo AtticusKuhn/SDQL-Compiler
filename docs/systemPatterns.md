@@ -4,14 +4,17 @@ Architecture overview:
 
 - Core types (`PartIiProject/Term.lean`):
   - `Ty`: `bool | int | real | date | string | record (List Ty) | dict Ty Ty`.
+  - `Ty.maxProduct`: scalar semiring over reals where addition is `max` (used via `promote[max_prod](...)`).
   - `Ty.denote`: maps to Lean types; `Dict` wraps `Std.TreeMap` for finite maps.
   - `tensor : Ty → Ty → Ty`: dictionary nests the right type; record maps fields; scalars act as left units.
 - Source locations:
   - `SourceLocation` (in `PartIiProject/Term.lean`) tracks byte offsets and a substring for better error reporting/debugging.
 - Semimodule structure:
   - `AddM t`: additive monoid witness for `t`. Boolean addition uses OR; integer uses `+`; dict and record are pointwise/fieldwise. `AddM.zero` gives additive identities and is used for lookup defaults and `sum` inits.
+  - `AddM.maxProductA`: uses `max` as addition (identity currently `0.0`).
 - Real scalars: `AddM.realA` (0.0, `+`) and `ScaleM.realS` (`*`).
 - `ScaleM sc t`: scalar action of `sc` on `t`. Booleans act via AND; integers via multiplication; extends through dict and record. Record scaling uses a typed list‑membership predicate `Mem` in `ScaleM.recordS` to select per‑field scaling evidence in a way that supports structural recursion and definitional equalities.
+  - `ScaleM.maxProductS`: multiplication for `maxProduct` scalars (uses `*`).
 - Terms:
   - Core (DeBruijn): `TermLoc2`/`Term2` in `PartIiProject/Term2.lean`, indexed by `ctx : List Ty` and using `Mem ty ctx` for variables; includes records/dicts, `not`, `if`, `let`, `add`, `mul`, `sum`, `lookup`, and positional record projection `proj`.
   - Surface (DeBruijn): `STermLoc2`/`STerm2` in `PartIiProject/SurfaceCore2.lean`, with named record projection via `HasField`.
@@ -43,6 +46,7 @@ Surface syntax (mini‑DSL):
   - Dicts: singleton `{ k -> v }` and multi‑entry literals. (Typed empty dict moved to the program DSL.)
   - Lookup: `d(k)`; `sum`: `sum( <k, v> in d ) body`.
   - Algebra: `e1 + e2`, `e1 * e2` (scalar inferred, with optional `*{bool|int|real}` for disambiguation); `if`, `not`, `let x = e1 in e2`.
+  - Scalar promotion: `promote[max_prod](e)`; multiplication can be annotated as `*{max_prod}`.
   - Boolean/builtin ops: `x && y`, `x || y`, `x == y`, `x <= y`, `x - y`, `dom(e)`, `range(e)`, `size(d)`, `endsWith(x,y)`, `date(n)`, `year(e)`, plus record `concat`.
 - Type elaboration: `elabTy` sorts record fields alphabetically for canonical type representation (stable for duplicate names like `_`). `elabTyPreserveOrder` preserves declaration order for load schemas, ensuring field positions match TBL column indices.
 - To build a typed program, use `[SDQLProg2 { T }| ... ]` (see `SyntaxSDQLProg.lean`) which runs the full pipeline to produce an `SProg2`.
@@ -81,6 +85,7 @@ Code generation integration:
 
 - `renderRustProg2Shown` emits a complete Rust `main` that prints the result via the `SDQLShow` trait.
 - Current tests avoid `sdql_mul` and complex tuple ops in Rust; those remain placeholders to expand later.
+  - Max-product support is implemented via a dedicated runtime scalar type `MaxProduct`, plus `max_product_add` and `promote_*` helpers.
 
 Code generation:
 
@@ -103,6 +108,7 @@ Notable patterns:
 - Addition and scaling are encoded as explicit evidence, guiding typing and compilation.
 - Lookups and sums rely on the additive identity of the result to stay total and align with sparse semantics.
 - Tests compare Rust program output against expected strings or a reference binary. Rust programs use `SDQLShow::show(&result)`.
+- Performance benchmarking uses `Performance.lean` to time direct execution of `sdql-rs` reference binaries vs Lean-generated Rust binaries, writing build artifacts to `.sdql-perf-out/`.
 
 Legacy/experiments:
 

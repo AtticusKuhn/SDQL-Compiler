@@ -20,3 +20,7 @@ name = "Tests"
 [[lean_exe]]
 name = "sdql-tests"
 root = "Tests.Main"
+
+[[lean_exe]]
+name = "performanceComparsion"
+root = "Performance"

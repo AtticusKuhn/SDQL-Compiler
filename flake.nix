@@ -49,6 +49,11 @@
             src = ./.;
           };
 
+          sdqlPerf = lake.mkPackage {
+            name = "performanceComparsion";
+            src = ./.;
+          };
+
           # Wrapper script that sets up datasets for tests and runs the Lean test runner.
           # TPCH reference binaries are built on-demand by `Tests/Main.lean`.
           sdqlTestsWithRef = pkgs.writeShellApplication {
@@ -71,6 +76,31 @@
 
               # Run tests from the current directory
               exec ${sdqlTests}/bin/sdql-tests "$@"
+            '';
+          };
+
+          performanceComparsion = pkgs.writeShellApplication {
+            name = "performanceComparsion";
+            runtimeInputs = [ rustToolchain ];
+            text = ''
+              set -euo pipefail
+
+              if [ ! -d "sdql-rs" ]; then
+                echo "Error: must be run from the project root directory (sdql-rs/ not found)" >&2
+                exit 1
+              fi
+
+              if [ ! -f "sdql_runtime.rs" ]; then
+                echo "Error: must be run from the project root directory (sdql_runtime.rs not found)" >&2
+                exit 1
+              fi
+
+              if [ ! -d "datasets/tpch-tiny" ]; then
+                echo "Error: datasets/tpch-tiny not found" >&2
+                exit 1
+              fi
+
+              exec ${sdqlPerf}/bin/performanceComparsion "$@"
             '';
           };
           # Runtime tools shared by sdql reference test runners
@@ -166,6 +196,7 @@
             default = sdqlTestsWithRef;
             sdql-tests = sdqlTestsWithRef;
             sdql-tests-bare = sdqlTests;
+            performanceComparsion = performanceComparsion;
             sdql-reference-tests = sdqlRefTestRunner;
             sdql-reference-tpch-0_01 = sdqlRefTPCH001;
             sdql-reference-tpch-1 = sdqlRefTPCH1;
@@ -196,6 +227,10 @@
             sdql-ref-tpch-1 = {
               type = "app";
               program = "${sdqlRefTPCH1}/bin/sdql-reference-tpch-1";
+            };
+            performanceComparsion = {
+              type = "app";
+              program = "${performanceComparsion}/bin/performanceComparsion";
             };
           };
 

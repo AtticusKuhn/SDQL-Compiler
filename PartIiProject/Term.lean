@@ -38,6 +38,7 @@ inductive Ty : Type where
   | record : List Ty → Ty
   | string : Ty
   | int : Ty
+  | maxProduct : Ty
   deriving Inhabited
 
 -- Date type: represented as YYYYMMDD integer (e.g., 19980902)
@@ -57,6 +58,7 @@ unsafe def Ty.denote (t : Ty) : Type :=
   match t with
   | .bool => Bool
   | .real => Float
+  | .maxProduct => Float
   | .date => SDQLDate
   | .int => Int
   | .string => String
@@ -80,6 +82,7 @@ mutual
   unsafe def showValue : {t : Ty} → t.denote → String
     | .bool, b => toString b
     | .real, n => toString n
+    | .maxProduct, n => toString n
     | .date, d => toString d
     | .int, n => toString n
     | .string, s => s
@@ -90,6 +93,7 @@ end
 inductive AddM : Ty → Type where
   | boolA : AddM Ty.bool
   | realA : AddM Ty.real
+  | maxProductA : AddM Ty.maxProduct
   | dateA : AddM Ty.date
   | intA : AddM Ty.int
   | stringA : AddM Ty.string
@@ -120,6 +124,7 @@ unsafe def Ty.ord (t : Ty) : Ord t.denote :=
   match t with
   | .bool => inferInstance
   | .real => inferInstance
+  | .maxProduct => inferInstance
   | .date => inferInstance
   | .int => inferInstance
   | .string => inferInstance
@@ -132,6 +137,7 @@ mutual
     match t with
     | .bool => false
     | .real => 0.0
+    | .maxProduct => 0.0
     | .date => SDQLDate.mk 0
     | .int => 0
     | .string => ""
@@ -152,6 +158,7 @@ mutual
   unsafe def AddM.zero {t : Ty} : AddM t → t.denote
     | .boolA => false
     | .realA => (0.0 : Float)
+    | .maxProductA => (0.0 : Float)
     | .dateA => SDQLDate.mk 10101  -- dummy date like sdql-rs (0001-01-01)
     | .intA => 0
     | .stringA => ""
@@ -184,6 +191,7 @@ mutual
   unsafe def AddM.denote {t : Ty} : AddM t → t.denote → t.denote → t.denote
     | .boolA, x, y => x || y
     | .realA, x, y => x + y
+    | .maxProductA, x, y => if x < y then y else x
     | .dateA, _x, y => y  -- date "addition" overwrites (like sdql-rs AddAssign)
     | .intA, x, y => Int.add x y
     | .stringA, x, y => x ++ y
@@ -200,6 +208,7 @@ end
 inductive ScaleM : Ty → Ty → Type where
   | boolS : ScaleM Ty.bool Ty.bool
   | realS : ScaleM Ty.real Ty.real
+  | maxProductS : ScaleM Ty.maxProduct Ty.maxProduct
   | intS : ScaleM Ty.int Ty.int
   | dictS {sc dom range : Ty} (sRange : ScaleM sc range) : ScaleM sc (Ty.dict dom range)
   | recordS {sc : Ty} {l : List Ty} (fields : ∀ (t : Ty), Mem t l → ScaleM sc t) : ScaleM sc (Ty.record l)
@@ -223,6 +232,7 @@ mutual
   unsafe def ScaleM.denote {sc t : Ty} : ScaleM sc t → sc.denote → t.denote → t.denote
     | .boolS, a, x => Bool.and a x
     | .realS, a, x => a * x
+    | .maxProductS, a, x => a * x
     | .intS, a, x => Int.mul a x
     | @ScaleM.dictS sc dom range sRange, a, d =>
         let inner := ScaleM.denote (sc := sc) (t := range) sRange
@@ -241,6 +251,8 @@ unsafe def ScaleM.mulDenote {sc t1 t2 : Ty}
   | .intS =>
       fun l r => ScaleM.denote s2 l r
   | .realS =>
+      fun l r => ScaleM.denote s2 l r
+  | .maxProductS =>
       fun l r => ScaleM.denote s2 l r
   | @ScaleM.dictS sc dom range sRange =>
       fun l r =>

@@ -12,6 +12,7 @@ unsafe def tyEq : SurfaceTy → SurfaceTy → Bool
   | .bool, .bool => true
   | .int, .int => true
   | .real, .real => true
+  | .maxProduct, .maxProduct => true
   | .date, .date => true
   | .string, .string => true
   | .dict k1 v1, .dict k2 v2 => tyEq k1 k2 && tyEq v1 v2
@@ -29,6 +30,7 @@ unsafe def tyToString : SurfaceTy → String
   | .bool => "bool"
   | .int => "int"
   | .real => "real"
+  | .maxProduct => "max_prod"
   | .date => "date"
   | .string => "string"
   | .dict k v => s!"\{ {tyToString k} -> {tyToString v} }"

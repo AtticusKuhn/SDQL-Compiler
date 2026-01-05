@@ -53,6 +53,7 @@ How to run:
 - Build tests: `lake build sdql-tests`.
 - Run tests: `lake exe sdql-tests`.
 - Preferred: `nix run` (runs the full test suite; sdql-rs TPCH reference binaries are built on-demand by the Lean test runner via `cargo build --release --bin ...` when missing).
+- Performance comparison: `nix run .#performanceComparsion` (times `sdql-rs` binaries vs Lean-generated Rust binaries; must be run from the project root).
 - Explore: open the `.lean` files and evaluate examples with `#eval`.
 - Try the DSL: use `[SDQLProg2 { int }| 3 + 5 ]` (runs the full pipeline) or start from `[SDQL| 3 + 5 ]` and call `loadTermToSProg2` explicitly.
 
@@ -61,7 +62,7 @@ Notes/constraints:
 - Boolean addition uses OR (matching SDQL); boolean scaling remains AND.
 - Codegen uses placeholder helpers (`sdql_mul`, `dict_add`, `tuple_add`). Execution path for tests relies on embedded runtime shims (`map_insert`, `lookup_or_default`, `SDQLShow`) in the generated program.
 - Rust iteration uses `.clone().into_iter()` in printed `for` loops to avoid moving maps that are reused later.
-- Kinds and scalar promotion are not modeled yet; scalars implemented include `bool`, `int`, and now `real` in the core.
+- Kinds are not modeled yet; scalar promotion exists via `promote[max_prod](e)` and the core includes `bool`, `int`, `real`, and `maxProduct`.
 - Surface multiplication uses `stensor` and casts via `ty_stensor_eq2`/`tyFields_map_stensor2` during surface→core lowering; these are currently `unsafe` (termination not proven).
 - Nix caveat: adding new modules (like `PartIiProject/SyntaxSDQL.lean`) can require the flake’s lean4‑nix manifest mapping to include them. Lake builds work; if `nix build` reports a missing module attribute, update manifests/lock or bump to the matching lean manifest (v4.24).
 CI:

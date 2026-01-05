@@ -6,13 +6,14 @@ Why it exists:
 
 What it provides today:
 
-- Core calculus: types `bool|int|real|date|string|record|dict` with a denotation into Lean types.
+- Core calculus: types `bool|int|real|maxProduct|date|string|record|dict` with a denotation into Lean types.
 - Semimodule structure: `AddM` (addition) and `ScaleM` (scalar action) for dictionaries, records, and scalars; tensor-shaped multiply.
 - Terms (DeBruijn): typed surface terms `STermLoc2`/`SProg2` and typed core terms `TermLoc2`/`Prog2`, both indexed by an explicit context `ctx : List _` and using `Mem` proofs for variables. Builtins include `And`, `Or`, `Eq`, `Leq`, `Sub`, `Div`, `StrEndsWith`, `StrStartsWith`, `StrContains`, `FirstIndex`, `LastIndex`, `SubString`, `Dom`, `Range`, `Size`, `DateLit`, `Year`, and `Concat`.
 - Parser pipeline: SDQL macros elaborate to `LoadTermLoc`, then run `LoadTermLoc → UntypedTermLoc → STermLoc2/SProg2 → TermLoc2/Prog2 → Rust`.
 - Pretty-printing: renderers for records/dictionaries values (`showValue`) and term printers (`Term2.showTermLoc2`) keep `#eval` usable.
 - Codegen (prototype): translation of core terms to a compact Rust-like AST and string rendering for quick demos and a path to real backends.
 - Tests: a Lean test executable that compiles SDQL to Rust, builds with `rustc`, runs outputs, and compares printed outputs (optionally against a reference implementation for TPCH queries).
+- Benchmarking: a Lean performance runner that times `sdql-rs` reference binaries vs Lean-generated Rust binaries.
 
 How it should work:
 

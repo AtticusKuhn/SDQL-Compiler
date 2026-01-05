@@ -64,6 +64,7 @@ syntax:65 sdql:65 "*" sdql:66 : sdql
 syntax:65 sdql:65 "*" "{" "int" "}" sdql:66 : sdql
 syntax:65 sdql:65 "*" "{" "bool" "}" sdql:66 : sdql
 syntax:65 sdql:65 "*" "{" "real" "}" sdql:66 : sdql
+syntax:65 sdql:65 "*" "{" "max_prod" "}" sdql:66 : sdql
 syntax:65 sdql:65 "/" sdql:66 : sdql
 syntax:58 sdql:58 "&&" sdql:59 : sdql
 syntax:57 sdql:57 "||" sdql:58 : sdql
@@ -94,6 +95,7 @@ syntax (name := sdqltyInt) "int" : sdqlty
 syntax (name := sdqltyBool) "bool" : sdqlty
 syntax (name := sdqltyString) "string" : sdqlty
 syntax (name := sdqltyReal) "real" : sdqlty
+syntax (name := sdqltyMaxProduct) "max_prod" : sdqlty
 syntax (name := sdqltyDate) "date" : sdqlty
 syntax (name := sdqltyDict) "{" sdqlty "->" sdqlty "}" : sdqlty
 syntax (name := sdqltyVec) "@vec" "{" sdqlty "->" sdqlty "}" : sdqlty
@@ -102,6 +104,9 @@ syntax (name := sdqltyRecord) "<" sepBy(sdqlident ":" sdqlty, ",") ">" : sdqlty
 
 -- typed empty dictionary: {}_{ Tdom, Trange }
 syntax "{" "}" "_" "{" sdqlty "," sdqlty "}" : sdql
+
+-- scalar promotion: promote[T](e)
+syntax "promote" "[" sdqlty "]" "(" sdql ")" : sdql
 
 -- load expressions
 syntax (name := sdqlLoad) "load" "[" sdqlty "]" "(" str ")" : sdql
@@ -158,6 +163,7 @@ partial def elabTy : TSyntax `sdqlty → MacroM (TSyntax `term)
   | `(sdqlty| bool) => `(SurfaceTy.bool)
   | `(sdqlty| string) => `(SurfaceTy.string)
   | `(sdqlty| real) => `(SurfaceTy.real)
+  | `(sdqlty| max_prod) => `(SurfaceTy.maxProduct)
   | `(sdqlty| date) => `(SurfaceTy.date)
   | `(sdqlty| varchar($n:num)) => `(SurfaceTy.string)
   | `(sdqlty| @vec { $k:sdqlty -> $v:sdqlty }) => do
@@ -179,6 +185,7 @@ partial def elabTyPreserveOrder : TSyntax `sdqlty → MacroM (TSyntax `term)
   | `(sdqlty| bool) => `(SurfaceTy.bool)
   | `(sdqlty| string) => `(SurfaceTy.string)
   | `(sdqlty| real) => `(SurfaceTy.real)
+  | `(sdqlty| max_prod) => `(SurfaceTy.maxProduct)
   | `(sdqlty| date) => `(SurfaceTy.date)
   | `(sdqlty| varchar($n:num)) => `(SurfaceTy.string)
   | `(sdqlty| @vec { $k:sdqlty -> $v:sdqlty }) => do
@@ -318,6 +325,10 @@ mutual
       -- control
       | `(sdql| not $e:sdql) =>
           wrapLoadWithStx stx (← `(LoadTerm'.not $(← elabSDQLToLoad e)))
+      | `(sdql| promote[$t:sdqlty]($e:sdql)) => do
+          let ee ← elabSDQLToLoad e
+          let tt ← elabTy t
+          wrapLoadWithStx stx (← `(LoadTerm'.promote $tt $ee))
       | `(sdql| if $c:sdql then $t:sdql else $f:sdql) => do
           let cc ← elabSDQLToLoad c
           let tt ← elabSDQLToLoad t
@@ -365,6 +376,10 @@ mutual
           let xx ← elabSDQLToLoad x
           let yy ← elabSDQLToLoad y
           wrapLoadWithStx stx (← `(LoadTerm'.mul (some SurfaceTy.real) $xx $yy))
+      | `(sdql| $x:sdql *{max_prod} $y:sdql) => do
+          let xx ← elabSDQLToLoad x
+          let yy ← elabSDQLToLoad y
+          wrapLoadWithStx stx (← `(LoadTerm'.mul (some SurfaceTy.maxProduct) $xx $yy))
       | `(sdql| $x:sdql && $y:sdql) => do
           let xx ← elabSDQLToLoad x
           let yy ← elabSDQLToLoad y

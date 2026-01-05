@@ -83,6 +83,8 @@ mutual
         → TermLoc2 ctx t1
         → TermLoc2 ctx t2
         → Term2 ctx (tensor t1 t2)
+    | promote : {ctx : List Ty} → {fromType toType : Ty}
+        → TermLoc2 ctx fromType → Term2 ctx toType
     | sum : {ctx : List Ty} → {dom range ty : Ty}
         → (a : AddM ty)
         → TermLoc2 ctx (.dict dom range)
@@ -175,6 +177,7 @@ mutual
         s!"let {x} = {showTermLoc2 names bound} in {showTermLoc2 (x :: names) body}"
     | .add _ t1 t2 => s!"{showTermLoc2 names t1} + {showTermLoc2 names t2}"
     | .mul _ _ t1 t2 => s!"{showTermLoc2 names t1} * {showTermLoc2 names t2}"
+    | .promote e => s!"promote({showTermLoc2 names e})"
     | .sum _ d body =>
         let k := freshName names
         let v := freshName (k :: names)
@@ -223,6 +226,7 @@ mutual
     | .bool => .bool
     | .int => .int
     | .real => .real
+    | .maxProduct => .maxProduct
     | .date => .date
     | .string => .string
     | .dict k v => .dict (ty k) (ty v)
@@ -254,6 +258,7 @@ mutual
     | _, SAdd.boolA => AddM.boolA
     | _, SAdd.intA => AddM.intA
     | _, SAdd.realA => AddM.realA
+    | _, SAdd.maxProductA => AddM.maxProductA
     | _, SAdd.dateA => AddM.dateA
     | _, SAdd.stringA => AddM.stringA
     | _, @SAdd.dictA _ _ aRange => AddM.dictA (toCoreAdd aRange)
@@ -270,6 +275,7 @@ def toCoreScale : {sc t : SurfaceTy} → SScale sc t → ScaleM (ty sc) (ty t)
   | _, _, SScale.boolS => ScaleM.boolS
   | _, _, SScale.intS => ScaleM.intS
   | _, _, SScale.realS => ScaleM.realS
+  | _, _, SScale.maxProductS => ScaleM.maxProductS
   | _, _, @SScale.dictS _ _ _ sRange => ScaleM.dictS (toCoreScale sRange)
   | _, _, @SScale.recordS sc σ fields =>
       -- Build the per-field scaling function using typed membership
@@ -318,6 +324,7 @@ mutual
     | .bool, b => rfl
     | .int, b => rfl
     | .real, b => rfl
+    | .maxProduct, b => rfl
     | .date, b => rfl
     | .string, b => rfl
     | .dict dom range, b => by
@@ -377,6 +384,8 @@ mutual
           have hmul : Term2 (tyCtx ctx) (tensor (ty t1) (ty t2)) :=
             Term2.mul (toCoreScale s1) (toCoreScale s2) (trLoc2 e1) (trLoc2 e2)
           simpa [ty_stensor_eq2, -stensor] using hmul
+    | @STerm2.promote _ fromType toType e =>
+        Term2.promote (fromType := ty fromType) (toType := ty toType) (trLoc2 e)
     | STerm2.emptyDict => Term2.emptyDict
     | STerm2.dictInsert k v d =>
         Term2.dictInsert (trLoc2 k) (trLoc2 v) (trLoc2 d)

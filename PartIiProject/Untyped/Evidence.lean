@@ -15,6 +15,7 @@ mutual
     | .bool => pure SAdd.boolA
     | .int => pure SAdd.intA
     | .real => pure SAdd.realA
+    | .maxProduct => pure SAdd.maxProductA
     | .date => pure SAdd.dateA
     | .string => pure SAdd.stringA
     | .dict _ range => do
@@ -38,6 +39,7 @@ unsafe def synthSScale (stx : SourceLocation) (sc : SurfaceTy) (t : SurfaceTy) :
   | .bool, .bool => pure SScale.boolS
   | .int, .int => pure SScale.intS
   | .real, .real => pure SScale.realS
+  | .maxProduct, .maxProduct => pure SScale.maxProductS
   | sc, .dict _ range => do
       let sRange ← synthSScale stx sc range
       pure (SScale.dictS sRange)
@@ -75,4 +77,3 @@ unsafe def findFieldByIndex (stx : SourceLocation) : (σ : Schema) → (i : Nat)
   | _ :: rest, i + 1 => do
       let ⟨nm', ⟨t', pf⟩⟩ ← findFieldByIndex stx rest i
       pure ⟨nm', ⟨t', HasField.there pf⟩⟩
-
