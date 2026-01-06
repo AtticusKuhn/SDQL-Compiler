@@ -72,7 +72,7 @@ Testing infrastructure:
   - Standalone file imported via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`
   - Core types: `Real` (Ord-capable f64 wrapper), `Date` (YYYYMMDD integer)
   - Semimodule trait: `SdqlAdd` with implementations for bool (OR), i64, Real, Date, String, BTreeMap, and tuples up to arity 8
-  - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5` (record/tuple addition via `SdqlAdd`)
+  - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add!` (record/tuple addition via `SdqlAdd`, used as `tuple_add!(N)(a,b)`)
   - Extension functions: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_lt`, `ext_sub`, `ext_div`, `ext_str_ends_with`, `ext_str_starts_with`, `ext_str_contains`, `ext_first_index`, `ext_last_index`, `ext_sub_string`, `ext_dom`, `ext_range`, `ext_size`, `ext_year`
   - TBL loaders: `FromTblField` trait for type-directed parsing (i64, String, Real, bool, Date), `build_col<T>` for extracting typed columns, `load_tbl` for parsing pipe-delimited TBL files
   - TPCH dataset path override: `load_tbl` rewrites paths under `datasets/tpch/` using `TPCH_DATASET_PATH` (e.g. pointing to `datasets/tpch-tiny`) so SDQL sources can keep upstream paths while tests swap datasets.

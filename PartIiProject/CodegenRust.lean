@@ -262,11 +262,6 @@ def genTableLoader (ty : _root_.Ty) (path : String) : String :=
 
 /- DeBruijn Program-level codegen ---------------------------------------- -/
 
-/-- Build a name environment from a context.
-    Each position in the context gets a name like "arg0", "arg1", etc. -/
-def mkLoadEnv (ctx : List _root_.Ty) : Rust.NameEnv :=
-  (List.range ctx.length).map (fun i => s!"arg{i}")
-
 /-- Render a Rust program from a `Prog2` (DeBruijn indexed).
     The generated program:
     - imports the sdql_runtime module,
@@ -277,22 +272,25 @@ def mkLoadEnv (ctx : List _root_.Ty) : Rust.NameEnv :=
 def renderRustProg2Shown (p : Prog2) (config : Rust.ShowConfig := Rust.defaultConfig) : String :=
   let header := rustRuntimeHeader
   -- Build name environment for context variables
-  let env := mkLoadEnv p.ctx
   -- Generate inline loaders for each context variable
-  let rec genLoaders (ctx : List _root_.Ty) (paths : List String) (idx : Nat)
-      : List String :=
+  -- IMPORTANT: `Rust.showExpr*` names variables by *absolute* position in the context
+  -- (oldest binder = `x0`, newest binder = `x{n-1}`), while DeBruijn indices count
+  -- from the most-recent binder. So the `i`th element of `p.ctx` (head = most recent)
+  -- must be named `x{(n-1) - i}` to align with the pretty-printer.
+  let rec genLoaders (ctx : List _root_.Ty) (paths : List String) (idx : Nat) : List String :=
     match ctx, paths with
     | [], [] => []
     | ty :: restCtx, path :: restPaths =>
         let tyStr := Rust.showTy (coreTyToRustTy ty)
-        let nm := s!"arg{idx}"
+        let nm := s!"x{idx}"
         let loaderExpr := genTableLoader ty path
-        s!"let {nm}: {tyStr} = {loaderExpr};" :: genLoaders restCtx restPaths (idx + 1)
+        s!"let {nm}: {tyStr} = {loaderExpr};" :: genLoaders restCtx restPaths (idx - 1)
     | _, _ => []  -- Mismatched lengths, shouldn't happen
-  let paramDecls := genLoaders p.ctx p.loadPaths 0
+  let startIdx := p.ctx.length - 1
+  let paramDecls := genLoaders p.ctx p.loadPaths startIdx
   -- Compile the term to a DeBruijn-indexed Rust AST, and pretty-print using `env`
   let expr := Compile2.compileLoc2 p.term
-  let bodyExpr := Rust.showExprLocRun env expr 1 config
+  let bodyExpr := Rust.showExprLocRun expr 1 config
   let loadsStr := String.intercalate "\n" (paramDecls.map (fun s => "  " ++ s))
   let mainBody :=
     "fn main() {\n" ++
