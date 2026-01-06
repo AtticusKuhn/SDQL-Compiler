@@ -30,6 +30,21 @@ instance : ToString SurfaceTy := {
 }
 abbrev Schema := List (String × SurfaceTy)
 
+def SurfaceTy.sdqlToString : SurfaceTy → String
+  | .bool => "bool"
+  | .int => "int"
+  | .real => "real"
+  | .maxProduct => "max_prod"
+  | .date => "date"
+  | .string => "string"
+  | .dict k v => s!"\{ {sdqlToString k} -> {sdqlToString v} }"
+  | .record σ => s!"<{schemaToString σ}>"
+where
+  schemaToString : Schema → String
+    | [] => ""
+    | [(n, t)] => s!"{n}: {sdqlToString t}"
+    | (n, t) :: rest => s!"{n}: {sdqlToString t}, {schemaToString rest}"
+
 /- Field-membership proof with an index extractor (used for dot projection). -/
 inductive HasField : Schema → String → SurfaceTy → Type where
   | here  {nm σ t} : HasField (⟨nm, t⟩ :: σ) nm t

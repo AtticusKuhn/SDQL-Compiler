@@ -240,26 +240,20 @@ unsafe def runBenchmark (b : Benchmark) : IO (Except String Reading) := do
   }
 
 unsafe def microBenchmarks : List Benchmark :=
-  let nAdd : Nat := 2000000
-  let nDict : Nat := 400000
-  let nLookup : Nat := 200000
-
   let pAdd : SProg2 :=
-    [SDQLProg2 { int }| sum( <_, _> in range(2000000) ) 1 ]
+    [SDQLProg2 { int }| sum( <_, _> <- range(2000000) ) 1 ]
   let pDict : SProg2 :=
-    [SDQLProg2 { { int -> int } }| sum( <i, _> in range(400000) ) { i -> 1 } ]
+    [SDQLProg2 { { int -> int } }| sum( <i, _> <- range(400000) ) { i -> 1 } ]
   let pLookup : SProg2 :=
     [SDQLProg2 { int }|
-      let d = sum( <i, _> in range(200000) ) { i -> i } in
-      sum( <i, _> in range(200000) ) d(i)
+      let d = sum( <i, _> <- range(200000) ) { i -> i } in
+      sum( <i, _> <- range(200000) ) d(i)
     ]
 
-  -- sdql-rs uses `<-` for summation binders; keep the source in sdql-rs syntax here.
-  let sAdd : String := s!"sum(<i,_> <- range({nAdd})) 1"
-  let sDict : String := s!"sum(<i,_> <- range({nDict})) " ++ "{ i -> 1 }"
-  let sLookup : String :=
-    "let d = " ++ s!"sum(<i,_> <- range({nLookup})) " ++ "{ i -> i }" ++ "\n" ++
-    s!"sum(<i,_> <- range({nLookup})) d(i)"
+  -- sdql-rs uses `<-` for summation binders; use our `SProg2`→String printer, which emits sdql-rs syntax.
+  let sAdd : String := toString pAdd
+  let sDict : String := toString pDict
+  let sLookup : String := toString pLookup
 
   [ { name := "micro_sum_range_add"
       prog := pAdd
