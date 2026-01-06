@@ -26,20 +26,8 @@ where
     | _, _ => false
 
 /-- Pretty print a SurfaceTy -/
-unsafe def tyToString : SurfaceTy → String
-  | .bool => "bool"
-  | .int => "int"
-  | .real => "real"
-  | .maxProduct => "max_prod"
-  | .date => "date"
-  | .string => "string"
-  | .dict k v => s!"\{ {tyToString k} -> {tyToString v} }"
-  | .record σ => s!"<{schemaToString σ}>"
-where
-  schemaToString : Schema → String
-    | [] => ""
-    | [(n, t)] => s!"{n}: {tyToString t}"
-    | (n, t) :: rest => s!"{n}: {tyToString t}, {schemaToString rest}"
+unsafe def tyToString (t : SurfaceTy) : String :=
+  SurfaceTy.sdqlToString t
 
 /-- Check type equality and produce a term via unsafe cast if equal -/
 unsafe def checkTyEq2 {ctx : List SurfaceTy}
