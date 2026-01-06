@@ -13,4 +13,18 @@ Q15 is tiny-only (SF=0.01 currently diverges due to missing
 - change how `Rust.Expr` is represented to use DeBruijn indexing instead of string for variables
 - get rid of ugly `A *{Type} B` syntax
 - Get rid of ugly `<_1 =..., _2 = ...>` syntax. Just replace this with `<..., ....>`
-- Make script to check performance of testcases.
+- the tuple_add4, tuple_add5 thing is annoying. Just replace with a macro.
+
+```bash
+[atticusk@nixos:~/coding/part_ii_project]$ find PartIiProject -name "*.lean" -exec wc -l {} + | sort -nr | head -n10
+  3987 total
+   546 PartIiProject/Rust.lean
+   494 PartIiProject/SyntaxSDQL.lean
+   462 PartIiProject/Untyped/Infer.lean
+   448 PartIiProject/Term2.lean
+   316 PartIiProject/SurfaceCore2.lean
+   302 PartIiProject/Term.lean
+   302 PartIiProject/CodegenRust.lean
+   216 PartIiProject/Untyped/ExtractLoads.lean
+   147 PartIiProject/Untyped/TypeOf.lean
+```

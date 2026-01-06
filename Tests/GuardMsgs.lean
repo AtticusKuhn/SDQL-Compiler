@@ -32,4 +32,13 @@ open PartIiProject
       sum( <i, _> <- range(200000) ) d(i)
     ] : SProg2))
 
+
+/-- info: "let t = load[int](\"path\")\n1 + t" -/
+#guard_msgs in
+#eval (toString (
+    [SDQLProg2 { int }|
+      1 + load[int]("path")
+    ] : SProg2))
+
+
 end PerfToString

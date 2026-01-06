@@ -12,7 +12,7 @@ What works:
 - New program pipeline (DeBruijn): `[SDQLProg2 { T }| ... ]` elaborates to `LoadTermLoc` then runs `LoadTermLoc → UntypedTermLoc → STermLoc2` to produce an `SProg2` with an explicit typed context (`ctx : List SurfaceTy`) and `loadPaths`.
 - Rust codegen: compiles into a DeBruijn-indexed Rust AST (`Expr : Nat → Type`, vars are `Fin ctx`) and renders expressions/blocks/loops; `sum` becomes a block with a mutable accumulator and a `for (k,v) in map.clone().into_iter()` loop. Runtime calls are represented by `RuntimeFn` (no stringly-typed function names).
 - Program-level Rust codegen: `renderRustProg2Shown` compiles a core `Prog2` to a standalone Rust program. Generated programs import `sdql_runtime.rs` (a standalone file with helpers, loaders, and printing) via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`. The runtime includes:
-  - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add0..tuple_add5`
+  - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add!`
   - Core types: `Real` (Ord-capable f64), `Date` (YYYYMMDD integer)
   - Traits: `SdqlAdd` for semimodule addition, `FromTblField` for TBL parsing, `SDQLShow` for printing
   - TBL loaders: `build_col<T>`, `load_tbl`

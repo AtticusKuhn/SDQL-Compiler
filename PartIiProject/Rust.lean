@@ -61,14 +61,7 @@ inductive RuntimeFn : Type where
 
 def runtimeFnName : RuntimeFn → String
   | .dictAdd => "dict_add"
-  | .tupleAdd arity =>
-      match arity with
-      | 0 => "tuple_add0"
-      | 1 => "tuple_add"
-      | 2 => "tuple_add2"
-      | 3 => "tuple_add3"
-      | 4 => "tuple_add4"
-      | _ => "tuple_add5"
+  | .tupleAdd arity => s!"tuple_add{arity}"
   | .sdqlMul => "sdql_mul"
   | .maxProductAdd => "max_product_add"
   | .promoteMaxProduct => "promote_max_product"
@@ -258,13 +251,6 @@ partial def showTy : Ty → String
       | _  => paren <| String.intercalate ", " (ts.map showTy)
   | .map k v => s!"std::collections::BTreeMap<{showTy k}, {showTy v}>"
 
-/-- Escape potentially-problematic substrings for embedding in a Rust block comment. -/
-def escapeForBlockComment (s : String) : String :=
-  -- Avoid prematurely closing the comment and keep the output single-line.
-  s.replace "*/" "* /"
-   |>.replace "\r" " "
-   |>.replace "\n" " "
-
 /-- Format a source location as a Rust comment.
     Uses `SourceLocation.substring` (not byte ranges) since some pipelines only populate the substring. -/
 def formatLocComment (loc : SourceLocation) : String :=
@@ -272,7 +258,7 @@ def formatLocComment (loc : SourceLocation) : String :=
   if snippet.isEmpty then
     ""  -- Don't emit comment for unknown locations
   else
-    s!"/* {escapeForBlockComment snippet} */ "
+    s!"\n/* {snippet} */\n"
 
 /-- Configuration for whether to emit source location comments -/
 structure ShowConfig where
@@ -286,164 +272,159 @@ def defaultConfig : ShowConfig := ⟨false⟩
 /-- Configuration that emits location comments -/
 def withLocComments : ShowConfig := ⟨true⟩
 
- /-- Name environment, indexed from most recent binder (head) to oldest (tail). -/
-abbrev NameEnv := List String
-
- /-- State used to generate fresh Rust variable names during pretty-printing. -/
-abbrev ShowM := StateM Nat
-
-private def freshName (pfx : String) : ShowM String := do
-  let n ← get
-  set (n + 1)
-  return s!"{pfx}{n}"
-
-private def lookupVar {ctx : Nat} (env : NameEnv) (v : Fin ctx) : String :=
-  env.getD v.1 s!"v{v.1}"
+/-- Convert a DeBruijn variable index (0 = most recent binder) into a stable Rust name.
+    We name variables by *absolute* position in the context (0 = oldest binder),
+    so printed names don't shift under binders. -/
+private def varName {ctx : Nat} (v : Fin ctx) : String :=
+  -- `v.1 < ctx`, so `ctx - 1 - v.1` is the "absolute" index from the oldest binder.
+  s!"x{ctx - 1 - v.1}"
 
 mutual
   /-- Show a located expression, optionally emitting source location comments -/
-  partial def showExprLoc {ctx : Nat} (env : NameEnv) (e : ExprLoc ctx)
-      (indent := 0) (config : ShowConfig := defaultConfig) : ShowM String := do
+  partial def showExprLoc {ctx : Nat} (e : ExprLoc ctx)
+      (indent := 0) (config : ShowConfig := defaultConfig) : String :=
     let locComment := if config.emitLocComments then formatLocComment e.loc else ""
-    let inner ← showExpr env e.expr indent config
-    return locComment ++ inner
+    let inner := showExpr e.expr indent config
+    locComment ++ inner
 
-  partial def showExpr {ctx : Nat} (env : NameEnv) (e : Expr ctx)
-      (indent := 0) (config : ShowConfig := defaultConfig) : ShowM String := do
+  partial def showExpr {ctx : Nat} (e : Expr ctx)
+      (indent := 0) (config : ShowConfig := defaultConfig) : String :=
     match e with
-    | .var v => return lookupVar env v
-    | .litInt n => return toString n
-    | .litReal f => return s!"Real::new({f})"
-    | .litDate d => return s!"date!({d})"
-    | .litBool b => return (if b then "true" else "false")
-    | .litString s => return s!"String::from(\"{s}\")"
+    | .var v => varName v
+    | .litInt n =>  toString n
+    | .litReal f =>  s!"Real::new({f})"
+    | .litDate d =>  s!"date!({d})"
+    | .litBool b =>  (if b then "true" else "false")
+    | .litString s =>  s!"String::from(\"{s}\")"
     | .tuple es =>
         let es := Exprs.toList es
         match es with
-        | [] => return "()"
+        | [] =>  "()"
         | [e] =>
-            let se ← showExprLoc env e indent config
-            return s!"({se},)"
+            let se := showExprLoc e indent config
+            s!"({se},)"
         | _ =>
-            let parts ← es.mapM (fun e => showExprLoc env e indent config)
-            return paren <| String.intercalate ", " parts
+            let parts := es.map (fun e => showExprLoc e indent config)
+            paren <| String.intercalate ", " parts
     | .tupleProj e idx =>
-        let se ← showExprLoc env e indent config
-        return s!"({se}).{idx}"
+        let se := showExprLoc e indent config
+        s!"({se}).{idx}"
     | .borrow e =>
-        let se ← showExprLoc env e indent config
-        return s!"&{paren se}"
-    | .mapEmpty => return "std::collections::BTreeMap::new()"
+        let se :=  showExprLoc e indent config
+        s!"&{paren se}"
+    | .mapEmpty => "std::collections::BTreeMap::new()"
     | .mapInsert m k v =>
-        let sm ← showExprLoc env m indent config
-        let sk ← showExprLoc env k indent config
-        let sv ← showExprLoc env v indent config
-        return s!"map_insert({sm}, {sk}, {sv})"
+        let sm :=  showExprLoc m indent config
+        let sk :=  showExprLoc k indent config
+        let sv :=  showExprLoc v indent config
+        s!"map_insert({sm}, {sk}, {sv})"
     -- Always parenthesize binary operator operands to avoid Rust precedence pitfalls
     -- (e.g. `x * (1.0 + y)` must not render as `x * 1.0 + y`).
     | .binop op a b =>
-        let sa ← showExprLoc env a indent config
-        let sb ← showExprLoc env b indent config
-        return s!"{paren sa} {showBinOp op} {paren sb}"
+        let sa  :=  showExprLoc a indent config
+        let sb  :=  showExprLoc b indent config
+        s!"{paren sa} {showBinOp op} {paren sb}"
     | .not a =>
-        let sa ← showExprLoc env a indent config
-        return s!"!{paren sa}"
-    | .ite c t f => do
-        let ci ← showExprLoc env c indent config
-        let ti ← showExprLoc env t (indent+1) config
-        let fi ← showExprLoc env f (indent+1) config
-        return (
+        let sa  :=  showExprLoc a indent config
+        s!"!{paren sa}"
+    | .ite c t f =>
+        let ci := showExprLoc c indent config
+        let ti := showExprLoc t (indent+1) config
+        let fi := showExprLoc f (indent+1) config
+        (
           "if " ++ ci ++ " {\n" ++
           indentStr (indent+1) ++ ti ++ "\n" ++ indentStr indent ++ "} else {\n" ++
           indentStr (indent+1) ++ fi ++ "\n" ++ indentStr indent ++ "}"
         )
-    | .letIn v body => do
-        let name ← freshName "x"
-        let vi ← showExprLoc env v indent config
-        let bi ← showExprLoc (name :: env) body indent config
-        return "{" ++ " let " ++ name ++ " = " ++ vi ++ "; " ++ bi ++ " }"
+    | .letIn (ctx := ctx) v body =>
+        let name  :=  s!"x{ctx}"
+        let vi  :=  showExprLoc v indent config
+        let bi  :=  showExprLoc body indent config
+        "{" ++ " let " ++ name ++ " = " ++ vi ++ "; " ++ bi ++ " }"
     | .callRuntimeFn f args =>
-        let argsStr ← (Exprs.toList args).mapM (fun a => showExprLoc env a indent config)
-        return s!"{runtimeFnName f}({String.intercalate ", " argsStr})"
+        let argsStr  :=  (Exprs.toList args).map (fun a => showExprLoc a indent config)
+        s!"{runtimeFnName f}({String.intercalate ", " argsStr})"
     | .block ss result =>
-        let (bodyStr, envOut) ← showStmtSeq env ss (indent+1) config
-        let ri ← showExprLoc envOut result (indent+1) config
+        let (bodyStr)  :=  showStmtSeq ss (indent+1) config
+        let ri  :=  showExprLoc result (indent+1) config
         let bodyPrefix := if bodyStr.isEmpty then "" else bodyStr ++ "\n"
-        return "{" ++ "\n" ++ bodyPrefix ++ indentStr (indent+1) ++ ri ++ "\n" ++ indentStr indent ++ "}"
-    | .lookupOrDefault m k d => do
-        let sm ← showExprLoc env m indent config
-        let sk ← showExprLoc env k indent config
-        let sd ← showExprLoc env d indent config
-        return s!"lookup_or_default(&{sm}, {sk}, {sd})"
+        "{" ++ "\n" ++ bodyPrefix ++ indentStr (indent+1) ++ ri ++ "\n" ++ indentStr indent ++ "}"
+    | .lookupOrDefault m k d =>
+        let sm := showExprLoc m indent config
+        let sk := showExprLoc k indent config
+        let sd := showExprLoc d indent config
+        s!"lookup_or_default(&{sm}, {sk}, {sd})"
 
   /-- Show a located statement, optionally emitting source location comments -/
-  partial def showStmtLoc {ctxIn ctxOut : Nat} (env : NameEnv) (s : StmtLoc ctxIn ctxOut)
-      (indent : Nat) (config : ShowConfig := defaultConfig) : ShowM (String × NameEnv) := do
+  partial def showStmtLoc {ctxIn ctxOut : Nat} (s : StmtLoc ctxIn ctxOut)
+      (indent : Nat) (config : ShowConfig := defaultConfig) : String  :=
     let locComment := if config.emitLocComments then formatLocComment s.loc else ""
     -- For statements, emit the comment at the start of the line
-    let (line, envOut) ← showStmt env s.stmt indent config
+    let (line) := showStmt s.stmt indent config
     let rendered :=
       if locComment.isEmpty then line
       else indentStr indent ++ locComment ++ line.trimLeft
-    return (rendered, envOut)
+    (rendered)
 
-  partial def showStmt {ctxIn ctxOut : Nat} (env : NameEnv) (s : Stmt ctxIn ctxOut)
-      (indent : Nat) (config : ShowConfig := defaultConfig) : ShowM (String × NameEnv) := do
+  partial def showStmt {ctxIn ctxOut : Nat}  (s : Stmt ctxIn ctxOut)
+      (indent : Nat) (config : ShowConfig := defaultConfig) :  (String) :=
     match s with
     | .letDecl isMut initOpt =>
-        let nm ← freshName "x"
+        let nm :=  s!"x{ctxIn}"
         let kw := if isMut then "let mut" else "let"
-        let initStr ←
+        let initStr :=
           match initOpt with
-          | .none => pure ""
-          | .some e => do
-              let se ← showExprLoc env e indent config
-              pure s!" = {se}"
-        return (s!"{indentStr indent}{kw} {nm}{initStr};", nm :: env)
-    | .assign tgt rhs => do
-        let n := lookupVar env tgt
-        let se ← showExprLoc env rhs indent config
-        return (s!"{indentStr indent}{n} = {se};", env)
-    | .expr e => do
-        let se ← showExprLoc env e indent config
-        return (s!"{indentStr indent}{se};", env)
-    | .forKV m body => do
-        let k ← freshName "k"
-        let v ← freshName "v"
-        let sm ← showExprLoc env m indent config
+          | .none =>  ""
+          | .some e =>
+              let se := showExprLoc e indent config
+              s!" = {se}"
+        (s!"{indentStr indent}{kw} {nm}{initStr};")
+    | .assign tgt rhs =>
+        let n := varName tgt
+        let se := showExprLoc rhs indent config
+        (s!"{indentStr indent}{n} = {se};")
+    | .expr e =>
+        let se := showExprLoc e indent config
+        (s!"{indentStr indent}{se};")
+    | .forKV (ctx := ctx) m body =>
+        -- The loop body context is `ctx + 2` (two fresh DeBruijn binders at indices 0 and 1).
+        -- Under `varName`, binder index 0 must print as `x{ctx+1}` and binder index 1 as `x{ctx}`.
+        let k :=  s!"x{ctx + 1}"
+        let v := s!"x{ctx}"
+        let sm := showExprLoc m indent config
         let head := indentStr indent ++ "for (" ++ k ++ ", " ++ v ++ ") in " ++ sm ++ ".clone().into_iter() {"
-        let (inner, _envOut) ← showStmtSeq (k :: v :: env) body (indent+1) config
+        let (inner ) := showStmtSeq body (indent+1) config
         let tail := "\n" ++ indentStr indent ++ "}"
         let mid := if inner = "" then "" else "\n" ++ inner
-        return (head ++ mid ++ tail, env)
+        (head ++ mid ++ tail)
 
-  partial def showStmtSeq {ctxIn ctxOut : Nat} (env : NameEnv) (ss : StmtSeq ctxIn ctxOut)
-      (indent : Nat) (config : ShowConfig := defaultConfig) : ShowM (String × NameEnv) := do
+  partial def showStmtSeq {ctxIn ctxOut : Nat} (ss : StmtSeq ctxIn ctxOut)
+      (indent : Nat) (config : ShowConfig := defaultConfig) : (String ) :=
     match ss with
-    | .nil => return ("", env)
-    | .cons s rest => do
-        let (line, env1) ← showStmtLoc env s indent config
-        let (tail, env2) ← showStmtSeq env1 rest indent config
+    | .nil => ("")
+    | .cons s rest =>
+        let (line) := showStmtLoc s indent config
+        let (tail) := showStmtSeq rest indent config
         let out := if tail.isEmpty then line else line ++ "\n" ++ tail
-        return (out, env2)
+        (out)
 end
 
-def showExprLocRun {ctx : Nat} (env : NameEnv) (e : ExprLoc ctx)
+def showExprLocRun {ctx : Nat}  (e : ExprLoc ctx)
     (indent := 0) (config : ShowConfig := defaultConfig) : String :=
-  (showExprLoc env e indent config).run' 0
+  (showExprLoc e indent config)
 
-def showExprRun {ctx : Nat} (env : NameEnv) (e : Expr ctx)
+def showExprRun {ctx : Nat} (e : Expr ctx)
     (indent := 0) (config : ShowConfig := defaultConfig) : String :=
-  (showExpr env e indent config).run' 0
+  (showExpr e indent config)
 
 /- Small helper to wrap an expression into a main function as a string. -/
 def wrapAsMain (e : Expr 0) (config : ShowConfig := defaultConfig) : String :=
-  let exprStr := showExprRun (env := []) e 1 config
+  let exprStr := showExprRun e 1 config
   "fn main() {\n  let result = " ++ exprStr ++ ";\n}\n"
 
 /-- Wrap a located expression into a main function -/
 def wrapAsMainLoc (e : ExprLoc 0) (config : ShowConfig := defaultConfig) : String :=
-  let exprStr := showExprLocRun (env := []) e 1 config
+  let exprStr := showExprLocRun e 1 config
   "fn main() {\n  let result = " ++ exprStr ++ ";\n}\n"
 
 namespace Rename1
