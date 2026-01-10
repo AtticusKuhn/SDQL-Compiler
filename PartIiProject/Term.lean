@@ -39,7 +39,102 @@ inductive Ty : Type where
   | string : Ty
   | int : Ty
   | maxProduct : Ty
-  deriving Inhabited
+  deriving Inhabited, BEq, Repr
+
+namespace Ty
+
+mutual
+  def decEq : (a b : Ty) → Decidable (a = b)
+    | .bool, .bool => isTrue rfl
+    | .bool, .real => isFalse (by intro h; cases h)
+    | .bool, .date => isFalse (by intro h; cases h)
+    | .bool, .dict _ _ => isFalse (by intro h; cases h)
+    | .bool, .record _ => isFalse (by intro h; cases h)
+    | .bool, .string => isFalse (by intro h; cases h)
+    | .bool, .int => isFalse (by intro h; cases h)
+    | .bool, .maxProduct => isFalse (by intro h; cases h)
+    | .real, .bool => isFalse (by intro h; cases h)
+    | .real, .real => isTrue rfl
+    | .real, .date => isFalse (by intro h; cases h)
+    | .real, .dict _ _ => isFalse (by intro h; cases h)
+    | .real, .record _ => isFalse (by intro h; cases h)
+    | .real, .string => isFalse (by intro h; cases h)
+    | .real, .int => isFalse (by intro h; cases h)
+    | .real, .maxProduct => isFalse (by intro h; cases h)
+    | .date, .bool => isFalse (by intro h; cases h)
+    | .date, .real => isFalse (by intro h; cases h)
+    | .date, .date => isTrue rfl
+    | .date, .dict _ _ => isFalse (by intro h; cases h)
+    | .date, .record _ => isFalse (by intro h; cases h)
+    | .date, .string => isFalse (by intro h; cases h)
+    | .date, .int => isFalse (by intro h; cases h)
+    | .date, .maxProduct => isFalse (by intro h; cases h)
+    | .dict _ _, .bool => isFalse (by intro h; cases h)
+    | .dict _ _, .real => isFalse (by intro h; cases h)
+    | .dict _ _, .date => isFalse (by intro h; cases h)
+    | .dict a1 b1, .dict a2 b2 =>
+        match decEq a1 a2 with
+        | isTrue ha =>
+            match decEq b1 b2 with
+            | isTrue hb => isTrue (by cases ha; cases hb; rfl)
+            | isFalse hb => isFalse (by intro h; cases h; exact hb rfl)
+        | isFalse ha => isFalse (by intro h; cases h; exact ha rfl)
+    | .dict _ _, .record _ => isFalse (by intro h; cases h)
+    | .dict _ _, .string => isFalse (by intro h; cases h)
+    | .dict _ _, .int => isFalse (by intro h; cases h)
+    | .dict _ _, .maxProduct => isFalse (by intro h; cases h)
+    | .record _, .bool => isFalse (by intro h; cases h)
+    | .record _, .real => isFalse (by intro h; cases h)
+    | .record _, .date => isFalse (by intro h; cases h)
+    | .record _, .dict _ _ => isFalse (by intro h; cases h)
+    | .record l1, .record l2 =>
+        match decEqList l1 l2 with
+        | isTrue hl => isTrue (by cases hl; rfl)
+        | isFalse hl => isFalse (by intro h; cases h; exact hl rfl)
+    | .record _, .string => isFalse (by intro h; cases h)
+    | .record _, .int => isFalse (by intro h; cases h)
+    | .record _, .maxProduct => isFalse (by intro h; cases h)
+    | .string, .bool => isFalse (by intro h; cases h)
+    | .string, .real => isFalse (by intro h; cases h)
+    | .string, .date => isFalse (by intro h; cases h)
+    | .string, .dict _ _ => isFalse (by intro h; cases h)
+    | .string, .record _ => isFalse (by intro h; cases h)
+    | .string, .string => isTrue rfl
+    | .string, .int => isFalse (by intro h; cases h)
+    | .string, .maxProduct => isFalse (by intro h; cases h)
+    | .int, .bool => isFalse (by intro h; cases h)
+    | .int, .real => isFalse (by intro h; cases h)
+    | .int, .date => isFalse (by intro h; cases h)
+    | .int, .dict _ _ => isFalse (by intro h; cases h)
+    | .int, .record _ => isFalse (by intro h; cases h)
+    | .int, .string => isFalse (by intro h; cases h)
+    | .int, .int => isTrue rfl
+    | .int, .maxProduct => isFalse (by intro h; cases h)
+    | .maxProduct, .bool => isFalse (by intro h; cases h)
+    | .maxProduct, .real => isFalse (by intro h; cases h)
+    | .maxProduct, .date => isFalse (by intro h; cases h)
+    | .maxProduct, .dict _ _ => isFalse (by intro h; cases h)
+    | .maxProduct, .record _ => isFalse (by intro h; cases h)
+    | .maxProduct, .string => isFalse (by intro h; cases h)
+    | .maxProduct, .int => isFalse (by intro h; cases h)
+    | .maxProduct, .maxProduct => isTrue rfl
+
+  def decEqList : (l1 l2 : List Ty) → Decidable (l1 = l2)
+    | [], [] => isTrue rfl
+    | [], _ :: _ => isFalse (by intro h; cases h)
+    | _ :: _, [] => isFalse (by intro h; cases h)
+    | t1 :: ts1, t2 :: ts2 =>
+        match decEq t1 t2 with
+        | isTrue ht =>
+            match decEqList ts1 ts2 with
+            | isTrue hts => isTrue (by cases ht; cases hts; rfl)
+            | isFalse hts => isFalse (by intro h; cases h; exact hts rfl)
+        | isFalse ht => isFalse (by intro h; cases h; exact ht rfl)
+end
+
+instance : DecidableEq Ty := decEq
+
+end Ty
 
 -- Date type: represented as YYYYMMDD integer (e.g., 19980902)
 -- This matches sdql-rs's date representation
@@ -172,12 +267,15 @@ unsafe instance toStringHList {l : List Ty} : ToString (HList Ty.denote l) where
 unsafe instance reprHList {l : List Ty} : Repr (HList Ty.denote l) where
   reprPrec h _ := repr (toString h)
 
+
+
 @[simp, reducible]
 def tensor (a b : Ty) : Ty :=
   match a with
   | .dict dom range => .dict dom (tensor range b)
   | .record l => .record (l.map (fun t => tensor t b))
   | _ => b
+
 termination_by a
 
 mutual
@@ -212,6 +310,12 @@ inductive ScaleM : Ty → Ty → Type where
   | intS : ScaleM Ty.int Ty.int
   | dictS {sc dom range : Ty} (sRange : ScaleM sc range) : ScaleM sc (Ty.dict dom range)
   | recordS {sc : Ty} {l : List Ty} (fields : ∀ (t : Ty), Mem t l → ScaleM sc t) : ScaleM sc (Ty.record l)
+
+inductive has_tensor  (S : Ty) : Ty → Ty → Type where
+  | map_over_dict : {dom range c : Ty} → (has_tensor S range c) → has_tensor S (.dict dom range)  (.dict dom c)
+  | scalar : {T1 : Ty} → (ScaleM S T1) → has_tensor S T1 T1
+  | map_over_record {L0 L1 : List Ty}  :  HList2 (has_tensor S · ·) L0 L1 → has_tensor S (.record L0) (.record L1)
+
 
 def toHList {T : Type} {l : List T} {ftype : T → Type}
     (f : ∀ (t : T), Mem t l → ftype t) : HList ftype l :=

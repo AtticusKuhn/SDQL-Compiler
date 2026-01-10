@@ -94,10 +94,12 @@ Code generation:
   - variables are `Fin ctx` (no stringly-typed variable names)
   - block sequencing uses `StmtSeq` to track context growth via `letDecl`
   - runtime calls go through `RuntimeFn` (no stringly-typed function names)
-  - pretty-printer takes an initial `NameEnv` for free vars and generates fresh binder names for `letDecl` / `forKV`
+  - loops: `forKV` for `BTreeMap` iteration and `forRange` for `range(n)` iteration without allocating a map
+  - pretty-printer takes an initial `NameEnv` for free vars and generates fresh binder names for `letDecl` / `forKV` / `forRange`
 - `PartIiProject/CodegenRust.lean`: compiles core terms/programs to this AST.
   - Maps basic ops (`+`, `|` for bool OR, `not`, `if`, `let`).
   - `lookup` compiles to `lookup_or_default(m,k,zero)`; `sum` becomes a block with an accumulator and a `for (k,v) in map.clone().into_iter()` loop.
+  - Optimization: `sum(<k,v> in range(N)) ...` compiles to `forRange N ...` (rendered as `for k in 0..N { let v = true; ... }`) to avoid constructing a `BTreeMap` just to iterate `0..N`.
   - `mul` emits a placeholder call `sdql_mul(e1, e2)`; record/dict addition use helper calls `tuple_add` and `dict_add`.
   - Builtins compile to external helpers: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_sub`, `ext_div`, `ext_str_ends_with`, `ext_str_starts_with`, `ext_str_contains`, `ext_first_index`, `ext_last_index`, `ext_sub_string`, `ext_dom`, `ext_range`, `ext_size`, `ext_year`, plus record concat support.
   - Program support: `renderRustProg2Shown` renders a complete `main` from a `Prog2`, including table loaders for `loadPaths` and optional `SourceLocation` comments.
