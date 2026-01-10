@@ -155,6 +155,9 @@ mutual
     | assign : {ctx : Nat} → (target : Fin ctx) → (rhs : ExprLoc ctx) → Stmt ctx ctx
     | expr : {ctx : Nat} → ExprLoc ctx → Stmt ctx ctx
     | forKV : {ctx : Nat} → (map : ExprLoc ctx) → (body : StmtSeq (ctx + 2) (ctx + 2)) → Stmt ctx ctx
+    /-- Optimized loop form for iterating over `range(n)` without allocating a map.
+        Semantically, this behaves like iterating key/value pairs `(k, true)` for `k ∈ [0, n)`. -/
+    | forRange : {ctx : Nat} → (endExclusive : ExprLoc ctx) → (body : StmtSeq (ctx + 2) (ctx + 2)) → Stmt ctx ctx
     deriving Repr
 end
 
@@ -397,6 +400,23 @@ mutual
         let tail := "\n" ++ indentStr indent ++ "}"
         let mid := if inner = "" then "" else "\n" ++ inner
         (head ++ mid ++ tail)
+    | .forRange (ctx := ctx) endExclusive body =>
+        -- The loop body context is `ctx + 2` with:
+        --   - binder index 0 = key, prints as `x{ctx+1}`
+        --   - binder index 1 = value, prints as `x{ctx}`
+        -- We materialize the value binder by inserting `let x{ctx} = true;` at the top of the loop body.
+        let k := s!"x{ctx + 1}"
+        let v := s!"x{ctx}"
+        let send := showExprLoc endExclusive indent config
+        let head := indentStr indent ++ "for " ++ k ++ " in 0.." ++ paren send ++ " {"
+        let vInit := indentStr (indent + 1) ++ "let " ++ v ++ " = true;"
+        let inner := showStmtSeq body (indent + 1) config
+        let tail := "\n" ++ indentStr indent ++ "}"
+        let innerLines :=
+          match inner with
+          | "" => vInit
+          | _ => vInit ++ "\n" ++ inner
+        head ++ "\n" ++ innerLines ++ tail
 
   partial def showStmtSeq {ctxIn ctxOut : Nat} (ss : StmtSeq ctxIn ctxOut)
       (indent : Nat) (config : ShowConfig := defaultConfig) : (String ) :=
@@ -501,6 +521,10 @@ namespace Rename1
           -- Body sees two additional binders (k,v) that are unaffected by the renaming.
           let (body', _fOut) := stmtSeq (liftN 2 f) body
           .forKV (exprLoc f m) body'
+      | .forRange endExclusive body =>
+          -- Body sees two additional binders (k,v) that are unaffected by the renaming.
+          let (body', _fOut) := stmtSeq (liftN 2 f) body
+          .forRange (exprLoc f endExclusive) body'
 
     /-- Rename a statement sequence by inserting one new variable in the context.
         Returns both the renamed sequence and the induced renaming on the final context. -/
@@ -517,6 +541,7 @@ namespace Rename1
                 | .assign .. => f
                 | .expr .. => f
                 | .forKV .. => f
+                | .forRange .. => f
               let (rest', fOut) := stmtSeq fNext rest
               (.cons s' rest', fOut)
   end

@@ -9,6 +9,7 @@ Current focus:
 
 Latest changes:
 
+- Optimized `sum(<k,v> in range(N)) ...` codegen by adding `Rust.Stmt.forRange` and compiling this pattern to `for k in 0..N { let v = true; ... }`, avoiding an intermediate `BTreeMap` from `ext_range`.
 - Refactored fully to DeBruijn-indexed terms/programs:
   - Removed PHOAS surface/core term layers (`STerm'`/`SProg` and `Term'`/`Prog`).
   - `Term.lean` and `SurfaceCore.lean` now define only shared types, builtins, and semimodule evidence.

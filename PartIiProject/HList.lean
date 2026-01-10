@@ -4,6 +4,11 @@ inductive HList {α : Type} (β : α → Type) : List α → Type where
   | cons {x xs} : β x → HList β xs → HList β (x :: xs)
 
 
+inductive HList2 {α β  : Type} (f : α → β →  Type) : List α → List β →  Type where
+  | nil : HList2 f [] []
+  | cons {x y xs ys} : f x y → HList2 f xs ys → HList2 f (x :: xs) (y :: ys)
+
+
 def hmap {T : Type} {l : List T} {ftype : T → Type} {gtype : T → Type} (f : {t : T} → ftype t → gtype t) : HList ftype l  → HList gtype l
   | HList.nil => HList.nil
   | HList.cons t ts => HList.cons (f t) (hmap f ts)

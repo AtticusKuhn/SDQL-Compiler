@@ -161,7 +161,10 @@ mutual
         | _, _ => inner.expr
     | .lookup aRange d k =>
         .lookupOrDefault (compileLoc2 d) (compileLoc2 k) (zeroOfAddMLoc (ctx := ctx.length) aRange)
-    | @Term2.sum _ dom range _ a d body =>
+    | @Term2.sum ctx dom range ctx1 a d body =>
+        -- match  dom, range, d with
+        --   | Ty.int, Ty.bool, ((TermLoc2.mk _ (Term2.builtin BuiltinFn.Range n))) => sorry
+        --   | _, _, _  => sorry
         let n := ctx.length
         let accInit : Rust.ExprLoc n := zeroOfAddMLoc (ctx := n) a
         let accDecl : Rust.StmtLoc n (n+1) := Rust.StmtLoc.mk loc (.letDecl true (.some accInit))
@@ -189,7 +192,14 @@ mutual
 
         let loopBody : Rust.StmtSeq (n+3) (n+3) :=
           Rust.StmtSeq.cons assignAcc Rust.StmtSeq.nil
-        let loopStmt : Rust.StmtLoc (n+1) (n+1) := Rust.StmtLoc.mk loc (.forKV de loopBody)
+        let loopStmt : Rust.StmtLoc (n+1) (n+1) :=
+          match de.expr with
+          | .callRuntimeFn .extRange (.cons endExclusive .nil) =>
+              -- Special-case `sum(<k,v> in range(N)) ...` to avoid allocating a `BTreeMap`:
+              -- compile the loop as `for k in 0..N { let v = true; ... }`.
+              Rust.StmtLoc.mk loc (.forRange endExclusive loopBody)
+          | _ =>
+              Rust.StmtLoc.mk loc (.forKV de loopBody)
 
         let stmts : Rust.StmtSeq n (n+1) :=
           Rust.StmtSeq.cons accDecl (Rust.StmtSeq.cons loopStmt Rust.StmtSeq.nil)
