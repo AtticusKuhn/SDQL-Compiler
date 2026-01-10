@@ -139,7 +139,7 @@ mutual
         .letIn (compileLoc2 bound) (compileLoc2 body)
     | .add a t1 t2 =>
         Compile.compileAdd a (compileLoc2 t1) (compileLoc2 t2)
-    | @Term2.mul _ _ _ _ s1 s2 e1 e2 =>
+    | @Term2.mul _ _ _ _ _ s1 s2 _ e1 e2 =>
         let lhs := compileLoc2 e1
         let rhs := compileLoc2 e2
         match s1, s2 with
@@ -206,7 +206,7 @@ mutual
         let accResult : Rust.ExprLoc (n+1) :=
           Rust.ExprLoc.withUnknownLoc (.var ⟨0, Nat.succ_pos n⟩)
         .block stmts accResult
-    | .proj _ r i => .tupleProj (compileLoc2 r) i
+    | @Term2.proj _ _ _ r i _ => .tupleProj (compileLoc2 r) i
     | .builtin b a =>
         Compile.compileBuiltin b (compileLoc2 a)
 
