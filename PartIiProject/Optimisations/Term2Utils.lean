@@ -79,6 +79,26 @@ def liftSubst2 {ctx ctx' : List Ty} {a b : Ty} (σ : Subst ctx ctx') :
   liftSubst (a := a) (liftSubst (a := b) σ)
 
 mutual
+  /-- A "dummy" term of a given type, intended only for unreachable substitution branches. -/
+  def defaultTerm2 {ctx : List Ty} : {ty : Ty} → Term2 ctx ty
+    | .bool => .constBool false
+    | .int => .constInt 0
+    | .real => .constReal 0.0
+    | .maxProduct => .promote (.mk SourceLocation.unknown (.constReal 0.0))
+    | .date => .builtin (.DateLit 0) (.mk SourceLocation.unknown (.constRecord .nil))
+    | .string => .constString ""
+    | .record l => .constRecord (defaultFields2 (ctx := ctx) l)
+    | .dict _ _ => .emptyDict
+
+  def defaultLoc2 {ctx : List Ty} : {ty : Ty} → TermLoc2 ctx ty
+    | ty => .mk SourceLocation.unknown (defaultTerm2 (ctx := ctx) (ty := ty))
+
+  def defaultFields2 {ctx : List Ty} : (l : List Ty) → TermFields2 ctx l
+    | [] => .nil
+    | t :: ts => .cons (defaultLoc2 (ctx := ctx) (ty := t)) (defaultFields2 (ctx := ctx) ts)
+end
+
+mutual
   def substTerm2 {ctx ctx' : List Ty} {ty : Ty}
       (σ : Subst ctx ctx') : Term2 ctx ty → Term2 ctx' ty
     | .var m => σ m
@@ -126,11 +146,11 @@ mutual
     | .lookup _ d k => mentionsIndexLoc d i || mentionsIndexLoc k i
     | .not e => mentionsIndexLoc e i
     | .ite c t f => mentionsIndexLoc c i || mentionsIndexLoc t i || mentionsIndexLoc f i
-    | .letin bound body => mentionsIndexLoc bound i || mentionsIndexLoc body i
+    | .letin bound body => mentionsIndexLoc bound i || mentionsIndexLoc body (i + 1)
     | .add _ t1 t2 => mentionsIndexLoc t1 i || mentionsIndexLoc t2 i
     | @Term2.mul _ _ _ _ _ _ _ _ t1 t2 => mentionsIndexLoc t1 i || mentionsIndexLoc t2 i
     | .promote e => mentionsIndexLoc e i
-    | .sum _ d body => mentionsIndexLoc d i || mentionsIndexLoc body i
+    | .sum _ d body => mentionsIndexLoc d i || mentionsIndexLoc body (i + 2)
     | @Term2.proj _ _ _ record _ _ => mentionsIndexLoc record i
     | .builtin _ arg => mentionsIndexLoc arg i
 

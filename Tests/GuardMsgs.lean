@@ -1,4 +1,5 @@
 import PartIiProject.SyntaxSDQLProg
+import Tests.Optimisations.VerticalLoopFusion
 
 open PartIiProject
 

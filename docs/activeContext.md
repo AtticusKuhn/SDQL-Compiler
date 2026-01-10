@@ -46,6 +46,9 @@ Latest changes:
 - Refactored the Rust AST to be DeBruijn-indexed (`Expr : Nat → Type`, vars are `Fin ctx`) and replaced stringly-typed runtime calls with `RuntimeFn`; updated `PartIiProject/CodegenRust.lean` accordingly.
 - Added a performance benchmarking runner `Performance.lean` (flake app `performanceComparsion`) that compares runtime (ms) of `sdql-rs` binaries vs Lean-generated Rust binaries, including microbenchmarks and TPCH cases.
 - Fixed a dependent-pattern-matching blocker in optimisation passes by refactoring `Term2.mul`/`Term2.proj` to carry typeclass witnesses (`has_tensor`/`has_proj`) instead of computed indices (`tensor` / `List.getD`) directly.
+- Added a small `Term2` optimisation framework (`PartIiProject/Optimisations/Apply.lean`) where each rewrite is a non-recursive `Optimisation` and `applyOptimisations{,Loc}` performs the recursive traversal + (fuel-bounded) fixpoint iteration.
+- Implemented vertical loop fusion over `Term2` as two separate rewrites in `PartIiProject/Optimisations/VerticalLoopFusion.lean` (`verticalLoopFusionKeyMap2` and `verticalLoopFusionValueMap2`).
+- Added/confirmed `#guard_msgs` coverage for vertical loop fusion in `Tests/Optimisations/VerticalLoopFusion.lean` (pulled in via `Tests/GuardMsgs.lean`).
 
 Next steps (proposed):
 
