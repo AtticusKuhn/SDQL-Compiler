@@ -110,6 +110,7 @@ Notable patterns:
 - For optimisation passes that pattern-match on `Term2`, avoid computed indices in inductive families:
   - `Term2.mul` carries a `has_tensor t1 t2 t3` witness (typeclass) instead of returning `Term2 ctx (tensor t1 t2)` directly.
   - `Term2.proj` carries a `has_proj l i t` witness instead of returning `Term2 ctx (l.getD i Ty.int)` directly.
+- Optimisation passes are structured as local, non-recursive rewrites over core terms (`PartIiProject/Optimisations/Apply.lean`): each `Optimisation` is `Term2 ctx ty → Option (Term2 ctx ty)`, and `applyOptimisations{,Loc}` provides the recursive traversal and fuel-bounded fixpoint iteration.
 - Addition and scaling are encoded as explicit evidence, guiding typing and compilation.
 - Lookups and sums rely on the additive identity of the result to stay total and align with sparse semantics.
 - Tests compare Rust program output against expected strings or a reference binary. Rust programs use `SDQLShow::show(&result)`.

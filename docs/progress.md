@@ -45,6 +45,7 @@ What works:
 - Performance comparison: `Performance.lean` executable `performanceComparsion` benchmarks runtime (ms) of `sdql-rs` reference binaries vs Lean-generated Rust binaries.
 - Surface/core terms are DeBruijn-indexed: surface terms in `SurfaceCore2.lean`, core terms in `Term2.lean`, with lowering in `ToCore2`.
 - Optimisation-friendly `Term2` indices: `mul`/`proj` carry `has_tensor`/`has_proj` witnesses to avoid dependent-elimination failures when pattern-matching in optimisation passes.
+- Optimisations over `Term2`: `PartIiProject/Optimisations/Apply.lean` provides a recursive driver for non-recursive `Optimisation` rewrites; `PartIiProject/Optimisations/VerticalLoopFusion.lean` implements key-map and value-map vertical loop fusion with `#guard_msgs` regression tests.
 
 What's left to build:
 
