@@ -77,12 +77,13 @@ mutual
         → TermLoc2 ctx ty
         → TermLoc2 ctx ty
         → Term2 ctx ty
-    | mul : {ctx : List Ty} → {sc t1 t2 : Ty}
+    | mul : {ctx : List Ty} → {sc t1 t2 t3 : Ty}
         → (s1 : ScaleM sc t1)
         → (s2 : ScaleM sc t2)
+        → [has_tensor t1 t2 t3]
         → TermLoc2 ctx t1
         → TermLoc2 ctx t2
-        → Term2 ctx (tensor t1 t2)
+        → Term2 ctx t3
     | promote : {ctx : List Ty} → {fromType toType : Ty}
         → TermLoc2 ctx fromType → Term2 ctx toType
     | sum : {ctx : List Ty} → {dom range ty : Ty}
@@ -90,10 +91,11 @@ mutual
         → TermLoc2 ctx (.dict dom range)
         → TermLoc2 (dom :: range :: ctx) ty
         → Term2 ctx ty
-    | proj : {ctx : List Ty} → (l : List Ty)
+    | proj : {ctx : List Ty} → (l : List Ty) → {t : Ty}
         → TermLoc2 ctx (.record l)
         → (i : Nat)
-        → Term2 ctx (l.getD i Ty.int)
+        → [has_proj l i t]
+        → Term2 ctx t
     | builtin : {ctx : List Ty} → {a b : Ty}
         → BuiltinFn a b
         → TermLoc2 ctx a
@@ -176,13 +178,14 @@ mutual
         let x := freshName names
         s!"let {x} = {showTermLoc2 names bound} in {showTermLoc2 (x :: names) body}"
     | .add _ t1 t2 => s!"{showTermLoc2 names t1} + {showTermLoc2 names t2}"
-    | .mul _ _ t1 t2 => s!"{showTermLoc2 names t1} * {showTermLoc2 names t2}"
+    | @Term2.mul _ _ _ _ _ _ _ _ t1 t2 =>
+        s!"{showTermLoc2 names t1} * {showTermLoc2 names t2}"
     | .promote e => s!"promote({showTermLoc2 names e})"
     | .sum _ d body =>
         let k := freshName names
         let v := freshName (k :: names)
         s!"sum({k}, {v} in {showTermLoc2 names d}) {showTermLoc2 (k :: v :: names) body}"
-    | .proj _ record i => s!"{showTermLoc2 names record}.{i}"
+    | @Term2.proj _ _ _ record i _ => s!"{showTermLoc2 names record}.{i}"
     | .builtin _ arg => s!"builtin({showTermLoc2 names arg})"
 where
   /-- Get a variable name from its Mem proof -/

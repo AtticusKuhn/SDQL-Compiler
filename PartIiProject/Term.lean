@@ -311,10 +311,24 @@ inductive ScaleM : Ty → Ty → Type where
   | dictS {sc dom range : Ty} (sRange : ScaleM sc range) : ScaleM sc (Ty.dict dom range)
   | recordS {sc : Ty} {l : List Ty} (fields : ∀ (t : Ty), Mem t l → ScaleM sc t) : ScaleM sc (Ty.record l)
 
-inductive has_tensor  (S : Ty) : Ty → Ty → Type where
-  | map_over_dict : {dom range c : Ty} → (has_tensor S range c) → has_tensor S (.dict dom range)  (.dict dom c)
-  | scalar : {T1 : Ty} → (ScaleM S T1) → has_tensor S T1 T1
-  | map_over_record {L0 L1 : List Ty}  :  HList2 (has_tensor S · ·) L0 L1 → has_tensor S (.record L0) (.record L1)
+/-!
+`tensor t1 t2` is the *computed* result type of `t1 * t2`, but it is awkward to
+mention in indices of inductive families (e.g. `Term2`) because dependent
+pattern matching then has to solve equations involving `tensor`.
+
+We instead carry an explicit witness (as a typeclass) connecting an abstract
+result type `t3` to the computed `tensor t1 t2`. This keeps `tensor` out of the
+indices while still letting constructors infer the canonical result type.
+-/
+class has_tensor (t1 t2 : Ty) (t3 : outParam Ty) : Type where
+  eq : t3 = tensor t1 t2
+
+instance (t1 t2 : Ty) : has_tensor t1 t2 (tensor t1 t2) := ⟨rfl⟩
+
+class has_proj (l : List Ty) (i : Nat) (t : outParam Ty) : Type where
+  eq : t = l.getD i Ty.int
+
+instance (l : List Ty) (i : Nat) : has_proj l i (l.getD i Ty.int) := ⟨rfl⟩
 
 
 def toHList {T : Type} {l : List T} {ftype : T → Type}

@@ -45,6 +45,7 @@ Latest changes:
   - `PartIiProject/Rust.lean`: generated `for` loops iterate via `.clone().into_iter()` to avoid moving maps used more than once.
 - Refactored the Rust AST to be DeBruijn-indexed (`Expr : Nat → Type`, vars are `Fin ctx`) and replaced stringly-typed runtime calls with `RuntimeFn`; updated `PartIiProject/CodegenRust.lean` accordingly.
 - Added a performance benchmarking runner `Performance.lean` (flake app `performanceComparsion`) that compares runtime (ms) of `sdql-rs` binaries vs Lean-generated Rust binaries, including microbenchmarks and TPCH cases.
+- Fixed a dependent-pattern-matching blocker in optimisation passes by refactoring `Term2.mul`/`Term2.proj` to carry typeclass witnesses (`has_tensor`/`has_proj`) instead of computed indices (`tensor` / `List.getD`) directly.
 
 Next steps (proposed):
 
