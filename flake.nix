@@ -251,8 +251,9 @@
                 claude-code
                 sshpass
                 # sdql reference prerequisites
-                jdk17 sbt scala_2_13
-                clang clang-tools gcc gnumake gnused
+                # commenting out scala for now
+                # jdk17 sbt scala_2_13
+                # clang clang-tools gcc gnumake gnused
                 # bench/report helpers
                 jq gnuplot
               ]);

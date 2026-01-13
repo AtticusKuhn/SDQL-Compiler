@@ -1,4 +1,8 @@
 import PartIiProject.Optimisations.Apply
+import PartIiProject.Optimisations.HorizontalLoopFusion
+import PartIiProject.Optimisations.LoopFactorization
+import PartIiProject.Optimisations.LoopInvariantCodeMotion
+import PartIiProject.Optimisations.LoopMemoization
 import PartIiProject.Optimisations.VerticalLoopFusion
 
 namespace PartIiProject.Optimisations

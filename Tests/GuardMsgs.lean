@@ -1,4 +1,8 @@
 import PartIiProject.SyntaxSDQLProg
+import Tests.Optimisations.HorizontalLoopFusion
+import Tests.Optimisations.LoopFactorization
+import Tests.Optimisations.LoopInvariantCodeMotion
+import Tests.Optimisations.LoopMemoization
 import Tests.Optimisations.VerticalLoopFusion
 
 open PartIiProject

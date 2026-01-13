@@ -1,5 +1,6 @@
 import PartIiProject.Term2
 import PartIiProject.CodegenRust
+import PartIiProject.Optimisations
 import PartIiProject.SyntaxSDQLProg
 import Tests.GuardMsgs
 import Tests.TPCH.Q01
@@ -29,6 +30,7 @@ namespace Tests
 namespace Cases
 
 open PartIiProject
+open PartIiProject.Optimisations
 
 /- Expected-output strings are produced by evaluating the term in Lean
    and pretty-printing the resulting value via `showValue`. -/
@@ -39,6 +41,8 @@ unsafe inductive TestCase where
   | program (name : String) (p : SProg2) (expected : String) : TestCase
   | programRef (name : String) (p : SProg2) (refBinPath : String) (envVars : List (String × String)) : TestCase
   | compileOnly (name : String) (p : SProg2) : TestCase
+  | optimisationEq (name : String) (p : SProg2) (opts : List Optimisation)
+      (envVars : List (String × String)) : TestCase
 
 open TestCase
 
@@ -80,6 +84,73 @@ unsafe def smallCases : List TestCase :=
   , TestCase.program "underscore_ident" p_underscore_ident "4"
   , TestCase.program "if_then_true" p_if_then_true "7"
   , TestCase.program "if_then_false" p_if_then_false "0"
+  ]
+
+/- End-to-end optimisation correctness checks (Lean → Rust → binary). -/
+
+unsafe def p_vertical_loop_fusion_key_map : SProg2 :=
+  [SDQLProg2 { { int -> int } }|
+    let y = sum( <x, x_v> <- ({ 1 -> 10, 2 -> 20 }) ) { x + 1 -> x_v } in
+    sum( <x, x_v> <- y ) { x + 2 -> x_v }
+  ]
+
+unsafe def p_vertical_loop_fusion_value_map : SProg2 :=
+  [SDQLProg2 { { int -> int } }|
+    let y = sum( <x, x_v> <- ({ 1 -> 10, 2 -> 20 }) ) { x -> x_v + 1 } in
+    sum( <x, x_v> <- y ) { x -> x_v + 2 }
+  ]
+
+unsafe def p_horizontal_loop_fusion : SProg2 :=
+  [SDQLProg2 { int }|
+    let d = { 1 -> 10, 2 -> 20 } in
+    let y1 = sum( <k, v> <- d ) v in
+    let y2 = sum( <k, v> <- d ) (v + 1) in
+    y1 + y2
+  ]
+
+unsafe def p_loop_factorization_left : SProg2 :=
+  [SDQLProg2 { int }|
+    sum( <k, v> <- ({ 1 -> 10, 2 -> 20 }) ) (2 * v)
+  ]
+
+unsafe def p_loop_factorization_right : SProg2 :=
+  [SDQLProg2 { int }|
+    sum( <k, v> <- ({ 1 -> 10, 2 -> 20 }) ) (v * 2)
+  ]
+
+unsafe def p_loop_invariant_code_motion : SProg2 :=
+  [SDQLProg2 { int }|
+    let d = { 1 -> 10, 2 -> 20 } in
+    sum( <k, v> <- d ) (let y = 5 in v + y)
+  ]
+
+unsafe def p_loop_memoization_lookup : SProg2 :=
+  [SDQLProg2 { int }|
+    sum( <k, v> <- ({ 1 -> 10, 2 -> 20 }) ) (if k == 1 then v)
+  ]
+
+unsafe def p_loop_memoization_partition : SProg2 :=
+  [SDQLProg2 { { int -> int } }|
+    sum( <k, v> <- ({ 1 -> 10, 2 -> 20 }) ) (if k == 1 then { k -> v })
+  ]
+
+unsafe def optimisationCases : List TestCase :=
+  [ TestCase.optimisationEq "vertical_loop_fusion_key_map" p_vertical_loop_fusion_key_map
+      [verticalLoopFusionKeyMap2, verticalLoopFusionValueMap2] []
+  , TestCase.optimisationEq "vertical_loop_fusion_value_map" p_vertical_loop_fusion_value_map
+      [verticalLoopFusionKeyMap2, verticalLoopFusionValueMap2] []
+  , TestCase.optimisationEq "horizontal_loop_fusion" p_horizontal_loop_fusion
+      [horizontalLoopFusion2] []
+  , TestCase.optimisationEq "loop_factorization_left" p_loop_factorization_left
+      [loopFactorizationLeft2] []
+  , TestCase.optimisationEq "loop_factorization_right" p_loop_factorization_right
+      [loopFactorizationRight2] []
+  , TestCase.optimisationEq "loop_invariant_code_motion" p_loop_invariant_code_motion
+      [loopInvariantCodeMotion2] []
+  , TestCase.optimisationEq "loop_memoization_lookup" p_loop_memoization_lookup
+      [loopMemoizationLookup2] []
+  , TestCase.optimisationEq "loop_memoization_partition" p_loop_memoization_partition
+      [loopMemoizationPartition2] []
   ]
 
 /- TPCH-style programs exercise file-loading pipelines. Queries listed here are
@@ -188,7 +259,7 @@ unsafe def tpchCasesSF001 : List TestCase :=
   ]
 
 unsafe def cases : List TestCase :=
-  smallCases ++ tpchCases ++ tpchCasesSF001
+  smallCases ++ optimisationCases ++ tpchCases ++ tpchCasesSF001
 
 end Cases
 end Tests

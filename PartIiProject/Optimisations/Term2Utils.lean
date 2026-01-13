@@ -158,12 +158,58 @@ mutual
     match t with
     | .mk _ inner => mentionsIndex inner i
 
-  def mentionsIndexFields {ctx : List Ty} {l : List Ty} (fs : TermFields2 ctx l) (i : Nat) : Bool :=
+def mentionsIndexFields {ctx : List Ty} {l : List Ty} (fs : TermFields2 ctx l) (i : Nat) : Bool :=
     match fs with
     | .nil => false
     | .cons h t => mentionsIndexLoc h i || mentionsIndexFields t i
 end
 
 end Term2
+
+namespace Ty
+
+mutual
+  def synthAddM : (t : Ty) → AddM t
+    | .bool => .boolA
+    | .int => .intA
+    | .real => .realA
+    | .maxProduct => .maxProductA
+    | .date => .dateA
+    | .string => .stringA
+    | .dict dom range => .dictA (synthAddM range)
+    | .record l => .recordA (synthAddMHList l)
+
+  def synthAddMHList : (l : List Ty) → HList AddM l
+    | [] => .nil
+    | t :: ts => .cons (synthAddM t) (synthAddMHList ts)
+end
+
+end Ty
+
+namespace AddM
+
+mutual
+  /-- Syntactic check for whether a term is the additive identity for the given `AddM`. -/
+  def isZeroTerm2 {ctx : List Ty} : {ty : Ty} → AddM ty → Term2 ctx ty → Bool
+    | .bool, .boolA, .constBool false => true
+    | .int, .intA, .constInt 0 => true
+    | .real, .realA, .constReal r => r == 0.0
+    | .maxProduct, .maxProductA, .promote (fromType := .real) (toType := .maxProduct) (.mk _ (.constReal r)) =>
+        r == 0.0
+    | .date, .dateA, .builtin (.DateLit 10101) (.mk _ (.constRecord .nil)) => true
+    | .string, .stringA, .constString "" => true
+    | .dict _ _, .dictA _, .emptyDict => true
+    | .record _, .recordA fieldsEv, .constRecord fields =>
+        isZeroFields2 fieldsEv fields
+    | _, _, _ => false
+
+  def isZeroFields2 {ctx : List Ty}
+      : {l : List Ty} → HList AddM l → TermFields2 ctx l → Bool
+    | [], .nil, .nil => true
+    | _ :: _, .cons hEv tEv, .cons h t =>
+        isZeroTerm2 hEv h.term && isZeroFields2 tEv t
+end
+
+end AddM
 
 end PartIiProject.Optimisations

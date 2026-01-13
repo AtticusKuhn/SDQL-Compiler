@@ -5,7 +5,7 @@ open PartIiProject
 namespace PartIiProject.Optimisations
 
 open PartIiProject.Optimisations.Term2
-
+set_option pp.mvars.delayed true
 /--
 Vertical loop fusion, specialized to the two common "singleton dict" shapes:
 
@@ -21,17 +21,20 @@ def verticalLoopFusionKeyMap2 : Optimisation :=
   fun {ctx} {ty} t =>
     match t with
     | Term2.letin
-        (.mk _ (Term2.sum _ e₁ (.mk _ (.dictInsert k₁ v₁ (.mk _ .emptyDict)))))
+        (.mk _ (Term2.sum _ e₁ (.mk _ (.dictInsert k₁ ⟨_,  .var (.tail _ (.head _)) ⟩  (.mk _ .emptyDict)))))
         (.mk _ (Term2.sum a₂
           (.mk _ (.var (.head _)))
-          (.mk bodyLoc (.dictInsert k₂ v₂ (.mk emptyLoc .emptyDict))))) =>
-        match v₁.term, v₂.term with
-        | .var (.tail _ (.head _)), .var (.tail _ (.head _)) =>
-            if Term2.mentionsIndexLoc k₁ 1 || Term2.mentionsIndexLoc k₂ 1 || Term2.mentionsIndexLoc k₂ 2 then
-              none
-            else
+          (.mk bodyLoc (.dictInsert k₂ v₂ (.mk emptyLoc .emptyDict)))))
+    -- | Term2.letin
+    --     (.mk _ (Term2.sum _ e₁ (.mk _ (.dictInsert k₁ v₁ (.mk _ .emptyDict)))))
+    --     (.mk _ (Term2.sum a₂
+    --       (.mk _ (.var (.head _)))
+    --       (.mk bodyLoc (.dictInsert k₂ v₂ (.mk emptyLoc .emptyDict))))) =>
+          =>
+        match v₂.term with
+        |  .var (.tail _ (@Mem.head _ _ _)) =>
               let σ : Term2.Subst (_ :: _ :: (.dict _ _) :: ctx) (_ :: _ :: ctx) :=
-                fun {ty} m =>
+                fun m =>
                   match m with
                   | .head _ => k₁.term
                   | .tail _ m =>
@@ -41,13 +44,11 @@ def verticalLoopFusionKeyMap2 : Optimisation :=
                           match m with
                           | .head _ => Term2.defaultTerm2
                           | .tail _ m => .var (.tail _ (.tail _ m))
-              let k₂' := Term2.substLoc2 σ k₂
-              let v₂' := Term2.substLoc2 σ v₂
               let emptyFused : TermLoc2 (_ :: _ :: ctx) (.dict _ _) := .mk emptyLoc .emptyDict
               let fusedBody : TermLoc2 (_ :: _ :: ctx) (.dict _ _) :=
-                .mk bodyLoc (.dictInsert k₂' v₂' emptyFused)
+                .mk bodyLoc (.dictInsert (Term2.substLoc2 σ k₂) (Term2.substLoc2 σ v₂) emptyFused)
               some (Term2.sum a₂ e₁ fusedBody)
-        | _, _ => none
+        | _ => none
     | _ => none
 
 def verticalLoopFusionValueMap2 : Optimisation :=
@@ -60,11 +61,8 @@ def verticalLoopFusionValueMap2 : Optimisation :=
           (.mk bodyLoc (.dictInsert k₂ v₂ (.mk emptyLoc .emptyDict))))) =>
         match k₁.term, k₂.term with
         | .var (.head _), .var (.head _) =>
-            if Term2.mentionsIndexLoc v₁ 0 || Term2.mentionsIndexLoc v₂ 0 || Term2.mentionsIndexLoc v₂ 2 then
-              none
-            else
               let σ : Term2.Subst (_ :: _ :: (.dict _ _) :: ctx) (_ :: _ :: ctx) :=
-                fun {ty} m =>
+                fun m =>
                   match m with
                   | .head _ => k₁.term
                   | .tail _ m =>
