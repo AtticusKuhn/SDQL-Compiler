@@ -126,6 +126,157 @@ namespace TermLoc2
 end TermLoc2
 
 -- ============================================================================
+-- Structural equality (ignoring source locations and evidence)
+-- ============================================================================
+
+namespace Term2BEq
+
+inductive BuiltinFnRep : Type
+  | Or
+  | And
+  | Eq (t : Ty)
+  | Leq (t : Ty)
+  | Lt (t : Ty)
+  | Sub (t : Ty)
+  | Div
+  | StrEndsWith
+  | StrStartsWith
+  | StrContains
+  | FirstIndex
+  | LastIndex
+  | SubString
+  | Dom (dom range : Ty)
+  | Range
+  | Size (dom range : Ty)
+  | DateLit (yyyymmdd : Int)
+  | Year
+  | Concat (l1 l2 : List Ty)
+  deriving BEq
+
+def builtinFnRep : {a b : Ty} → BuiltinFn a b → BuiltinFnRep
+  | _, _, .Or => .Or
+  | _, _, .And => .And
+  | _, _, .Eq t => .Eq t
+  | _, _, .Leq t => .Leq t
+  | _, _, .Lt t => .Lt t
+  | _, _, .Sub t => .Sub t
+  | _, _, .Div => .Div
+  | _, _, .StrEndsWith => .StrEndsWith
+  | _, _, .StrStartsWith => .StrStartsWith
+  | _, _, .StrContains => .StrContains
+  | _, _, .FirstIndex => .FirstIndex
+  | _, _, .LastIndex => .LastIndex
+  | _, _, .SubString => .SubString
+  | _, _, .Dom (dom := dom) (range := range) => .Dom dom range
+  | _, _, .Range => .Range
+  | _, _, .Size (dom := dom) (range := range) => .Size dom range
+  | _, _, .DateLit n => .DateLit n
+  | _, _, .Year => .Year
+  | _, _, .Concat l1 l2 => .Concat l1 l2
+
+def beqBuiltinFn : {a b : Ty} → BuiltinFn a b → BuiltinFn a b → Bool
+  | _, _, f, g => builtinFnRep f == builtinFnRep g
+
+mutual
+  def beqMem {α : Type} {a : α} : {as : List α} → Mem a as → Mem a as → Bool
+    | _ :: _, .head _, .head _ => true
+    | _ :: _, .tail _ m1, .tail _ m2 => beqMem m1 m2
+    | _, _, _ => false
+
+  def beqTermLoc2 {ctx : List Ty} {ty : Ty} : TermLoc2 ctx ty → TermLoc2 ctx ty → Bool
+    | .mk _ t1, .mk _ t2 => beqTerm2 t1 t2
+
+  def beqFields2 {ctx : List Ty}
+      : {l : List Ty} → TermFields2 ctx l → TermFields2 ctx l → Bool
+    | [], .nil, .nil => true
+    | _ :: _, .cons h1 t1, .cons h2 t2 => beqTermLoc2 h1 h2 && beqFields2 t1 t2
+
+  /-- Syntactic equality for core terms.
+
+  Ignores `SourceLocation` and all typing/evidence arguments (`AddM`, `ScaleM`, `has_tensor`, `has_proj`).
+  Since variables are DeBruijn (`Mem` proofs), binder renaming is ignored (alpha-equivalence). -/
+  def beqTerm2 : {ctx : List Ty} → {ty : Ty} → Term2 ctx ty → Term2 ctx ty → Bool
+    | ctx0, ty0, t1, t2 =>
+        match ctx0, ty0, t1, t2 with
+        | _, _, .var m1, .var m2 => beqMem m1 m2
+        | _, Ty.int, @Term2.constInt _ n1, @Term2.constInt _ n2 => n1 == n2
+        | _, _, @Term2.constReal _ r1, @Term2.constReal _ r2 => r1.toBits == r2.toBits
+        | _, _,@Term2.constBool _ b1, @Term2.constBool _ b2 => b1 == b2
+        | _, _,@Term2.constString _ s1, @Term2.constString _ s2 => s1 == s2
+        | _, _,.constRecord fs1, .constRecord fs2 => beqFields2 fs1 fs2
+        | _, _,.emptyDict, .emptyDict => true
+        | _, _, .dictInsert k1 v1 d1, .dictInsert k2 v2 d2 =>
+            beqTermLoc2 k1 k2 && beqTermLoc2 v1 v2 && beqTermLoc2 d1 d2
+        | _, _, @Term2.lookup _ dom range _ d1 k1, @Term2.lookup _ dom' _ _ d2 k2 =>
+            match Ty.decEq dom dom' with
+            | isFalse _ => false
+            | isTrue hdom => match hdom with
+              | rfl =>
+                  beqTermLoc2 d1 d2 && beqTermLoc2 k1 k2
+        | _, _, .not e1, .not e2 => beqTermLoc2 e1 e2
+        | _, _, .ite c1 t1 f1, .ite c2 t2 f2 =>
+            beqTermLoc2 c1 c2 && beqTermLoc2 t1 t2 && beqTermLoc2 f1 f2
+        | _, _, @Term2.letin _ ty₁ _ bound1 body1, @Term2.letin _ ty₁' _ bound2 body2 =>
+            match Ty.decEq ty₁ ty₁' with
+            | isTrue h => match h with
+              | rfl => beqTermLoc2 bound1 bound2 && beqTermLoc2 body1 body2
+            | isFalse _ => false
+        | _, _, .add _ e1 e2, .add _ e1' e2' => beqTermLoc2 e1 e1' && beqTermLoc2 e2 e2'
+        | _, _, @Term2.mul _ sc t1 t2 _ _ _ _ e1 e2, @Term2.mul _ sc' t1' t2' _ _ _ _ e1' e2' =>
+            match Ty.decEq sc sc' with
+            | isFalse _ => false
+            | isTrue hsc => match hsc with
+              | rfl =>
+                  match Ty.decEq t1 t1' with
+                  | isFalse _ => false
+                  | isTrue ht1 => match ht1 with
+                    | rfl =>
+                        match Ty.decEq t2 t2' with
+                        | isFalse _ => false
+                        | isTrue ht2 => match ht2 with
+                          | rfl => beqTermLoc2 e1 e1' && beqTermLoc2 e2 e2'
+        | _, _, @Term2.promote _ fromType _ e1, @Term2.promote _ fromType' _ e2 =>
+            match Ty.decEq fromType fromType' with
+            | isTrue h => match h with
+              | rfl => beqTermLoc2 e1 e2
+            | isFalse _ => false
+        | _, _, @Term2.sum _ dom range _ _ d1 body1, @Term2.sum _ dom' range' _ _ d2 body2 =>
+            match Ty.decEq dom dom' with
+            | isFalse _ => false
+            | isTrue hdom => match hdom with
+              | rfl =>
+                  match Ty.decEq range range' with
+                  | isFalse _ => false
+                  | isTrue hrange => match hrange with
+                    | rfl => beqTermLoc2 d1 d2 && beqTermLoc2 body1 body2
+        | _, _, @Term2.proj _ l _ r1 i1 _, @Term2.proj _ l' _ r2 i2 _ =>
+            if i1 == i2 then
+              match Ty.decEqList l l' with
+              | isTrue h => match h with
+                | rfl => beqTermLoc2 r1 r2
+              | isFalse _ => false
+            else
+              false
+        | _, _, @Term2.builtin _ a _ b1 arg1, @Term2.builtin _ a' _ b2 arg2 =>
+            match Ty.decEq a a' with
+            | isFalse _ => false
+            | isTrue ha => match ha with
+              | rfl => beqBuiltinFn b1 b2 && beqTermLoc2 arg1 arg2
+        |_, _,  _, _ => false
+end
+
+end Term2BEq
+
+instance {ctx : List Ty} {ty : Ty} : BEq (Term2 ctx ty) where
+  beq := Term2BEq.beqTerm2
+
+instance {ctx : List Ty} {ty : Ty} : BEq (TermLoc2 ctx ty) where
+  beq := Term2BEq.beqTermLoc2
+
+instance {ctx : List Ty} {l : List Ty} : BEq (TermFields2 ctx l) where
+  beq := Term2BEq.beqFields2
+
+-- ============================================================================
 -- Program structure using DeBruijn terms
 -- ============================================================================
 
@@ -366,7 +517,7 @@ mutual
 
   /-- Translate an unlocated DeBruijn surface term to core -/
   unsafe def tr2 {ctx : List SurfaceTy} {t : SurfaceTy}
-      (loc : SourceLocation)
+      (_loc : SourceLocation)
       (e : STerm2 ctx t) : Term2 (tyCtx ctx) (ty t) :=
     match e with
     | STerm2.var m => Term2.var (tyMem m)

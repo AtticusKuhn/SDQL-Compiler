@@ -7,6 +7,7 @@ What works:
 - Boolean addition now matches SDQL/reference semantics (OR), fixing set-style aggregations like TPCH Q04’s `l_h`.
 - Source locations: `SourceLocation` threaded through the pipeline (`LoadTermLoc`, `UntypedTermLoc`, `STermLoc2`, `TermLoc2`) for better debugging/error reporting.
 - Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`, and builtins (`And`, `Or`, `Eq`, `Leq`, `Sub`, `Div`, `StrEndsWith`, `StrStartsWith`, `StrContains`, `FirstIndex`, `LastIndex`, `SubString`, `Dom`, `Range`, `Size`, `DateLit`, `Year`, `Concat`).
+- Syntactic equality for core terms: `BEq` on `Term2`/`TermLoc2` checks AST equality up to alpha-equivalence (DeBruijn) and ignores `SourceLocation` and typing evidence.
 - Pretty-printing for records/dicts; numerous `#eval` demos.
 - SDQL DSL macros: `[SDQL| ... ]` elaborates to `LoadTermLoc`, supporting literals, records (positional and named), dict literals, lookup, `sum`, `let`, `if`, `not`, `+`, `-`, `*` (scalar inferred; optional `*{bool|int|real}`), `/`, boolean ops, and builtins (`dom`, `range`, `size`, `endsWith`, `date`, `concat`).
 - New program pipeline (DeBruijn): `[SDQLProg2 { T }| ... ]` elaborates to `LoadTermLoc` then runs `LoadTermLoc → UntypedTermLoc → STermLoc2` to produce an `SProg2` with an explicit typed context (`ctx : List SurfaceTy`) and `loadPaths`.
@@ -22,6 +23,7 @@ What works:
 - Testing: Lean test executable `sdql-tests` compiles SDQL→Rust, builds with `rustc`, runs programs, and compares outputs. Supports two modes:
   - `TestCase.program`: compares against hardcoded expected strings
   - `TestCase.programRef`: dynamically compares against a reference Rust binary (e.g., sdql-rs)
+- Optimisation testing: `TestCase.optimisationEq` compiles and runs both the unoptimised program and an optimised variant (after applying a list of `Optimisation` rewrites over `Term2`), and asserts their outputs match (end-to-end via the Rust backend).
 - Tests: updated to consume `SProg2` programs built via `[SDQLProg2 { T }| ... ]` and to generate Rust via `renderRustProg2Shown`. `.sdql-test-out/*.rs` and binaries are regenerated through this path.
 - TPCH Q02: now tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q02_tiny`) using dynamic output comparison.
 - TPCH Q01: now tested against the sdql-rs reference implementation (`sdql-rs/target/release/tpch_q01_tiny`) using dynamic output comparison.
@@ -67,5 +69,5 @@ Known issues / caveats:
 - Codegen depends on helpers/traits included in generated files; multiplication is not yet wired end-to-end for programs (helpers exist for addition/tuples, and stubs for loaders).
 - Rust printing for tuples (records) is implemented for arities up to 5; extend as needed.
 - Rust loop codegen clones maps before iterating (`.clone().into_iter()`) to avoid moving shared intermediates.
-- `nix build` may fail to resolve newly-added Lean modules unless the lean4‑nix manifest mapping is updated; `lake build` remains authoritative and succeeds.
+- `nix build` may fail to resolve newly-added Lean modules unless the lean4‑nix manifest mapping is updated; In this case, you need to `git add` the new Lean file.
 - The DeBruijn pipeline is the only supported term/program representation (older PHOAS layers have been removed).

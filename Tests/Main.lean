@@ -1,10 +1,12 @@
 import PartIiProject.CodegenRust
+import PartIiProject.Optimisations
 import PartIiProject.Rust
 import PartIiProject.Term2
 import Tests.Cases
 import Lean
 
 open PartIiProject
+open PartIiProject.Optimisations
 open PartIiProject.Rust (withLocComments)
 open System
 
@@ -12,6 +14,7 @@ inductive TestKind where
   | compileOnly
   | expectOutput
   | expectRefMatch
+  | expectOptMatch
   deriving Inhabited
 
 structure TestResult where
@@ -115,9 +118,8 @@ unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
   IO.FS.createDirAll outDir
   -- Copy the shared runtime file to the output directory
   copyFile runtimeSrc (outDir / "sdql_runtime.rs")
-  let compileProgram (name : String) (sp : SProg2) :
+  let compileCoreProgram (name : String) (cp : Prog2) :
       IO (Except String FilePath) := do
-        let cp := ToCore2.trProg2 sp
         -- Generate Rust code with source location comments for debugging
         let rs := PartIiProject.renderRustProg2Shown cp withLocComments
         let rsPath := outDir / s!"{name}.rs"
@@ -127,6 +129,8 @@ unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
         if ccode != 0 then
           return .error cerr
         return .ok binPath
+  let compileProgram (name : String) (sp : SProg2) : IO (Except String FilePath) :=
+    compileCoreProgram name (ToCore2.trProg2 sp)
   match c with
   | .program name sp expected => do
       match ← compileProgram name sp with
@@ -168,6 +172,41 @@ unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
           let outStr := rout.trim
           return { name, kind := .expectRefMatch, expected? := some expected,
                    got? := some outStr, refBin? := some refBinPath }
+  | .optimisationEq name sp opts envVars => do
+      let baseCp := ToCore2.trProg2 sp
+      let optTerm := applyOptimisationsLoc opts baseCp.term
+      let optCp : Prog2 := { baseCp with term := optTerm }
+      if baseCp.term == optCp.term then
+        let baseCoreStr := Term2.showTermLoc2 [] baseCp.term
+        let optCoreStr := Term2.showTermLoc2 [] optCp.term
+        return {
+          name
+          kind := .expectOptMatch
+          stderr? := some s!"Optimisation test did not change the core term.\nUnoptimised:\n  {baseCoreStr}\nOptimised:\n  {optCoreStr}"
+        }
+
+      let unoptName := s!"{name}_unopt"
+      let optName := s!"{name}_opt"
+      match ← compileCoreProgram unoptName baseCp with
+      | .error err =>
+          return { name, kind := .expectOptMatch, stderr? := some s!"Unoptimised compile failed:\n{err}" }
+      | .ok unoptBin => do
+          match ← compileCoreProgram optName optCp with
+          | .error err =>
+              return { name, kind := .expectOptMatch, stderr? := some s!"Optimised compile failed:\n{err}" }
+          | .ok optBin => do
+              let (baseCode, baseOut, baseErr) ← runBinaryWithEnv unoptBin envVars
+              if baseCode != 0 then
+                return { name, kind := .expectOptMatch, stderr? := some s!"Unoptimised run failed:\n{baseErr}" }
+              let (optCode, optOut, optErr) ← runBinaryWithEnv optBin envVars
+              if optCode != 0 then
+                return { name, kind := .expectOptMatch, stderr? := some s!"Optimised run failed:\n{optErr}" }
+              return {
+                name
+                kind := .expectOptMatch
+                expected? := some baseOut.trim
+                got? := some optOut.trim
+              }
 
 def formatResult (r : TestResult) : String :=
   match r.stderr? with
@@ -191,6 +230,14 @@ def formatResult (r : TestResult) : String :=
               else
                 s!"[FAIL] {r.name}: expected (from {refBin}):\n  {expected}\ngot:\n  {got}"
           | _, _, _ => s!"[ERROR] {r.name}: missing output"
+      | .expectOptMatch =>
+          match r.expected?, r.got? with
+          | some unopt, some opt =>
+              if opt == unopt then
+                s!"[PASS] {r.name} (optimised matches unoptimised)"
+              else
+                s!"[FAIL] {r.name}: unoptimised:\n  {unopt}\noptimised:\n  {opt}"
+          | _, _ => s!"[ERROR] {r.name}: missing output"
 
 def anyFailures (rs : List TestResult) : Bool :=
   rs.any (fun r =>
@@ -210,6 +257,13 @@ def anyFailures (rs : List TestResult) : Bool :=
         | none =>
             match r.expected?, r.got? with
             | some expected, some got => got != expected
+            | _, _ => Bool.true
+    | .expectOptMatch =>
+        match r.stderr? with
+        | some _ => Bool.true
+        | none =>
+            match r.expected?, r.got? with
+            | some unopt, some opt => opt != unopt
             | _, _ => Bool.true)
 
 unsafe def main (_args : List String) : IO UInt32 := do
