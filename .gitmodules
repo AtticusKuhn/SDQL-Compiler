@@ -1,7 +1,3 @@
-[submodule "lean4nix/lean4-nix"]
-	path = lean4nix/lean4-nix
-	url = https://github.com/lenianiva/lean4-nix
-
 [submodule "sdql-rs"]
 	path = sdql-rs
 	url = https://github.com/AtticusKuhn/sdql-rs.git
