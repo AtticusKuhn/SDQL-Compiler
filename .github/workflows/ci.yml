@@ -19,7 +19,7 @@ jobs:
         uses: leanprover/lean-action@v1
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@nightly
 
       - name: Build library and tests
         run: |
