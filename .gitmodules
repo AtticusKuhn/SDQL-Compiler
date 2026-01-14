@@ -4,7 +4,7 @@
 
 [submodule "sdql-rs"]
 	path = sdql-rs
-	url = https://github.com/amascolo/sdql-rs/
+	url = https://github.com/AtticusKuhn/sdql-rs.git
 
 [submodule "tpch-dbgen"]
 	path = tpch-dbgen
