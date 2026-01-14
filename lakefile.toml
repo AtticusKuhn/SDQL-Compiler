@@ -24,3 +24,7 @@ root = "Tests.Main"
 [[lean_exe]]
 name = "performanceComparsion"
 root = "Performance"
+
+[[lean_exe]]
+name = "optimisationPerformanceComparison"
+root = "OptimisationPerformanceComparison"

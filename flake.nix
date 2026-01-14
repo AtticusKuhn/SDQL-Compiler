@@ -54,6 +54,11 @@
             src = ./.;
           };
 
+          sdqlOptPerf = lake.mkPackage {
+            name = "optimisationPerformanceComparison";
+            src = ./.;
+          };
+
           # Wrapper script that sets up datasets for tests and runs the Lean test runner.
           # TPCH reference binaries are built on-demand by `Tests/Main.lean`.
           sdqlTestsWithRef = pkgs.writeShellApplication {
@@ -101,6 +106,21 @@
               fi
 
               exec ${sdqlPerf}/bin/performanceComparsion "$@"
+            '';
+          };
+
+          optimisationPerformanceComparison = pkgs.writeShellApplication {
+            name = "optimisationPerformanceComparison";
+            runtimeInputs = [ rustToolchain ];
+            text = ''
+              set -euo pipefail
+
+              if [ ! -f "sdql_runtime.rs" ]; then
+                echo "Error: must be run from the project root directory (sdql_runtime.rs not found)" >&2
+                exit 1
+              fi
+
+              exec ${sdqlOptPerf}/bin/optimisationPerformanceComparison "$@"
             '';
           };
           # Runtime tools shared by sdql reference test runners
@@ -197,6 +217,7 @@
             sdql-tests = sdqlTestsWithRef;
             sdql-tests-bare = sdqlTests;
             performanceComparsion = performanceComparsion;
+            optimisationPerformanceComparison = optimisationPerformanceComparison;
             sdql-reference-tests = sdqlRefTestRunner;
             sdql-reference-tpch-0_01 = sdqlRefTPCH001;
             sdql-reference-tpch-1 = sdqlRefTPCH1;
@@ -231,6 +252,10 @@
             performanceComparsion = {
               type = "app";
               program = "${performanceComparsion}/bin/performanceComparsion";
+            };
+            optimisationPerformanceComparison = {
+              type = "app";
+              program = "${optimisationPerformanceComparison}/bin/optimisationPerformanceComparison";
             };
           };
 

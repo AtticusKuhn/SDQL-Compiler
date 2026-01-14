@@ -45,6 +45,7 @@ What works:
 - CI: GitHub Actions workflow builds the project and runs the test executable on pushes/PRs.
 - `nix run` support: wrapper script ensures datasets are present and runs tests with proper environment setup; reference binaries are built on-demand by the Lean test runner when missing.
 - Performance comparison: `Performance.lean` executable `performanceComparsion` benchmarks runtime (ms) of `sdql-rs` reference binaries vs Lean-generated Rust binaries.
+- Optimisation performance comparison: `OptimisationPerformanceComparison.lean` executable `optimisationPerformanceComparison` benchmarks runtime (ms) of unoptimised vs optimised Lean-generated Rust binaries for the implemented SDQL optimisations.
 - Surface/core terms are DeBruijn-indexed: surface terms in `SurfaceCore2.lean`, core terms in `Term2.lean`, with lowering in `ToCore2`.
 - Optimisation-friendly `Term2` indices: `mul`/`proj` carry `has_tensor`/`has_proj` witnesses to avoid dependent-elimination failures when pattern-matching in optimisation passes.
 - Optimisations over `Term2`: `PartIiProject/Optimisations/Apply.lean` provides a recursive driver for non-recursive `Optimisation` rewrites; `PartIiProject/Optimisations/VerticalLoopFusion.lean` implements key-map and value-map vertical loop fusion with `#guard_msgs` regression tests.
