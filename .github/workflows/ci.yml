@@ -15,16 +15,20 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Setup Lean toolchain
-        uses: leanprover/lean-action@v1
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Load dev shell
+        uses: nicknovitski/nix-develop@v1
 
-      - name: Build library and tests
-        run: |
-          lake build sdql-tests
+      - name: Run test suite
+        run: nix run
 
-      - name: Run tests
-        run: |
-          lake exe sdql-tests
+      - name: Run performance comparison
+        run: nix run .#performanceComparison
+
+      - name: Run optimisation performance comparison
+        run: nix run .#optimisationPerformanceComparison
