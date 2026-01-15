@@ -22,7 +22,7 @@ name = "sdql-tests"
 root = "Tests.Main"
 
 [[lean_exe]]
-name = "performanceComparsion"
+name = "performanceComparison"
 root = "Performance"
 
 [[lean_exe]]

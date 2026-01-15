@@ -50,7 +50,7 @@
           };
 
           sdqlPerf = lake.mkPackage {
-            name = "performanceComparsion";
+            name = "performanceComparison";
             src = ./.;
           };
 
@@ -84,8 +84,8 @@
             '';
           };
 
-          performanceComparsion = pkgs.writeShellApplication {
-            name = "performanceComparsion";
+          performanceComparison = pkgs.writeShellApplication {
+            name = "performanceComparison";
             runtimeInputs = [ rustToolchain ];
             text = ''
               set -euo pipefail
@@ -105,7 +105,7 @@
                 exit 1
               fi
 
-              exec ${sdqlPerf}/bin/performanceComparsion "$@"
+              exec ${sdqlPerf}/bin/performanceComparison "$@"
             '';
           };
 
@@ -216,7 +216,7 @@
             default = sdqlTestsWithRef;
             sdql-tests = sdqlTestsWithRef;
             sdql-tests-bare = sdqlTests;
-            performanceComparsion = performanceComparsion;
+            performanceComparison = performanceComparison;
             optimisationPerformanceComparison = optimisationPerformanceComparison;
             sdql-reference-tests = sdqlRefTestRunner;
             sdql-reference-tpch-0_01 = sdqlRefTPCH001;
@@ -249,9 +249,9 @@
               type = "app";
               program = "${sdqlRefTPCH1}/bin/sdql-reference-tpch-1";
             };
-            performanceComparsion = {
+            performanceComparison = {
               type = "app";
-              program = "${performanceComparsion}/bin/performanceComparsion";
+              program = "${performanceComparison}/bin/performanceComparison";
             };
             optimisationPerformanceComparison = {
               type = "app";
