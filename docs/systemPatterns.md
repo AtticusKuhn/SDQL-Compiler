@@ -15,8 +15,11 @@ Architecture overview:
 - Real scalars: `AddM.realA` (0.0, `+`) and `ScaleM.realS` (`*`).
 - `ScaleM sc t`: scalar action of `sc` on `t`. Booleans act via AND; integers via multiplication; extends through dict and record. Record scaling uses a typed list‑membership predicate `Mem` in `ScaleM.recordS` to select per‑field scaling evidence in a way that supports structural recursion and definitional equalities.
   - `ScaleM.maxProductS`: multiplication for `maxProduct` scalars (uses `*`).
+- Semiring ops:
+  - `HasMul t`: evidence for semiring multiplication `t → t → t` (bool/real plus square matrices via `tensor`).
+  - `HasClosure t`: evidence for Kleene star `closure(t) : t` (bool/real plus square matrices via `ScaleM`).
 - Terms:
-  - Core (DeBruijn): `TermLoc2`/`Term2` in `PartIiProject/Term2.lean`, indexed by `ctx : List Ty` and using `Mem ty ctx` for variables; includes records/dicts, `not`, `if`, `let`, `add`, `mul`, `sum`, `lookup`, and positional record projection `proj`.
+  - Core (DeBruijn): `TermLoc2`/`Term2` in `PartIiProject/Term2.lean`, indexed by `ctx : List Ty` and using `Mem ty ctx` for variables; includes records/dicts, `not`, `if`, `let`, `add`, `mul`, `semiringMul`, `closure`, `sum`, `lookup`, and positional record projection `proj`.
   - Surface (DeBruijn): `STermLoc2`/`STerm2` in `PartIiProject/SurfaceCore2.lean`, with named record projection via `HasField`.
   - Builtins: `BuiltinFn` (core) and `SBuiltin` (surface) cover `And`, `Or`, `Eq`, `Leq`, `Sub`, `Div`, `StrEndsWith`, `StrStartsWith`, `StrContains`, `FirstIndex`, `LastIndex`, `SubString`, `Dom`, `Range`, `Size`, `DateLit`, `Year`, and `Concat`.
 - Utilities:
@@ -45,7 +48,7 @@ Surface syntax (mini‑DSL):
   - Records: positional `< e1, e2 >`, `< e1, e2, e3 >`, and named `< a = e1, b = e2, ... >` literals.
   - Dicts: singleton `{ k -> v }` and multi‑entry literals. (Typed empty dict moved to the program DSL.)
   - Lookup: `d(k)`; `sum`: `sum( <k, v> in d ) body`.
-  - Algebra: `e1 + e2`, `e1 * e2` (scalar inferred, with optional `*{bool|int|real}` for disambiguation); `if`, `not`, `let x = e1 in e2`.
+  - Algebra: `e1 + e2`, tensor `e1 * e2` (scalar inferred, with optional `*{bool|int|real|max_prod}` for disambiguation), semiring `e1 *s e2`, `closure(e)`; `if`, `not`, `let x = e1 in e2`.
   - Scalar promotion: `promote[max_prod](e)`; multiplication can be annotated as `*{max_prod}`.
   - Boolean/builtin ops: `x && y`, `x || y`, `x == y`, `x <= y`, `x - y`, `dom(e)`, `range(e)`, `size(d)`, `endsWith(x,y)`, `date(n)`, `year(e)`, plus record `concat`.
 - Type elaboration: `elabTy` sorts record fields alphabetically for canonical type representation (stable for duplicate names like `_`). `elabTyPreserveOrder` preserves declaration order for load schemas, ensuring field positions match TBL column indices.
@@ -72,7 +75,7 @@ Testing infrastructure:
   - Standalone file imported via `#[path = "sdql_runtime.rs"] mod sdql_runtime;`
   - Core types: `Real` (Ord-capable f64 wrapper), `Date` (YYYYMMDD integer)
   - Semimodule trait: `SdqlAdd` with implementations for bool (OR), i64, Real, Date, String, BTreeMap, and tuples up to arity 8
-  - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add!` (record/tuple addition via `SdqlAdd`, used as `tuple_add!(N)(a,b)`)
+  - Helpers: `map_insert`, `lookup_or_default`, `dict_add`, `tuple_add!` (record/tuple addition via `SdqlAdd`, used as `tuple_add!(N)(a,b)`), plus stubs `sdql_semiring_mul`/`sdql_closure` for square-matrix ops.
   - Extension functions: `ext_and`, `ext_or`, `ext_eq`, `ext_leq`, `ext_lt`, `ext_sub`, `ext_div`, `ext_str_ends_with`, `ext_str_starts_with`, `ext_str_contains`, `ext_first_index`, `ext_last_index`, `ext_sub_string`, `ext_dom`, `ext_range`, `ext_size`, `ext_year`
   - TBL loaders: `FromTblField` trait for type-directed parsing (i64, String, Real, bool, Date), `build_col<T>` for extracting typed columns, `load_tbl` for parsing pipe-delimited TBL files
   - TPCH dataset path override: `load_tbl` rewrites paths under `datasets/tpch/` using `TPCH_DATASET_PATH` (e.g. pointing to `datasets/tpch-tiny`) so SDQL sources can keep upstream paths while tests swap datasets.
@@ -84,7 +87,7 @@ Testing infrastructure:
 Code generation integration:
 
 - `renderRustProg2Shown` emits a complete Rust `main` that prints the result via the `SDQLShow` trait.
-- Current tests avoid `sdql_mul` and complex tuple ops in Rust; those remain placeholders to expand later.
+- Current tests avoid `sdql_mul` and the matrix stubs for `sdql_semiring_mul`/`sdql_closure` in Rust; those remain placeholders to expand later.
   - Max-product support is implemented via a dedicated runtime scalar type `MaxProduct`, plus `max_product_add` and `promote_*` helpers.
 
 Code generation:

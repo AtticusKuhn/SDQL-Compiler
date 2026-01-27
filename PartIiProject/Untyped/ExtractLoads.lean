@@ -38,6 +38,8 @@ where
           go (body ()) boundLoads  -- dummy Nat for PHOAS traversal
       | .add e1 e2 => go e2 (go e1 acc)
       | .mul _ e1 e2 => go e2 (go e1 acc)
+      | .semiringMul e1 e2 => go e2 (go e1 acc)
+      | .closure e => go e acc
       | .promote _ e => go e acc
       | .projByName _ e => go e acc
       | .lookup d k => go k (go d acc)
@@ -170,6 +172,10 @@ where
         return .add (← transform depth pathToIndex e1) (← transform depth pathToIndex e2)
     | .mul sc e1 e2 =>
         return .mul sc (← transform depth pathToIndex e1) (← transform depth pathToIndex e2)
+    | .semiringMul e1 e2 =>
+        return .semiringMul (← transform depth pathToIndex e1) (← transform depth pathToIndex e2)
+    | .closure e =>
+        return .closure (← transform depth pathToIndex e)
     | .promote toTy e =>
         return .promote toTy (← transform depth pathToIndex e)
     | .projByName name e =>

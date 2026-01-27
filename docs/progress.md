@@ -6,10 +6,10 @@ What works:
 - Semimodule structure: `AddM` (with zeros) and `ScaleM`; includes `AddM.realA` and `ScaleM.realS`; tensor-shaped multiply via `ScaleM.mulDenote`.
 - Boolean addition now matches SDQL/reference semantics (OR), fixing set-style aggregations like TPCH Q04’s `l_h`.
 - Source locations: `SourceLocation` threaded through the pipeline (`LoadTermLoc`, `UntypedTermLoc`, `STermLoc2`, `TermLoc2`) for better debugging/error reporting.
-- Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `sum`, and builtins (`And`, `Or`, `Eq`, `Leq`, `Sub`, `Div`, `StrEndsWith`, `StrStartsWith`, `StrContains`, `FirstIndex`, `LastIndex`, `SubString`, `Dom`, `Range`, `Size`, `DateLit`, `Year`, `Concat`).
+- Terms: variables, constants, records (construct/proj by index), dict (empty/insert/lookup), `not`, `if`, `let`, `add`, `mul`, `semiringMul`, `closure`, `sum`, and builtins (`And`, `Or`, `Eq`, `Leq`, `Sub`, `Div`, `StrEndsWith`, `StrStartsWith`, `StrContains`, `FirstIndex`, `LastIndex`, `SubString`, `Dom`, `Range`, `Size`, `DateLit`, `Year`, `Concat`).
 - Syntactic equality for core terms: `BEq` on `Term2`/`TermLoc2` checks AST equality up to alpha-equivalence (DeBruijn) and ignores `SourceLocation` and typing evidence.
 - Pretty-printing for records/dicts; numerous `#eval` demos.
-- SDQL DSL macros: `[SDQL| ... ]` elaborates to `LoadTermLoc`, supporting literals, records (positional and named), dict literals, lookup, `sum`, `let`, `if`, `not`, `+`, `-`, `*` (scalar inferred; optional `*{bool|int|real}`), `/`, boolean ops, and builtins (`dom`, `range`, `size`, `endsWith`, `date`, `concat`).
+- SDQL DSL macros: `[SDQL| ... ]` elaborates to `LoadTermLoc`, supporting literals, records (positional and named), dict literals, lookup, `sum`, `let`, `if`, `not`, `+`, `-`, tensor `*` (scalar inferred; optional `*{bool|int|real|max_prod}`), semiring `*s`, `closure(...)`, `/`, boolean ops, and builtins (`dom`, `range`, `size`, `endsWith`, `date`, `concat`).
 - New program pipeline (DeBruijn): `[SDQLProg2 { T }| ... ]` elaborates to `LoadTermLoc` then runs `LoadTermLoc → UntypedTermLoc → STermLoc2` to produce an `SProg2` with an explicit typed context (`ctx : List SurfaceTy`) and `loadPaths`.
 - Rust codegen: compiles into a DeBruijn-indexed Rust AST (`Expr : Nat → Type`, vars are `Fin ctx`) and renders expressions/blocks/loops; `sum` becomes a block with a mutable accumulator and a `for (k,v) in map.clone().into_iter()` loop. Runtime calls are represented by `RuntimeFn` (no stringly-typed function names).
 - Rust codegen optimization: `sum(<k,v> in range(N)) ...` emits a `forRange` loop (`for k in 0..N { let v = true; ... }`) to avoid allocating a `BTreeMap` just to iterate a contiguous integer range.
@@ -68,6 +68,7 @@ Known issues / caveats:
 
 - `lookup` returns additive identity on misses; sparse representation may elide zero-valued entries.
 - Codegen depends on helpers/traits included in generated files; multiplication is not yet wired end-to-end for programs (helpers exist for addition/tuples, and stubs for loaders).
+- Rust runtime stubs remain for `sdql_semiring_mul` and `sdql_closure` (square-matrix semantics).
 - Rust printing for tuples (records) is implemented for arities up to 5; extend as needed.
 - Rust loop codegen clones maps before iterating (`.clone().into_iter()`) to avoid moving shared intermediates.
 - `nix build` may fail to resolve newly-added Lean modules unless the lean4‑nix manifest mapping is updated; In this case, you need to `git add` the new Lean file.

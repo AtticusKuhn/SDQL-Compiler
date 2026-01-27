@@ -75,6 +75,15 @@ unsafe def p_if_then_true : SProg2 :=
 unsafe def p_if_then_false : SProg2 :=
   [SDQLProg2 { int }| if false then 7 ]
 
+unsafe def p_semiring_mul_real : SProg2 :=
+  [SDQLProg2 { real }| 2.0 *s 3.0 ]
+
+unsafe def p_closure_bool : SProg2 :=
+  [SDQLProg2 { bool }| closure(false) ]
+
+unsafe def p_closure_real : SProg2 :=
+  [SDQLProg2 { real }| closure(0.5) ]
+
 unsafe def smallCases : List TestCase :=
   [ TestCase.program "add_int" p_add_int "8"
   , TestCase.program "dict_insert" p_dict_is "{1 -> \"one\", }"
@@ -84,6 +93,9 @@ unsafe def smallCases : List TestCase :=
   , TestCase.program "underscore_ident" p_underscore_ident "4"
   , TestCase.program "if_then_true" p_if_then_true "7"
   , TestCase.program "if_then_false" p_if_then_false "0"
+  , TestCase.program "semiring_mul_real" p_semiring_mul_real "6"
+  , TestCase.program "closure_bool" p_closure_bool "true"
+  , TestCase.program "closure_real" p_closure_real "2"
   ]
 
 /- End-to-end optimisation correctness checks (Lean → Rust → binary). -/

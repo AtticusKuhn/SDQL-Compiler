@@ -311,6 +311,18 @@ inductive ScaleM : Ty → Ty → Type where
   | dictS {sc dom range : Ty} (sRange : ScaleM sc range) : ScaleM sc (Ty.dict dom range)
   | recordS {sc : Ty} {l : List Ty} (fields : ∀ (t : Ty), Mem t l → ScaleM sc t) : ScaleM sc (Ty.record l)
 
+inductive HasMul : Ty → Type where
+  | boolS : HasMul Ty.bool
+  | realS : HasMul Ty.real
+  | squareMatrix {t : Ty} : HasMul t → HasMul (tensor t t)
+
+inductive HasClosure : Ty → Type where
+  -- closure(b : Bool) : Bool := true
+  | boolS : HasClosure Ty.bool
+  -- closure(r : Real) : Real := 1 / (1 - r)
+  | realS : HasClosure Ty.real
+  | squareMatrix {s t : Ty} : ScaleM s t → HasClosure (tensor t t)
+
 /-!
 `tensor t1 t2` is the *computed* result type of `t1 * t2`, but it is awkward to
 mention in indices of inductive families (e.g. `Term2`) because dependent

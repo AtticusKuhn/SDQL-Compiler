@@ -47,6 +47,10 @@ mutual
     | .add a t1 t2 => .add a (renameLoc2 ρ t1) (renameLoc2 ρ t2)
     | @Term2.mul _ sc t1 t2 t3 s1 s2 inst e1 e2 =>
         @Term2.mul _ sc t1 t2 t3 s1 s2 inst (renameLoc2 ρ e1) (renameLoc2 ρ e2)
+    | .semiringMul hm e1 e2 =>
+        .semiringMul hm (renameLoc2 ρ e1) (renameLoc2 ρ e2)
+    | .closure hc e =>
+        .closure hc (renameLoc2 ρ e)
     | .promote e => .promote (renameLoc2 ρ e)
     | .sum a d body => .sum a (renameLoc2 ρ d) (renameLoc2 (liftRen2 ρ) body)
     | @Term2.proj _ l t record i inst =>
@@ -116,6 +120,10 @@ mutual
     | .add a t1 t2 => .add a (substLoc2 σ t1) (substLoc2 σ t2)
     | @Term2.mul _ sc t1 t2 t3 s1 s2 inst e1 e2 =>
         @Term2.mul _ sc t1 t2 t3 s1 s2 inst (substLoc2 σ e1) (substLoc2 σ e2)
+    | .semiringMul hm e1 e2 =>
+        .semiringMul hm (substLoc2 σ e1) (substLoc2 σ e2)
+    | .closure hc e =>
+        .closure hc (substLoc2 σ e)
     | .promote e => .promote (substLoc2 σ e)
     | .sum a d body => .sum a (substLoc2 σ d) (substLoc2 (liftSubst2 σ) body)
     | @Term2.proj _ l t record i inst =>
@@ -149,6 +157,8 @@ mutual
     | .letin bound body => mentionsIndexLoc bound i || mentionsIndexLoc body (i + 1)
     | .add _ t1 t2 => mentionsIndexLoc t1 i || mentionsIndexLoc t2 i
     | @Term2.mul _ _ _ _ _ _ _ _ t1 t2 => mentionsIndexLoc t1 i || mentionsIndexLoc t2 i
+    | .semiringMul _ t1 t2 => mentionsIndexLoc t1 i || mentionsIndexLoc t2 i
+    | .closure _ e => mentionsIndexLoc e i
     | .promote e => mentionsIndexLoc e i
     | .sum _ d body => mentionsIndexLoc d i || mentionsIndexLoc body (i + 2)
     | @Term2.proj _ _ _ record _ _ => mentionsIndexLoc record i

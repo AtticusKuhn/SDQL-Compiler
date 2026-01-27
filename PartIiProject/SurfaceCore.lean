@@ -84,6 +84,16 @@ unsafe def stensor (a b : SurfaceTy) : SurfaceTy :=
   | .record σ => .record (σ.map (fun (n, t) => (n, stensor t b)))
   | _ => b
 
+unsafe inductive SHasMul : SurfaceTy → Type where
+  | boolS : SHasMul .bool
+  | realS : SHasMul .real
+  | squareMatrix {t : SurfaceTy} : SHasMul t → SHasMul (stensor t t)
+
+unsafe inductive SHasClosure : SurfaceTy → Type where
+  | boolS : SHasClosure .bool
+  | realS : SHasClosure .real
+  | squareMatrix {s t : SurfaceTy} : SScale s t → SHasClosure (stensor t t)
+
 inductive SBuiltin : SurfaceTy → SurfaceTy → Type where
   | And : SBuiltin (.record [("_1", .bool), ("_2", .bool)]) .bool
   | Or  : SBuiltin (.record [("_1", .bool), ("_2", .bool)]) .bool

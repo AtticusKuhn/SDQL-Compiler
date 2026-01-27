@@ -28,6 +28,10 @@ mutual
     | add : LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
     /-- Multiplication. Optional scalar annotation `*{S}` may be provided to disambiguate. -/
     | mul : Option SurfaceTy → LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
+    /-- Semiring multiplication: `e1 *s e2`. -/
+    | semiringMul : LoadTermLoc rep → LoadTermLoc rep → LoadTerm' rep
+    /-- Kleene star (closure): `closure(e)`. -/
+    | closure : LoadTermLoc rep → LoadTerm' rep
     /-- Scalar promotion: `promote[T](e)` changes the scalar type annotation. -/
     | promote : SurfaceTy → LoadTermLoc rep → LoadTerm' rep
     | projByName : String → LoadTermLoc rep → LoadTerm' rep

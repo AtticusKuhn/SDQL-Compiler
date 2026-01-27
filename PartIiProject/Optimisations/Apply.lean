@@ -87,6 +87,20 @@ mutual
         match tryOptimisations opts t' with
         | some t'' => (t'', true)
         | none => (t', ch)
+    | .semiringMul hm e1 e2 =>
+        let (t1', ch1) := applyOptimisationsOnceLoc opts e1
+        let (t2', ch2) := applyOptimisationsOnceLoc opts e2
+        let ch := ch1 || ch2
+        let t' := Term2.semiringMul hm t1' t2'
+        match tryOptimisations opts t' with
+        | some t'' => (t'', true)
+        | none => (t', ch)
+    | .closure hc e =>
+        let (e', chE) := applyOptimisationsOnceLoc opts e
+        let t' := Term2.closure hc e'
+        match tryOptimisations opts t' with
+        | some t'' => (t'', true)
+        | none => (t', chE)
     | .promote e =>
         let (e', chE) := applyOptimisationsOnceLoc opts e
         let t' := Term2.promote e'

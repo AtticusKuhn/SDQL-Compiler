@@ -32,6 +32,10 @@ mutual
     | add : {ctx : List SurfaceTy} → {ty : SurfaceTy} → (a : SAdd ty) → STermLoc2 ctx ty → STermLoc2 ctx ty → STerm2 ctx ty
     | mul : {ctx : List SurfaceTy} → {sc t1 t2 : SurfaceTy} → (s1 : SScale sc t1) → (s2 : SScale sc t2)
         → STermLoc2 ctx t1 → STermLoc2 ctx t2 → STerm2 ctx (stensor t1 t2)
+    | semiringMul : {ctx : List SurfaceTy} → {t : SurfaceTy} → (s1 : SHasMul t)
+        → STermLoc2 ctx t → STermLoc2 ctx t → STerm2 ctx t
+    | closure : {ctx : List SurfaceTy} → {t : SurfaceTy} → (s1 : SHasClosure t)
+        → STermLoc2 ctx t → STerm2 ctx t
     | promote : {ctx : List SurfaceTy} → {fromType toType : SurfaceTy}
         → STermLoc2 ctx fromType → STerm2 ctx toType
     | emptyDict : {ctx : List SurfaceTy} → {domain ran : SurfaceTy} → STerm2 ctx (SurfaceTy.dict domain ran)
@@ -188,6 +192,8 @@ mutual
         s!"let {x} = {showTermLoc2 names bound} in {showTermLoc2 (x :: names) body}"
     | ⟨_, .add _ t1 t2⟩ => s!"{showTermLoc2 names t1} + {showTermLoc2 names t2}"
     | ⟨_, .mul _ _ t1 t2⟩ => s!"{showTermLoc2 names t1} * {showTermLoc2 names t2}"
+    | ⟨_, .semiringMul _ t1 t2⟩ => s!"{showTermLoc2 names t1} *s {showTermLoc2 names t2}"
+    | ⟨_, .closure _ e⟩ => s!"closure({showTermLoc2 names e})"
     | ⟨toType, @STerm2.promote _ _ _ e⟩ =>
         s!"promote[{SurfaceTy.sdqlToString toType}]({showTermLoc2 names e})"
     | ⟨_, .emptyDict⟩ => "{}"

@@ -53,6 +53,7 @@ syntax:70 sdql:70 "." sdqlident : sdql
 
 -- unary / control
 syntax "not" sdql : sdql
+syntax "closure" "(" sdql ")" : sdql
 syntax "if" sdql "then" sdql "else" sdql : sdql
 syntax "if" sdql "then" sdql : sdql
 syntax "let" sdqlident "=" sdql "in" sdql : sdql
@@ -61,6 +62,7 @@ syntax "let" sdqlident "=" sdql "in" sdql : sdql
 syntax:60 sdql:60 "+" sdql:61 : sdql
 syntax:60 sdql:60 "-" sdql:61 : sdql
 syntax:65 sdql:65 "*" sdql:66 : sdql
+syntax:65 sdql:65 "*s" sdql:66 : sdql
 syntax:65 sdql:65 "*" "{" "int" "}" sdql:66 : sdql
 syntax:65 sdql:65 "*" "{" "bool" "}" sdql:66 : sdql
 syntax:65 sdql:65 "*" "{" "real" "}" sdql:66 : sdql
@@ -325,6 +327,9 @@ mutual
       -- control
       | `(sdql| not $e:sdql) =>
           wrapLoadWithStx stx (← `(LoadTerm'.not $(← elabSDQLToLoad e)))
+      | `(sdql| closure($e:sdql)) => do
+          let ee ← elabSDQLToLoad e
+          wrapLoadWithStx stx (← `(LoadTerm'.closure $ee))
       | `(sdql| promote[$t:sdqlty]($e:sdql)) => do
           let ee ← elabSDQLToLoad e
           let tt ← elabTy t
@@ -360,6 +365,10 @@ mutual
           let loc ← mkSourceLoc stx
           let arg := (← `(LoadTermLoc.mk (stx := $loc) (LoadTerm'.constRecord [("_1", $xx), ("_2", $yy)])))
           wrapLoadWithStx stx (← `(LoadTerm'.builtinDiv $arg))
+      | `(sdql| $x:sdql *s $y:sdql) => do
+          let xx ← elabSDQLToLoad x
+          let yy ← elabSDQLToLoad y
+          wrapLoadWithStx stx (← `(LoadTerm'.semiringMul $xx $yy))
       | `(sdql| $x:sdql * $y:sdql) => do
           let xx ← elabSDQLToLoad x
           let yy ← elabSDQLToLoad y

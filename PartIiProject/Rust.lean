@@ -34,6 +34,8 @@ inductive RuntimeFn : Type where
   | dictAdd : RuntimeFn
   | tupleAdd : (arity : Nat) → RuntimeFn
   | sdqlMul : RuntimeFn
+  | sdqlSemiringMul : RuntimeFn
+  | sdqlClosure : RuntimeFn
   | maxProductAdd : RuntimeFn
   | promoteMaxProduct : RuntimeFn
   | demoteMaxProduct : RuntimeFn
@@ -63,6 +65,8 @@ def runtimeFnName : RuntimeFn → String
   | .dictAdd => "dict_add"
   | .tupleAdd arity => s!"tuple_add{arity}"
   | .sdqlMul => "sdql_mul"
+  | .sdqlSemiringMul => "sdql_semiring_mul"
+  | .sdqlClosure => "sdql_closure"
   | .maxProductAdd => "max_product_add"
   | .promoteMaxProduct => "promote_max_product"
   | .demoteMaxProduct => "demote_max_product"

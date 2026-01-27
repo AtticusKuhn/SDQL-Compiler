@@ -54,6 +54,14 @@ unsafe def typeof2 (ctx : List SurfaceTy) (e : UntypedTermLoc ctx.length) : Exce
         let t1 ← typeof2 ctx e1
         let t2 ← typeof2 ctx e2
         pure (stensor t1 t2)
+    | .semiringMul e1 e2 => do
+        let t1 ← typeof2 ctx e1
+        let t2 ← typeof2 ctx e2
+        if tyEq t1 t2 then
+          pure t1
+        else
+          .error (stx, s!"*s expects operands of the same type, got {tyToString t1} and {tyToString t2}")
+    | .closure e => typeof2 ctx e
     | .promote toTy _ => pure toTy
     | .projByName name inner => do
         let ty ← typeof2 ctx inner
