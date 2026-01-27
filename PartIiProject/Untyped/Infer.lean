@@ -221,6 +221,27 @@ unsafe def infer2 (ctx : List SurfaceTy)
         STermLoc2.mk stx (STerm2.mul s1 s2 term1 term2)
       checkTyEq2 stx resultTy expectedTy mulTerm
 
+  | .semiringMul e1 e2 => do
+      let ty1 ← typeof2 ctx e1
+      let ty2 ← typeof2 ctx e2
+      if !tyEq ty1 ty2 then
+        .error (stx, s!"*s expects operands of the same type, got {tyToString ty1} and {tyToString ty2}")
+      else do
+        let hm ← synthSHasMul stx ty1
+        let term1 ← infer2 ctx ty1 e1
+        let term2 ← infer2 ctx ty1 e2
+        let mulTerm : STermLoc2 ctx ty1 :=
+          STermLoc2.mk stx (STerm2.semiringMul hm term1 term2)
+        checkTyEq2 stx ty1 expectedTy mulTerm
+
+  | .closure e => do
+      let ty1 ← typeof2 ctx e
+      let hc ← synthSHasClosure stx ty1
+      let term1 ← infer2 ctx ty1 e
+      let closeTerm : STermLoc2 ctx ty1 :=
+        STermLoc2.mk stx (STerm2.closure hc term1)
+      checkTyEq2 stx ty1 expectedTy closeTerm
+
   | .promote toTy inner => do
       let fromTy ← typeof2 ctx inner
       if !canPromote fromTy toTy then

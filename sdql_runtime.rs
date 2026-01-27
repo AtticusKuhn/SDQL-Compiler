@@ -228,6 +228,14 @@ pub fn dict_add<K: Ord + Clone, V: SdqlAdd + Clone>(a: BTreeMap<K, V>, b: BTreeM
     acc
 }
 
+pub fn sdql_semiring_mul<T>(_a: T, _b: T) -> T {
+    todo!("sdql_semiring_mul for square matrices not implemented")
+}
+
+pub fn sdql_closure<T>(_a: T) -> T {
+    todo!("sdql_closure for square matrices not implemented")
+}
+
 /// Tuple/record addition for arity 0.
 pub fn tuple_add0(a: (), _b: ()) -> () { a }
 

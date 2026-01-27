@@ -84,6 +84,15 @@ mutual
         → TermLoc2 ctx t1
         → TermLoc2 ctx t2
         → Term2 ctx t3
+    | semiringMul : {ctx : List Ty} → {t : Ty}
+        → (s1 : HasMul t)
+        → TermLoc2 ctx t
+        → TermLoc2 ctx t
+        → Term2 ctx t
+    | closure : {ctx : List Ty} → {t : Ty}
+        → (s1 : HasClosure t)
+        → TermLoc2 ctx t
+        → Term2 ctx t
     | promote : {ctx : List Ty} → {fromType toType : Ty}
         → TermLoc2 ctx fromType → Term2 ctx toType
     | sum : {ctx : List Ty} → {dom range ty : Ty}
@@ -235,6 +244,10 @@ mutual
                         | isFalse _ => false
                         | isTrue ht2 => match ht2 with
                           | rfl => beqTermLoc2 e1 e1' && beqTermLoc2 e2 e2'
+        | _, _, .semiringMul _ e1 e2, .semiringMul _ e1' e2' =>
+            beqTermLoc2 e1 e1' && beqTermLoc2 e2 e2'
+        | _, _, .closure _ e1, .closure _ e2 =>
+            beqTermLoc2 e1 e2
         | _, _, @Term2.promote _ fromType _ e1, @Term2.promote _ fromType' _ e2 =>
             match Ty.decEq fromType fromType' with
             | isTrue h => match h with
@@ -331,6 +344,10 @@ mutual
     | .add _ t1 t2 => s!"{showTermLoc2 names t1} + {showTermLoc2 names t2}"
     | @Term2.mul _ _ _ _ _ _ _ _ t1 t2 =>
         s!"{showTermLoc2 names t1} * {showTermLoc2 names t2}"
+    | .semiringMul _ t1 t2 =>
+        s!"{showTermLoc2 names t1} *s {showTermLoc2 names t2}"
+    | .closure _ e =>
+        s!"closure({showTermLoc2 names e})"
     | .promote e => s!"promote({showTermLoc2 names e})"
     | .sum _ d body =>
         let k := freshName names
@@ -501,6 +518,24 @@ mutual
         simp [tyFields_map_stensor2, ty_stensor_eq2, -stensor]
 end
 
+-- Evidence translation: SHasMul → HasMul
+unsafe def toCoreHasMul : {t : SurfaceTy} → SHasMul t → HasMul (ty t)
+  | _, SHasMul.boolS => HasMul.boolS
+  | _, SHasMul.realS => HasMul.realS
+  | _, @SHasMul.squareMatrix t ht =>
+      by
+        have hmul : HasMul (tensor (ty t) (ty t)) := HasMul.squareMatrix (toCoreHasMul ht)
+        simpa [ty_stensor_eq2, -stensor] using hmul
+
+-- Evidence translation: SHasClosure → HasClosure
+unsafe def toCoreHasClosure : {t : SurfaceTy} → SHasClosure t → HasClosure (ty t)
+  | _, SHasClosure.boolS => HasClosure.boolS
+  | _, SHasClosure.realS => HasClosure.realS
+  | _, @SHasClosure.squareMatrix s t hs =>
+      by
+        have hcl : HasClosure (tensor (ty t) (ty t)) := HasClosure.squareMatrix (toCoreScale hs)
+        simpa [ty_stensor_eq2, -stensor] using hcl
+
 -- Main translation functions
 mutual
   /-- Translate DeBruijn surface term fields to core term fields -/
@@ -538,6 +573,10 @@ mutual
           have hmul : Term2 (tyCtx ctx) (tensor (ty t1) (ty t2)) :=
             Term2.mul (toCoreScale s1) (toCoreScale s2) (trLoc2 e1) (trLoc2 e2)
           simpa [ty_stensor_eq2, -stensor] using hmul
+    | @STerm2.semiringMul _ t hm e1 e2 =>
+        Term2.semiringMul (toCoreHasMul hm) (trLoc2 e1) (trLoc2 e2)
+    | @STerm2.closure _ t hc e =>
+        Term2.closure (toCoreHasClosure hc) (trLoc2 e)
     | @STerm2.promote _ fromType toType e =>
         Term2.promote (fromType := ty fromType) (toType := ty toType) (trLoc2 e)
     | STerm2.emptyDict => Term2.emptyDict

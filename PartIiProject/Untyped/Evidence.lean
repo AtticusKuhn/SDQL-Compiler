@@ -56,6 +56,41 @@ unsafe def synthSScale (stx : SourceLocation) (sc : SurfaceTy) (t : SurfaceTy) :
       pure (SScale.recordS fieldsOk)
   | _, _ => .error (stx, s!"Cannot scale {tyToString t} by {tyToString sc}")
 
+/-- Synthesize SHasMul evidence for semiring multiplication. -/
+unsafe def synthSHasMul (stx : SourceLocation) (ty : SurfaceTy) : Except TypeError (SHasMul ty) :=
+  match ty with
+  | .bool => pure SHasMul.boolS
+  | .real => pure SHasMul.realS
+  | _ => .error (stx, s!"*s expects a semiring type (bool or real), got {tyToString ty}")
+
+/-- Synthesize SHasClosure evidence for Kleene star. -/
+unsafe def synthSHasClosure (stx : SourceLocation) (ty : SurfaceTy) : Except TypeError (SHasClosure ty) :=
+  match ty with
+  | .bool => pure SHasClosure.boolS
+  | .real => pure SHasClosure.realS
+  | .dict dom range =>
+      match range with
+      | .dict dom' inner =>
+          if tyEq dom dom' then
+            match inner with
+            | .bool =>
+                let sRange : SScale .bool .bool := SScale.boolS
+                let sDict : SScale .bool (.dict dom .bool) := SScale.dictS sRange
+                let h := SHasClosure.squareMatrix sDict
+                pure (unsafeCast h)
+            | .real =>
+                let sRange : SScale .real .real := SScale.realS
+                let sDict : SScale .real (.dict dom .real) := SScale.dictS sRange
+                let h := SHasClosure.squareMatrix sDict
+                pure (unsafeCast h)
+            | _ =>
+                .error (stx, s!"closure expects bool, real, or a square matrix over bool/real, got {tyToString ty}")
+          else
+            .error (stx, s!"closure expects a square matrix (matching domains), got {tyToString ty}")
+      | _ =>
+          .error (stx, s!"closure expects bool, real, or a square matrix, got {tyToString ty}")
+  | _ => .error (stx, s!"closure expects bool, real, or a square matrix, got {tyToString ty}")
+
 /-- Find a field in a schema and return its type and HasField proof -/
 unsafe def findField (stx : SourceLocation) : (σ : Schema) → (name : String)
     → Except TypeError ((t : SurfaceTy) × HasField σ name t)

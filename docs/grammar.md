@@ -63,7 +63,7 @@ Keywords (e.g. `let`, `if`, `sum`, `load`, `promote`) are reserved and are writt
 Operators are left-associative, with precedence (tightest → loosest):
 
 1. postfix lookup/projection: `e(k)`, `e.field`
-2. multiplication/division: `*`, `*{S}`, `/`
+2. multiplication/division: `*`, `*s`, `*{S}`, `/`
 3. addition/subtraction: `+`, `-`
 4. comparisons: `==`, `<=`, `<`
 5. boolean AND/OR: `&&`, `||`
@@ -92,6 +92,7 @@ The grammar below encodes that precedence:
 <mulTail>    ::= <mulOp> <unaryExpr> <mulTail> | ε
 
 <mulOp>      ::= "*" | "/" | "*{" <scalarTy> "}"
+               | "*s"
 <scalarTy>   ::= "int" | "bool" | "real" | "max_prod"
 
 <unaryExpr>  ::= "not" <unaryExpr> | <postfixExpr>
@@ -123,6 +124,7 @@ scalar implicit (to be inferred later).
                | <recordLit>
                | <dictLit>
                | <typedEmptyDict>
+               | <closure>
                | <promote>
                | <load>
                | <builtin>
@@ -146,6 +148,7 @@ scalar implicit (to be inferred later).
              ::= "{" "}" "_" "{" <ty> "," <ty> "}"     -- {}_{Tdom, Trange}
 
 <promote>    ::= "promote" "[" <ty> "]" "(" <expr> ")"
+<closure>    ::= "closure" "(" <expr> ")"
 
 <load>       ::= "load" "[" <ty> "]" "(" <string> ")"
 ```

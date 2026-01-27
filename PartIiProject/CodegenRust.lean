@@ -151,6 +151,28 @@ mutual
             .callRuntimeFn .extAnd (Rust.Exprs.singleton arg)
         | _, _ =>
             .callRuntimeFn .sdqlMul (Rust.Exprs.ofList [lhs, rhs])
+    | @Term2.semiringMul _ _ hm e1 e2 =>
+        let lhs := compileLoc2 e1
+        let rhs := compileLoc2 e2
+        match hm with
+        | .boolS =>
+            let arg := ExprLoc.withUnknownLoc (.tuple (Rust.Exprs.ofList [lhs, rhs]))
+            .callRuntimeFn .extAnd (Rust.Exprs.singleton arg)
+        | .realS => .binop .mul lhs rhs
+        | .squareMatrix _ =>
+            .callRuntimeFn .sdqlSemiringMul (Rust.Exprs.ofList [lhs, rhs])
+    | @Term2.closure _ _ hc e =>
+        let arg := compileLoc2 e
+        match hc with
+        | .boolS => .litBool true
+        | .realS =>
+            let one : Rust.ExprLoc ctx.length := ExprLoc.withUnknownLoc (.litReal 1.0)
+            let denom : Rust.ExprLoc ctx.length := ExprLoc.withUnknownLoc (.binop .sub one arg)
+            let divArg : Rust.ExprLoc ctx.length :=
+              ExprLoc.withUnknownLoc (.tuple (Rust.Exprs.ofList [one, denom]))
+            .callRuntimeFn .extDiv (Rust.Exprs.singleton divArg)
+        | .squareMatrix _ =>
+            .callRuntimeFn .sdqlClosure (Rust.Exprs.singleton arg)
     | @Term2.promote _ fromType toType e =>
         let inner := compileLoc2 e
         match fromType, toType with
