@@ -59,6 +59,11 @@
             src = ./.;
           };
 
+          sdqlFlamegraph = lake.mkPackage {
+            name = "flamegraph";
+            src = ./.;
+          };
+
           # Wrapper script that sets up datasets for tests and runs the Lean test runner.
           # TPCH reference binaries are built on-demand by `Tests/Main.lean`.
           sdqlTestsWithRef = pkgs.writeShellApplication {
@@ -121,6 +126,33 @@
               fi
 
               exec ${sdqlOptPerf}/bin/optimisationPerformanceComparison "$@"
+            '';
+          };
+
+          flamegraphRunner = pkgs.writeShellApplication {
+            name = "flamegraph";
+            runtimeInputs =
+              [ rustToolchain pkgs.cargo-flamegraph ]
+              ++ pkgs.lib.optionals pkgs.stdenv.isLinux [ pkgs.linuxPackages.perf ];
+            text = ''
+              set -euo pipefail
+
+              if [ ! -f "sdql_runtime.rs" ]; then
+                echo "Error: must be run from the project root directory (sdql_runtime.rs not found)" >&2
+                exit 1
+              fi
+
+              if [ ! -d "datasets/tpch-tiny" ]; then
+                echo "Error: datasets/tpch-tiny not found" >&2
+                exit 1
+              fi
+
+              if [ ! -d "sdql-rs/datasets/tpch_datasets/SF_0.01" ]; then
+                echo "Error: sdql-rs/datasets/tpch_datasets/SF_0.01 not found" >&2
+                exit 1
+              fi
+
+              exec ${sdqlFlamegraph}/bin/flamegraph "$@"
             '';
           };
           # Runtime tools shared by sdql reference test runners
@@ -218,6 +250,7 @@
             sdql-tests-bare = sdqlTests;
             performanceComparison = performanceComparison;
             optimisationPerformanceComparison = optimisationPerformanceComparison;
+            flamegraph = flamegraphRunner;
             sdql-reference-tests = sdqlRefTestRunner;
             sdql-reference-tpch-0_01 = sdqlRefTPCH001;
             sdql-reference-tpch-1 = sdqlRefTPCH1;
@@ -256,6 +289,10 @@
             optimisationPerformanceComparison = {
               type = "app";
               program = "${optimisationPerformanceComparison}/bin/optimisationPerformanceComparison";
+            };
+            flamegraph = {
+              type = "app";
+              program = "${flamegraphRunner}/bin/flamegraph";
             };
           };
 

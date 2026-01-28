@@ -54,6 +54,7 @@ How to run:
 - Run tests: `lake exe sdql-tests`.
 - Preferred: `nix run` (runs the full test suite; sdql-rs TPCH reference binaries are built on-demand by the Lean test runner via `cargo build --release --bin ...` when missing).
 - Performance comparison: `nix run .#performanceComparison` (times `sdql-rs` binaries vs Lean-generated Rust binaries; must be run from the project root).
+- Flamegraph profiling: `nix run .#flamegraph` (generates per-TPCH SVGs for Lean-generated Rust binaries; must be run from the project root).
 - Optimisation performance comparison: `nix run .#optimisationPerformanceComparison` (times unoptimised vs optimised Lean-generated Rust binaries for a small suite of SDQL optimisation patterns).
 - Explore: open the `.lean` files and evaluate examples with `#eval`.
 - Try the DSL: use `[SDQLProg2 { int }| 3 + 5 ]` (runs the full pipeline) or start from `[SDQL| 3 + 5 ]` and call `loadTermToSProg2` explicitly.
