@@ -1,15 +1,19 @@
-
 - The implementation of `concat` in Rust is ugly, need to fix it.
 - `sub` currently type `t -> t -> t`, should introduce a typeclass for it.
 - Get github workflow to run successfully.
 - Make `<` and `<=` and `==` use a typeclass (instead of taking in any type `t`)
 - We currently use a bad representation of dates (i.e. YYYYMMDD as an `i64`). This is dumb.
-Q15 is tiny-only (SF=0.01 currently diverges due to missing
+- Q15 is tiny-only (SF=0.01 currently diverges due to missing
     promote[max_prod]/max-semirings).
 - get rid of ugly `A *{Type} B` syntax
 - Get rid of ugly `<_1 =..., _2 = ...>` syntax. Just replace this with `<..., ....>`
 - the tuple_add4, tuple_add5 thing is annoying. Just replace with a macro.
-
+- three of the supposed “optimisations” actually make the code slower. Horizontal_loop_fusion and loop_factorization_left and loop_invariant_code motion. I should investigate this, but I haven’t investigated this yet.
+- Add `docs/pipeline.md` file documenting the current pipeline
+- Add tree diagram with comments explaining each file.
+- start writing paper (in typst or latex), and add to CI/CD
+- optimisation pipeline is ugly, could this be improved by the use of a monad?
+- Current rust implementation is slowed down a lot by overused of `x.clone()` in BTreeMap. I'm not good enough with Rust to avoid this.
 ```bash
 [atticusk@nixos:~/coding/part_ii_project]$ find PartIiProject -name "*.lean" -exec wc -l {} + | sort -nr | head -n10
   3987 total
@@ -77,3 +81,79 @@ tpch_q22_sf001                       7ms          34ms        4.857×
 --------------------------------------------------------------------
 TOTAL                             2108ms       41959ms       19.904×
 ```
+
+```
+
+case                             sdql-rs      lean-gen     lean/sdql
+--------------------------------------------------------------------
+micro_sum_range_add                  1ms           1ms        1.000×
+micro_sum_range_dict_build          19ms          97ms        5.105×
+micro_sum_range_lookup               9ms          39ms        4.333×
+tpch_q01                            10ms           2ms        0.200×
+tpch_q02                             9ms           1ms        0.111×
+tpch_q03                             9ms           2ms        0.222×
+tpch_q04                             1ms           2ms        2.000×
+tpch_q05                             2ms           1ms        0.500×
+tpch_q06                            10ms           1ms        0.100×
+tpch_q07                            10ms           1ms        0.100×
+tpch_q09                            11ms           3ms        0.272×
+tpch_q10                             9ms           1ms        0.111×
+tpch_q11                             8ms           1ms        0.125×
+tpch_q12                             8ms           2ms        0.250×
+tpch_q13                             9ms           1ms        0.111×
+tpch_q14                             8ms           2ms        0.250×
+tpch_q16                             8ms           1ms        0.125×
+tpch_q17                             9ms           2ms        0.222×
+tpch_q18                             8ms           1ms        0.125×
+tpch_q19                             9ms           1ms        0.111×
+tpch_q20                             4ms           3ms        0.750×
+tpch_q21                           703ms           2ms        0.002×
+tpch_q22                             9ms           2ms        0.222×
+tpch_q01_sf001                      34ms         228ms        6.705×
+tpch_q02_sf001                      27ms          26ms        0.962×
+tpch_q03_sf001                      62ms        5248ms       84.645×
+tpch_q04_sf001                      34ms         230ms        6.764×
+tpch_q05_sf001                      54ms        1344ms       24.888×
+tpch_q06_sf001                      29ms         207ms        7.137×
+tpch_q07_sf001                      35ms        2407ms       68.771×
+tpch_q09_sf001                      47ms        1055ms       22.446×
+tpch_q10_sf001                      37ms        2345ms       63.378×
+tpch_q11_sf001                       6ms          22ms        3.666×
+tpch_q12_sf001                      37ms         357ms        9.648×
+tpch_q13_sf001                       8ms         100ms       12.500×
+tpch_q14_sf001                      32ms         206ms        6.437×
+tpch_q15_sf001                      31ms         207ms        6.677×
+tpch_q16_sf001                       6ms          97ms       16.166×
+tpch_q17_sf001                      31ms         192ms        6.193×
+tpch_q18_sf001                      38ms        1396ms       36.736×
+tpch_q19_sf001                      31ms         200ms        6.451×
+tpch_q20_sf001                      35ms         239ms        6.828×
+tpch_q21_sf001                     773ms       24619ms       31.848×
+tpch_q22_sf001                       6ms          35ms        5.833×
+--------------------------------------------------------------------
+TOTAL                             2276ms       40929ms       17.982×
+```
+
+
+Optimisation Performance Comparison:
+
+```
+[atticusk@nixos:~/coding/part_ii_project]$ nix run .#optimisationPerformanceComparison
+trace: evaluation warning: 'system' has been renamed to/replaced by 'stdenv.hostPlatform.system'
+SDQL optimisation performance comparison (mean of 3 run(s); wall-clock ms)
+Params: dictN=200000, memoN=100000, memoM=1000
+case                                   unopt           opt     opt/unopt
+------------------------------------------------------------------------
+vertical_loop_fusion_key_map           124ms          87ms        0.701×
+vertical_loop_fusion_value_map         109ms          53ms        0.486×
+horizontal_loop_fusion                  35ms          39ms        1.114×
+loop_factorization_left                 31ms          32ms        1.032×
+loop_factorization_right                34ms          31ms        0.911×
+loop_invariant_code_motion              31ms          34ms        1.096×
+loop_memoization_lookup               1409ms          29ms        0.020×
+loop_memoization_partition            1399ms          40ms        0.028×
+------------------------------------------------------------------------
+TOTAL                                 3172ms         345ms        0.108×
+
+```
+

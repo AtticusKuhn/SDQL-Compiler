@@ -399,10 +399,16 @@ mutual
         let k :=  s!"x{ctx + 1}"
         let v := s!"x{ctx}"
         let sm := showExprLoc m indent config
-        let head := indentStr indent ++ "for (" ++ k ++ ", " ++ v ++ ") in " ++ sm ++ ".clone().into_iter() {"
+        let head := indentStr indent ++ "for (" ++ k ++ ", " ++ v ++ ") in " ++ paren sm ++ ".iter() {"
+        let kClone := indentStr (indent + 1) ++ "let " ++ k ++ " = (*" ++ k ++ ").clone();"
+        let vClone := indentStr (indent + 1) ++ "let " ++ v ++ " = (*" ++ v ++ ").clone();"
         let (inner ) := showStmtSeq body (indent+1) config
         let tail := "\n" ++ indentStr indent ++ "}"
-        let mid := if inner = "" then "" else "\n" ++ inner
+        let mid :=
+          if inner = "" then
+            "\n" ++ kClone ++ "\n" ++ vClone
+          else
+            "\n" ++ kClone ++ "\n" ++ vClone ++ "\n" ++ inner
         (head ++ mid ++ tail)
     | .forRange (ctx := ctx) endExclusive body =>
         -- The loop body context is `ctx + 2` with:
