@@ -14,6 +14,8 @@
 - start writing paper (in typst or latex), and add to CI/CD
 - optimisation pipeline is ugly, could this be improved by the use of a monad?
 - Current rust implementation is slowed down a lot by overused of `x.clone()` in BTreeMap. I'm not good enough with Rust to avoid this.
+- Use Rust profiling. Use a profiler for any serious performance analysis.
+
 ```bash
 [atticusk@nixos:~/coding/part_ii_project]$ find PartIiProject -name "*.lean" -exec wc -l {} + | sort -nr | head -n10
   3987 total

@@ -47,6 +47,8 @@ Latest changes:
   - `PartIiProject/Rust.lean`: generated `for` loops iterate via `.clone().into_iter()` to avoid moving maps used more than once.
 - Refactored the Rust AST to be DeBruijn-indexed (`Expr : Nat → Type`, vars are `Fin ctx`) and replaced stringly-typed runtime calls with `RuntimeFn`; updated `PartIiProject/CodegenRust.lean` accordingly.
 - Added a performance benchmarking runner `Performance.lean` (flake app `performanceComparison`) that compares runtime (ms) of `sdql-rs` binaries vs Lean-generated Rust binaries, including microbenchmarks and TPCH cases.
+- Added a flamegraph profiling runner `Flamegraph.lean` (flake app `flamegraph`) that generates per-TPCH SVGs for Lean-generated Rust binaries using `cargo flamegraph`.
+- Flamegraph runner now rewrites `TPCH_DATASET_PATH` and TPCH tiny load paths to absolute paths so profiling works from the generated cargo workspace.
 - Refined the optimisation benchmarking runner `OptimisationPerformanceComparison.lean` (flake app `optimisationPerformanceComparison`) to use `[SDQLProg2 { T }| ... ]` programs, drop CLI arg parsing, and increase default input sizes so optimisation effects are clearer.
 - Fixed a dependent-pattern-matching blocker in optimisation passes by refactoring `Term2.mul`/`Term2.proj` to carry typeclass witnesses (`has_tensor`/`has_proj`) instead of computed indices (`tensor` / `List.getD`) directly.
 - Added a small `Term2` optimisation framework (`PartIiProject/Optimisations/Apply.lean`) where each rewrite is a non-recursive `Optimisation` and `applyOptimisations{,Loc}` performs the recursive traversal + (fuel-bounded) fixpoint iteration.
