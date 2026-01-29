@@ -32,3 +32,6 @@ jobs:
 
       - name: Run optimisation performance comparison
         run: nix run .#optimisationPerformanceComparison
+
+      - name: Build dissertation
+        run: nix run .#buildDissertation

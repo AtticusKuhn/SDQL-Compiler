@@ -155,6 +155,20 @@
               exec ${sdqlFlamegraph}/bin/flamegraph "$@"
             '';
           };
+          buildDissertation = pkgs.writeShellApplication {
+            name = "buildDissertation";
+            runtimeInputs = [ pkgs.typst pkgs.fontconfig ];
+            text = ''
+              set -euo pipefail
+
+              if [ ! -f "dissertation.typ" ]; then
+                echo "Error: dissertation.typ not found" >&2
+                exit 1
+              fi
+
+              typst compile dissertation.typ dissertation.pdf
+            '';
+          };
           # Runtime tools shared by sdql reference test runners
           sdqlRefRuntimeInputs = with pkgs; [
             # JVM + Scala toolchain
@@ -251,6 +265,7 @@
             performanceComparison = performanceComparison;
             optimisationPerformanceComparison = optimisationPerformanceComparison;
             flamegraph = flamegraphRunner;
+            buildDissertation = buildDissertation;
             sdql-reference-tests = sdqlRefTestRunner;
             sdql-reference-tpch-0_01 = sdqlRefTPCH001;
             sdql-reference-tpch-1 = sdqlRefTPCH1;
@@ -294,6 +309,10 @@
               type = "app";
               program = "${flamegraphRunner}/bin/flamegraph";
             };
+            buildDissertation = {
+              type = "app";
+              program = "${buildDissertation}/bin/buildDissertation";
+            };
           };
 
           devShells.default = pkgs.mkShell {
@@ -306,6 +325,8 @@
                 pkgs.lean.lean
                 pkgs.lean.lake
                 (pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default))
+                pkgs.typst
+                pkgs.fontconfig
               ]
               ++ (with pkgs; [
                 git unzip codex uv
