@@ -13,6 +13,7 @@ task2.md
 .sdql-opt-perf-out/*.bin
 .sdql-flamegraph-out/*.bin
 .sdql-flamegraph-out/*
+!.sdql-flamegraph-out/svgs/*.svg
 datasets/.sdql-test-out/
 datasets/tpch
 result

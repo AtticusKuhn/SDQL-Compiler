@@ -333,6 +333,7 @@
                 gemini-cli
                 claude-code
                 sshpass
+                evince
                 # sdql reference prerequisites
                 # commenting out scala for now
                 # jdk17 sbt scala_2_13
