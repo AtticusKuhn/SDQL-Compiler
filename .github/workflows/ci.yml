@@ -30,6 +30,9 @@ jobs:
       - name: Run performance comparison
         run: nix run .#performanceComparison
 
+      - name: Run flamegraph profiler
+        run: nix run .#flamegraph
+
       - name: Run optimisation performance comparison
         run: nix run .#optimisationPerformanceComparison
 
