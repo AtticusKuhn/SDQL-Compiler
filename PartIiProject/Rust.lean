@@ -140,6 +140,7 @@ mutual
     | callRuntimeFn : {ctx : Nat} → RuntimeFn → Exprs ctx → Expr ctx
     | block : {ctx : Nat} → {ctxOut : Nat} → StmtSeq ctx ctxOut → ExprLoc ctxOut → Expr ctx
     | lookupOrDefault : {ctx : Nat} → ExprLoc ctx → ExprLoc ctx → ExprLoc ctx → Expr ctx
+    | containsKey : {ctx : Nat} → ExprLoc ctx → ExprLoc ctx → Expr ctx
     deriving Repr
 
   /-- A statement paired with its source location from SDQL -/
@@ -361,6 +362,10 @@ mutual
         let sk := showExprLoc k indent config
         let sd := showExprLoc d indent config
         s!"lookup_or_default(&{sm}, {sk}, {sd})"
+    | .containsKey m k =>
+        let sm := showExprLoc m indent config
+        let sk := showExprLoc k indent config
+        s!"{paren sm}.contains_key(&{paren sk})"
 
   /-- Show a located statement, optionally emitting source location comments -/
   partial def showStmtLoc {ctxIn ctxOut : Nat} (s : StmtLoc ctxIn ctxOut)
@@ -508,6 +513,7 @@ namespace Rename1
           let (ss', fOut) := stmtSeq f ss
           .block ss' (exprLoc fOut result)
       | .lookupOrDefault m k d => .lookupOrDefault (exprLoc f m) (exprLoc f k) (exprLoc f d)
+      | .containsKey m k => .containsKey (exprLoc f m) (exprLoc f k)
 
     /-- Rename a located statement by inserting one new variable in the context. -/
     def stmtLoc {ctxIn ctxOut : Nat} (f : Fin ctxIn → Fin (ctxIn + 1))
