@@ -114,13 +114,45 @@ def memToFin {α : Type} {a : α} {ctx : List α} (m : Mem a ctx) : Fin ctx.leng
 
 mutual
   /-- Compile a DeBruijn located term into a Rust located expression. -/
-  def compileLoc2 {ctx : List _root_.Ty} {ty : _root_.Ty}
+  unsafe def compileLoc2 {ctx : List _root_.Ty} {ty : _root_.Ty}
       (t : TermLoc2 ctx ty) : Rust.ExprLoc ctx.length :=
     let ⟨loc, inner⟩ := t
     Rust.ExprLoc.mk loc (compile2 loc inner)
 
+  unsafe def compileSumBody {ctx : List _root_.Ty} {dom range ty : _root_.Ty}
+      (loc : SourceLocation)
+      (a : _root_.AddM ty)
+      (body : TermLoc2 (dom :: range :: ctx) ty)
+      (mkLoop : Rust.StmtSeq (ctx.length + 3) (ctx.length + 3) →
+        Rust.StmtLoc (ctx.length + 1) (ctx.length + 1)) : Rust.Expr ctx.length :=
+    let ctxLen := ctx.length
+    let accInit : Rust.ExprLoc ctxLen := zeroOfAddMLoc (ctx := ctxLen) a
+    let accDecl : Rust.StmtLoc ctxLen (ctxLen + 1) :=
+      Rust.StmtLoc.mk loc (.letDecl true (.some accInit))
+    let shiftAfter2 : Fin (ctxLen + 2) → Fin (ctxLen + 3) := fun i =>
+      if h : i.1 < 2 then
+        ⟨i.1, by omega⟩
+      else
+        ⟨i.1 + 1, by omega⟩
+    let bodyDomRange : Rust.ExprLoc (ctxLen + 2) := compileLoc2 body
+    let bodyLoop : Rust.ExprLoc (ctxLen + 3) :=
+      Rust.Rename1.exprLoc (ctx := ctxLen + 2) shiftAfter2 bodyDomRange
+    let accIdx : Fin (ctxLen + 3) := ⟨2, by omega⟩
+    let accVar : Rust.ExprLoc (ctxLen + 3) := Rust.ExprLoc.withUnknownLoc (.var accIdx)
+    let updated : Rust.Expr (ctxLen + 3) := Compile.compileAdd a accVar bodyLoop
+    let assignAcc : Rust.StmtLoc (ctxLen + 3) (ctxLen + 3) :=
+      Rust.StmtLoc.mk loc (.assign accIdx (Rust.ExprLoc.withUnknownLoc updated))
+    let loopBody : Rust.StmtSeq (ctxLen + 3) (ctxLen + 3) :=
+      Rust.StmtSeq.cons assignAcc Rust.StmtSeq.nil
+    let loopStmt := mkLoop loopBody
+    let stmts : Rust.StmtSeq ctxLen (ctxLen + 1) :=
+      Rust.StmtSeq.cons accDecl (Rust.StmtSeq.cons loopStmt Rust.StmtSeq.nil)
+    let accResult : Rust.ExprLoc (ctxLen + 1) :=
+      Rust.ExprLoc.withUnknownLoc (.var ⟨0, Nat.succ_pos ctxLen⟩)
+    .block stmts accResult
+
   /-- Compile a DeBruijn term into a Rust expression. -/
-  def compile2 {ctx : List _root_.Ty} {ty : _root_.Ty}
+  unsafe def compile2 {ctx : List _root_.Ty} {ty : _root_.Ty}
       (loc : SourceLocation)
       (t : Term2 ctx ty) : Rust.Expr ctx.length :=
     match t with
@@ -181,59 +213,26 @@ mutual
         | .real, .maxProduct => .callRuntimeFn .promoteMaxProduct (Rust.Exprs.singleton inner)
         | .maxProduct, .real => .callRuntimeFn .demoteMaxProduct (Rust.Exprs.singleton inner)
         | _, _ => inner.expr
+    | @Term2.sum _ Ty.int Ty.bool _ a ((TermLoc2.mk _ (Term2.builtin BuiltinFn.Range n))) body =>
+        let endExclusive :=
+          Rust.Rename1.exprLoc (ctx := ctx.length) Fin.succ (compileLoc2 n)
+        compileSumBody loc a body (fun loopBody =>
+          Rust.StmtLoc.mk loc (.forRange endExclusive loopBody))
+    | @Term2.lookup _ _ Ty.bool _ ((TermLoc2.mk _ (Term2.builtin BuiltinFn.Dom n))) index =>
+        .containsKey (compileLoc2 n) (compileLoc2 index)
     | .lookup aRange d k =>
         .lookupOrDefault (compileLoc2 d) (compileLoc2 k) (zeroOfAddMLoc (ctx := ctx.length) aRange)
     | @Term2.sum ctx dom range ctx1 a d body =>
-        -- match  dom, range, d with
-        --   | Ty.int, Ty.bool, ((TermLoc2.mk _ (Term2.builtin BuiltinFn.Range n))) => sorry
-        --   | _, _, _  => sorry
-        let n := ctx.length
-        let accInit : Rust.ExprLoc n := zeroOfAddMLoc (ctx := n) a
-        let accDecl : Rust.StmtLoc n (n+1) := Rust.StmtLoc.mk loc (.letDecl true (.some accInit))
-        let de : Rust.ExprLoc (n+1) :=
-          Rust.Rename1.exprLoc (ctx := n) Fin.succ (compileLoc2 d)
-
-        let shiftAfter2 : Fin (n + 2) → Fin (n + 3) := fun i =>
-          if h : i.1 < 2 then
-            ⟨i.1, by omega⟩
-          else
-            ⟨i.1 + 1, by omega⟩
-
-        let bodyDomRange : Rust.ExprLoc (n+2) := compileLoc2 body
-        let bodyLoop : Rust.ExprLoc (n+3) :=
-          Rust.Rename1.exprLoc (ctx := n+2) shiftAfter2 bodyDomRange
-
-        let accIdx : Fin (n + 3) :=
-          ⟨2, by omega⟩
-        -- let accIdx : Fin (n + 3) :=
-
-        let accVar : Rust.ExprLoc (n+3) := Rust.ExprLoc.withUnknownLoc (.var accIdx)
-        let updated : Rust.Expr (n+3) := Compile.compileAdd a accVar bodyLoop
-        let assignAcc : Rust.StmtLoc (n+3) (n+3) :=
-          Rust.StmtLoc.mk loc (.assign accIdx (Rust.ExprLoc.withUnknownLoc updated))
-
-        let loopBody : Rust.StmtSeq (n+3) (n+3) :=
-          Rust.StmtSeq.cons assignAcc Rust.StmtSeq.nil
-        let loopStmt : Rust.StmtLoc (n+1) (n+1) :=
-          match de.expr with
-          | .callRuntimeFn .extRange (.cons endExclusive .nil) =>
-              -- Special-case `sum(<k,v> in range(N)) ...` to avoid allocating a `BTreeMap`:
-              -- compile the loop as `for k in 0..N { let v = true; ... }`.
-              Rust.StmtLoc.mk loc (.forRange endExclusive loopBody)
-          | _ =>
-              Rust.StmtLoc.mk loc (.forKV de loopBody)
-
-        let stmts : Rust.StmtSeq n (n+1) :=
-          Rust.StmtSeq.cons accDecl (Rust.StmtSeq.cons loopStmt Rust.StmtSeq.nil)
-        let accResult : Rust.ExprLoc (n+1) :=
-          Rust.ExprLoc.withUnknownLoc (.var ⟨0, Nat.succ_pos n⟩)
-        .block stmts accResult
+        let de : Rust.ExprLoc (ctx.length + 1) :=
+          Rust.Rename1.exprLoc (ctx := ctx.length) Fin.succ (compileLoc2 d)
+        compileSumBody loc a body (fun loopBody =>
+          Rust.StmtLoc.mk loc (.forKV de loopBody))
     | @Term2.proj _ _ _ r i _ => .tupleProj (compileLoc2 r) i
     | .builtin b a =>
         Compile.compileBuiltin b (compileLoc2 a)
 
   /-- Compile DeBruijn record fields to a list of Rust expressions. -/
-  def compileFields2 {ctx : List _root_.Ty}
+  unsafe def compileFields2 {ctx : List _root_.Ty}
       : {l : List _root_.Ty} → TermFields2 ctx l → Rust.Exprs ctx.length
     | [], .nil => .nil
     | _, .cons h t => .cons (compileLoc2 h) (compileFields2 t)
@@ -301,7 +300,7 @@ def genTableLoader (ty : _root_.Ty) (path : String) : String :=
     - evaluates the compiled term, and
     - prints the result.
 -/
-def renderRustProg2Shown (p : Prog2) (config : Rust.ShowConfig := Rust.defaultConfig) : String :=
+unsafe def renderRustProg2Shown (p : Prog2) (config : Rust.ShowConfig := Rust.defaultConfig) : String :=
   let header := rustRuntimeHeader
   -- Build name environment for context variables
   -- Generate inline loaders for each context variable
