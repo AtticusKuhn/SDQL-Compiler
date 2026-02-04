@@ -1,0 +1,43 @@
+name: Release Dissertation PDF
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release-dissertation:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build dissertation
+        run: nix run .#buildDissertation
+
+      - name: Create or update release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          short_sha="${GITHUB_SHA:0:7}"
+          tag="dissertation-${short_sha}"
+          title="Dissertation build ${short_sha}"
+          notes="Automated build of dissertation.pdf for commit ${GITHUB_SHA}."
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dissertation.pdf --clobber
+            gh release edit "$tag" --title "$title" --notes "$notes"
+          else
+            gh release create "$tag" dissertation.pdf --title "$title" --notes "$notes" --target "$GITHUB_SHA"
+          fi
