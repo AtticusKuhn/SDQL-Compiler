@@ -35,8 +35,8 @@ jobs:
           sudo sysctl -w kernel.perf_event_paranoid=-1
           sudo sysctl -w kernel.kptr_restrict=0
 
-      - name: Run flamegraph profiler
-        run: nix run .#flamegraph
+      # - name: Run flamegraph profiler
+      #   run: nix run .#flamegraph
 
       - name: Run optimisation performance comparison
         run: nix run .#optimisationPerformanceComparison
