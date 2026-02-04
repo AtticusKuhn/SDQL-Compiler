@@ -88,7 +88,7 @@
     $t$,
     annot: "Type",
     {
-      Or[bool][_boolean_]
+      Or[BB][_BBean_]
       Or[real][_real number_]
       Or[date][_date_]
       Or[$\{t_1 arrow t_2}$][_dictionary_]
@@ -109,7 +109,7 @@
       Or[$x$][_variable_]
       Or[$i$][_integer literal_]
       Or[$r$][_real literal_]
-      Or[$b$][_boolean literal_]
+      Or[$b$][_BBean literal_]
       Or[$s$][_string literal_]
       Or[$<n_1 = e_1, n_2 = e_2, \ldots, n_m = e_m>$][_record literal_]
       Or[$\{n_1 = e_1, n_2 = e_2, \ldots, n_m = e_m\}$][_dictionary literal_]
@@ -128,48 +128,164 @@
     },
   ),
 )
-#let variable = prooftree(rule(
-  name: [Variable],
-  $Gamma, x : A tack x : A$,
-))
-#let abstraction = prooftree(rule(
-  name: [Abstraction],
-  $Gamma, x: A tack P : B$,
-  $Gamma tack lambda x . P : A => B$,
+#let ty_var = prooftree(rule(
+  name: [T-Var],
+  $in\ A\ Gamma$,
+  $Gamma tack x : A$,
 ))
 
-#let application = prooftree(rule(
-  name: [Application],
-  $Gamma tack P : A => B$,
-  $Delta tack Q : B$,
-  $Gamma, Delta tack P Q : B$,
+#let ty_const_int = prooftree(rule(
+  name: [T-Int],
+  $Gamma tack i : #int$,
 ))
 
-#let weakening = prooftree(rule(
-  name: [Weakening],
-  $Gamma tack P : B$,
-  $Gamma, x : A tack P : B$,
+#let ty_const_real = prooftree(rule(
+  name: [T-Real],
+    $Gamma tack r : RR$,
 ))
 
-#let contraction = prooftree(rule(
-  label: [Contraction],
-  $Gamma, x : A, y : A tack P : B$,
-  $Gamma, z : A tack P[x, y <- z]: B$,
+#let ty_const_BB = prooftree(rule(
+  name: [T-BB],
+    $Gamma tack b : BB$,
 ))
 
-#let exchange = prooftree(rule(
-  label: [Exchange],
-  $Gamma, x : A, y: B, Delta tack P : B$,
-  $Gamma, y : B, x: A, Delta tack P : B$,
+#let ty_const_string = prooftree(rule(
+  name: [T-String],
+  $Gamma tack s : "string"$,
+))
+
+#let ty_record = prooftree(rule(
+  name: [T-Record],
+  $Gamma tack e_1 : t_1$,
+  $dots$,
+  $Gamma tack e_n : t_n$,
+  $Gamma tack <e_1, \ldots, e_n> : <t_1, \ldots, t_n>$,
+))
+
+#let ty_empty_dict = prooftree(rule(
+  name: [T-EmptyDict],
+  $Gamma tack {} : \{t_1 arrow t_2\}$,
+))
+
+#let ty_dict_insert = prooftree(rule(
+  name: [T-DictInsert],
+  $Gamma tack k : t_1$,
+  $Gamma tack v : t_2$,
+  $Gamma tack d : \{t_1 arrow t_2\}$,
+  $Gamma tack \{k -> v\} ++ d : \{t_1 arrow t_2\}$,
+))
+
+#let ty_lookup = prooftree(rule(
+  name: [T-Lookup],
+  $"AddM"\ t_2$,
+  $Gamma tack d : \{t_1 arrow t_2\}$,
+  $Gamma tack k : t_1$,
+  $Gamma tack d(k) : t_2$,
+))
+
+#let ty_not = prooftree(rule(
+  name: [T-Not],
+  $Gamma tack e : BB$,
+  $Gamma tack "not"(e) : BB$,
+))
+
+#let ty_ite = prooftree(rule(
+  name: [T-If],
+  $Gamma tack e_1 : BB$,
+  $Gamma tack e_2 : t$,
+  $Gamma tack e_3 : t$,
+  $Gamma tack "if" e_1 "then" e_2 "else" e_3 : t$,
+))
+
+#let ty_letin = prooftree(rule(
+  name: [T-Let],
+  $Gamma tack e_1 : t_1$,
+  $Gamma, t_1 tack e_2 : t_2$,
+  $Gamma tack "let" x = e_1 "in" e_2 : t_2$,
+))
+
+#let ty_add = prooftree(rule(
+  name: [T-Add],
+  $"AddM"\ t$,
+  $Gamma tack e_1 : t$,
+  $Gamma tack e_2 : t$,
+  $Gamma tack e_1 + e_2 : t$,
+))
+
+#let ty_mul = prooftree(rule(
+  name: [T-Mul],
+  $"ScaleM"\ s\ t_1$,
+  $"ScaleM"\ s\ t_2$,
+  $"has_tensor"\ t_1\ t_2\ t_3$,
+  $Gamma tack e_1 : t_1$,
+  $Gamma tack e_2 : t_2$,
+  $Gamma tack e_1 * e_2 : t_3$,
+))
+
+#let ty_semiring_mul = prooftree(rule(
+  name: [T-SemiringMul],
+  $"HasMul"\ t$,
+  $Gamma tack e_1 : t$,
+  $Gamma tack e_2 : t$,
+  $Gamma tack e_1 *s e_2 : t$,
+))
+
+#let ty_closure = prooftree(rule(
+  name: [T-Closure],
+  $"HasClosure"\ t$,
+  $Gamma tack e : t$,
+  $Gamma tack "closure"(e) : t$,
+))
+
+#let ty_promote = prooftree(rule(
+  name: [T-Promote],
+  $Gamma tack e : t_1$,
+  $Gamma tack "promote"[t_2](e) : t_2$,
+))
+
+#let ty_sum = prooftree(rule(
+  name: [T-Sum],
+  $"AddM"\ t$,
+  $Gamma tack d : \{t_1 arrow t_2\}$,
+  $Gamma, t_1, t_2 tack e : t$,
+  $Gamma tack "sum"(<k, v> "in" d) e : t$,
+))
+
+#let ty_proj = prooftree(rule(
+  name: [T-Proj],
+  $"has_proj"\ <t_1, \ldots, t_n>\ i\ t$,
+  $Gamma tack r : <t_1, \ldots, t_n>$,
+  $Gamma tack r.i : t$,
+))
+
+#let ty_builtin = prooftree(rule(
+  name: [T-Builtin],
+  $f : a => b$,
+  $Gamma tack e : a$,
+  $Gamma tack f(e) : b$,
 ))
 
 #align(center, rule-set(
-  variable,
-  abstraction,
-  application,
-  weakening,
-  contraction,
-  exchange
+  ty_var,
+  ty_const_int,
+  ty_const_real,
+  ty_const_BB,
+  ty_const_string,
+  ty_record,
+  ty_empty_dict,
+  ty_dict_insert,
+  ty_lookup,
+  ty_not,
+  ty_ite,
+  ty_letin,
+  ty_add,
+  ty_mul,
+  ty_semiring_mul,
+  ty_closure,
+  ty_promote,
+  ty_sum,
+  ty_proj,
+  ty_builtin,
 ))
 == Previous Work on SDQL
 
