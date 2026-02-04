@@ -314,8 +314,47 @@ inductive ScaleM : Ty → Ty → Type where
 inductive HasMul : Ty → Type where
   | boolS : HasMul Ty.bool
   | realS : HasMul Ty.real
-  | squareMatrix {t : Ty} : HasMul t → HasMul (tensor t t)
+  | squareMatrix {s t : Ty} : ScaleM s t → HasMul (tensor t t)
 
+/-- info: Ty.dict (Ty.int) (Ty.dict (Ty.int) (Ty.real)) -/
+#guard_msgs in
+#eval
+  let t : Ty := (.dict .int .real);
+  tensor t t
+
+/-- info: Ty.record [Ty.record [Ty.int, Ty.real], Ty.record [Ty.int, Ty.real]] -/
+#guard_msgs in
+#eval
+  let t : Ty := (.record [.int , .real]);
+  tensor t t
+
+/--
+Example: The type (Ty.dict (Ty.int) (Ty.dict (Ty.int) (Ty.real)))
+represents square matrices with real entries. Thus, it should have
+semi-ring multiplication
+-/
+example : HasMul (Ty.dict (Ty.int) (Ty.dict (Ty.int) (Ty.real))) :=
+  .squareMatrix (t := (.dict .int .real)) (.dictS .realS)
+
+unsafe def HasMul.denote {t : Ty} (hm : HasMul t) (am : AddM t)
+    (x y : t.denote) : t.denote :=
+  match hm with
+  -- Boolean multiplication is AND
+  | .boolS => x && y
+  -- Real multiplication is standard *
+  | .realS => x * y
+  -- Square Matrix Multiplication
+  -- A · B corresponds to iterating rows of A, scaling rows of B, and summing them.
+  | @HasMul.squareMatrix s vecTy sc =>
+    match vecTy, x, y, sc, am with
+    | .dict dom range, A, B, ScaleM.dictS sRange, x =>
+      -- A, B : Dict dom (tensor range vecTy)
+      -- logic: C[i] = ∑_k (A[i][k] * B[k])
+        -- simp [tensor, tensor._unary] at x
+        sorry
+
+    -- Fallback for non-dict tensors (e.g. records of records)
+    | a, b, c, d, e => Ty.inhabited (tensor a a)
 inductive HasClosure : Ty → Type where
   -- closure(b : Bool) : Bool := true
   | boolS : HasClosure Ty.bool

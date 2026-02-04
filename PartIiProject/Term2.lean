@@ -522,10 +522,11 @@ end
 unsafe def toCoreHasMul : {t : SurfaceTy} → SHasMul t → HasMul (ty t)
   | _, SHasMul.boolS => HasMul.boolS
   | _, SHasMul.realS => HasMul.realS
-  | _, @SHasMul.squareMatrix t ht =>
+  | _, @SHasMul.squareMatrix s  t ht =>
       by
-        have hmul : HasMul (tensor (ty t) (ty t)) := HasMul.squareMatrix (toCoreHasMul ht)
-        simpa [ty_stensor_eq2, -stensor] using hmul
+        have hmul : HasMul (tensor (ty t) (ty t)) := HasMul.squareMatrix (s := ty s) (toCoreScale ht)
+        simp [ty_stensor_eq2, -stensor]
+        exact hmul
 
 -- Evidence translation: SHasClosure → HasClosure
 unsafe def toCoreHasClosure : {t : SurfaceTy} → SHasClosure t → HasClosure (ty t)

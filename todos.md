@@ -159,3 +159,7 @@ TOTAL                                 3172ms         345ms        0.108×
 
 ```
 
+ nix flake lock --update-input nixpkgs --update-input nix --update-input lean4-nix --update-input flake-parts
+
+Interactive view
+file:///home/atticusk/coding/part_ii_project/.sdql-flamegraph-out/svgs/

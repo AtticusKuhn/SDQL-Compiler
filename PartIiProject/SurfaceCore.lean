@@ -87,7 +87,7 @@ unsafe def stensor (a b : SurfaceTy) : SurfaceTy :=
 unsafe inductive SHasMul : SurfaceTy → Type where
   | boolS : SHasMul .bool
   | realS : SHasMul .real
-  | squareMatrix {t : SurfaceTy} : SHasMul t → SHasMul (stensor t t)
+  | squareMatrix {s t : SurfaceTy} : SScale s t  → SHasMul (stensor t t)
 
 unsafe inductive SHasClosure : SurfaceTy → Type where
   | boolS : SHasClosure .bool
