@@ -78,6 +78,27 @@ unsafe def p_if_then_false : SProg2 :=
 unsafe def p_semiring_mul_real : SProg2 :=
   [SDQLProg2 { real }| 2.0 *s 3.0 ]
 
+unsafe def p_semiring_mul_matrix_2x2 : SProg2 :=
+  [SDQLProg2 { { int -> { int -> real } } }|
+    let a = { 1 -> { 1 -> 1.0, 2 -> 2.0 }, 2 -> { 1 -> 3.0, 2 -> 4.0 } } in
+    let b = { 1 -> { 1 -> 5.0, 2 -> 6.0 }, 2 -> { 1 -> 7.0, 2 -> 8.0 } } in
+    a *s b
+  ]
+
+unsafe def p_semiring_mul_record_tensor : SProg2 :=
+  [SDQLProg2 { <<int, real>, <int, real>> }|
+    < <1, 2.0>, <3, 4.0> > *s < <5, 6.0>, <7, 8.0> >
+  ]
+
+unsafe def p_semiring_mul_4d_tensor : SProg2 :=
+  [SDQLProg2 { { int -> { int -> { int -> { int -> real } } } } }|
+    let a = { 1 -> { 1 -> 1.0, 2 -> 2.0 } } in
+    let b = { 1 -> { 1 -> 2.0 } } in
+    let x = { 1 -> { 1 -> 3.0 } } in
+    let y = { 1 -> { 1 -> 4.0 } } in
+    (a * b) *s (x * y)
+  ]
+
 unsafe def p_closure_bool : SProg2 :=
   [SDQLProg2 { bool }| closure(false) ]
 
@@ -94,6 +115,11 @@ unsafe def smallCases : List TestCase :=
   , TestCase.program "if_then_true" p_if_then_true "7"
   , TestCase.program "if_then_false" p_if_then_false "0"
   , TestCase.program "semiring_mul_real" p_semiring_mul_real "6"
+  , TestCase.program "semiring_mul_matrix_2x2" p_semiring_mul_matrix_2x2
+      "{1 -> {1 -> 19, 2 -> 22, }, 2 -> {1 -> 43, 2 -> 50, }, }"
+  , TestCase.compileOnly "semiring_mul_record_tensor" p_semiring_mul_record_tensor
+  , TestCase.program "semiring_mul_4d_tensor" p_semiring_mul_4d_tensor
+      "{1 -> {1 -> {1 -> {1 -> 24, }, }, 2 -> {1 -> {1 -> 48, }, }, }, }"
   , TestCase.program "closure_bool" p_closure_bool "true"
   , TestCase.program "closure_real" p_closure_real "2"
   ]
