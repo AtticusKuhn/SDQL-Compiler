@@ -196,6 +196,490 @@ impl<T1: SdqlAdd, T2: SdqlAdd, T3: SdqlAdd, T4: SdqlAdd, T5: SdqlAdd, T6: SdqlAd
 }
 
 // ============================================================================
+// Tensor Semiring Helpers (decompose/mkTensor/bilinear)
+// ============================================================================
+
+/// Additive identity for SDQL values.
+pub trait SdqlZero {
+    fn sdql_zero() -> Self;
+}
+
+/// Multiplicative identity for scalar types.
+pub trait SdqlOne {
+    fn sdql_one() -> Self;
+}
+
+/// Scalar action on SDQL values.
+pub trait SdqlScale<S> {
+    fn sdql_scale(s: &S, v: &Self) -> Self;
+}
+
+/// Bilinear form on SDQL semimodule values.
+pub trait SdqlBilinear {
+    type Scalar: SdqlAdd + SdqlZero;
+    fn sdql_bilinear(a: &Self, b: &Self) -> Self::Scalar;
+}
+
+/// Tensor construction/decomposition driven by the left type.
+pub trait TensorLeft<R>: Sized {
+    type Tensor;
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor;
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)>;
+}
+
+/// Semiring multiplication for tensor types.
+pub trait SdqlSemiringTensor<V>: Sized {
+    type Scalar: SdqlAdd + SdqlZero + SdqlOne;
+    fn decompose(&self) -> Vec<(V, V)>;
+    fn mk_tensor(a: &V, b: &V) -> Self;
+    fn bilinear(a: &V, b: &V) -> Self::Scalar;
+    fn scale(s: &Self::Scalar, t: &Self) -> Self;
+    fn zero() -> Self;
+    fn add(a: &Self, b: &Self) -> Self;
+}
+
+impl SdqlZero for bool {
+    fn sdql_zero() -> Self { false }
+}
+
+impl SdqlZero for i64 {
+    fn sdql_zero() -> Self { 0 }
+}
+
+impl SdqlZero for Real {
+    fn sdql_zero() -> Self { Real::new(0.0) }
+}
+
+impl SdqlZero for MaxProduct {
+    fn sdql_zero() -> Self { MaxProduct(Real::new(0.0)) }
+}
+
+impl SdqlZero for Date {
+    fn sdql_zero() -> Self { Date::new(10101) }
+}
+
+impl SdqlZero for String {
+    fn sdql_zero() -> Self { String::new() }
+}
+
+impl SdqlZero for () {
+    fn sdql_zero() -> Self { () }
+}
+
+impl<K: Ord, V> SdqlZero for BTreeMap<K, V> {
+    fn sdql_zero() -> Self { BTreeMap::new() }
+}
+
+macro_rules! impl_sdql_zero_tuple {
+    ( $( $T:ident ),+ ) => {
+        impl< $( $T: SdqlZero ),+ > SdqlZero for ( $( $T, )+ ) {
+            fn sdql_zero() -> Self {
+                ( $( $T::sdql_zero(), )+ )
+            }
+        }
+    };
+}
+
+impl_sdql_zero_tuple!(T1);
+impl_sdql_zero_tuple!(T1, T2);
+impl_sdql_zero_tuple!(T1, T2, T3);
+impl_sdql_zero_tuple!(T1, T2, T3, T4);
+impl_sdql_zero_tuple!(T1, T2, T3, T4, T5);
+impl_sdql_zero_tuple!(T1, T2, T3, T4, T5, T6);
+impl_sdql_zero_tuple!(T1, T2, T3, T4, T5, T6, T7);
+impl_sdql_zero_tuple!(T1, T2, T3, T4, T5, T6, T7, T8);
+
+impl SdqlOne for bool {
+    fn sdql_one() -> Self { true }
+}
+
+impl SdqlOne for Real {
+    fn sdql_one() -> Self { Real::new(1.0) }
+}
+
+impl SdqlOne for MaxProduct {
+    fn sdql_one() -> Self { MaxProduct(Real::new(1.0)) }
+}
+
+impl SdqlScale<bool> for bool {
+    fn sdql_scale(s: &bool, v: &Self) -> Self { *s && *v }
+}
+
+impl SdqlScale<Real> for Real {
+    fn sdql_scale(s: &Real, v: &Self) -> Self { *s * *v }
+}
+
+impl SdqlScale<MaxProduct> for MaxProduct {
+    fn sdql_scale(s: &MaxProduct, v: &Self) -> Self { *s * *v }
+}
+
+impl<S, K: Ord + Clone, V: SdqlScale<S>> SdqlScale<S> for BTreeMap<K, V> {
+    fn sdql_scale(s: &S, v: &Self) -> Self {
+        let mut out = BTreeMap::new();
+        for (k, val) in v.iter() {
+            out.insert(k.clone(), V::sdql_scale(s, val));
+        }
+        out
+    }
+}
+
+macro_rules! impl_sdql_scale_tuple {
+    ( $( $T:ident, $idx:tt ),+ ) => {
+        impl<S, $( $T: SdqlScale<S> ),+ > SdqlScale<S> for ( $( $T, )+ ) {
+            fn sdql_scale(s: &S, v: &Self) -> Self {
+                ( $( $T::sdql_scale(s, &v.$idx), )+ )
+            }
+        }
+    };
+}
+
+impl_sdql_scale_tuple!(T1, 0);
+impl_sdql_scale_tuple!(T1, 0, T2, 1);
+impl_sdql_scale_tuple!(T1, 0, T2, 1, T3, 2);
+impl_sdql_scale_tuple!(T1, 0, T2, 1, T3, 2, T4, 3);
+impl_sdql_scale_tuple!(T1, 0, T2, 1, T3, 2, T4, 3, T5, 4);
+impl_sdql_scale_tuple!(T1, 0, T2, 1, T3, 2, T4, 3, T5, 4, T6, 5);
+impl_sdql_scale_tuple!(T1, 0, T2, 1, T3, 2, T4, 3, T5, 4, T6, 5, T7, 6);
+impl_sdql_scale_tuple!(T1, 0, T2, 1, T3, 2, T4, 3, T5, 4, T6, 5, T7, 6, T8, 7);
+
+impl SdqlBilinear for bool {
+    type Scalar = bool;
+    fn sdql_bilinear(a: &Self, b: &Self) -> Self::Scalar { *a && *b }
+}
+
+impl SdqlBilinear for Real {
+    type Scalar = Real;
+    fn sdql_bilinear(a: &Self, b: &Self) -> Self::Scalar { *a * *b }
+}
+
+impl SdqlBilinear for MaxProduct {
+    type Scalar = MaxProduct;
+    fn sdql_bilinear(a: &Self, b: &Self) -> Self::Scalar { *a * *b }
+}
+
+impl<K: Ord, V: SdqlBilinear> SdqlBilinear for BTreeMap<K, V>
+where
+    V::Scalar: SdqlAdd + SdqlZero,
+{
+    type Scalar = V::Scalar;
+    fn sdql_bilinear(a: &Self, b: &Self) -> Self::Scalar {
+        let mut acc = V::Scalar::sdql_zero();
+        for (k, v1) in a.iter() {
+            if let Some(v2) = b.get(k) {
+                let term = V::sdql_bilinear(v1, v2);
+                acc = acc.sdql_add(&term);
+            }
+        }
+        acc
+    }
+}
+
+macro_rules! impl_sdql_bilinear_tuple {
+    ( $T1:ident, $idx1:tt; $( $T:ident, $idx:tt ),* ) => {
+        impl< $T1, $( $T ),* > SdqlBilinear for ( $T1, $( $T, )* )
+        where
+            $T1: SdqlBilinear,
+            $( $T: SdqlBilinear<Scalar = <$T1 as SdqlBilinear>::Scalar>, )*
+            <$T1 as SdqlBilinear>::Scalar: SdqlAdd + SdqlZero,
+        {
+            type Scalar = <$T1 as SdqlBilinear>::Scalar;
+            fn sdql_bilinear(a: &Self, b: &Self) -> Self::Scalar {
+                let mut acc = <$T1 as SdqlBilinear>::sdql_bilinear(&a.$idx1, &b.$idx1);
+                $(
+                    let term = <$T as SdqlBilinear>::sdql_bilinear(&a.$idx, &b.$idx);
+                    acc = acc.sdql_add(&term);
+                )*
+                acc
+            }
+        }
+    };
+}
+
+impl_sdql_bilinear_tuple!(T1, 0;);
+impl_sdql_bilinear_tuple!(T1, 0; T2, 1);
+impl_sdql_bilinear_tuple!(T1, 0; T2, 1, T3, 2);
+impl_sdql_bilinear_tuple!(T1, 0; T2, 1, T3, 2, T4, 3);
+impl_sdql_bilinear_tuple!(T1, 0; T2, 1, T3, 2, T4, 3, T5, 4);
+impl_sdql_bilinear_tuple!(T1, 0; T2, 1, T3, 2, T4, 3, T5, 4, T6, 5);
+impl_sdql_bilinear_tuple!(T1, 0; T2, 1, T3, 2, T4, 3, T5, 4, T6, 5, T7, 6);
+impl_sdql_bilinear_tuple!(T1, 0; T2, 1, T3, 2, T4, 3, T5, 4, T6, 5, T7, 6, T8, 7);
+
+impl<R: SdqlScale<bool> + Clone> TensorLeft<R> for bool {
+    type Tensor = R;
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor {
+        R::sdql_scale(a, b)
+    }
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
+        vec![(bool::sdql_one(), t.clone())]
+    }
+}
+
+impl<R: SdqlScale<Real> + Clone> TensorLeft<R> for Real {
+    type Tensor = R;
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor {
+        R::sdql_scale(a, b)
+    }
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
+        vec![(Real::sdql_one(), t.clone())]
+    }
+}
+
+impl<R: SdqlScale<MaxProduct> + Clone> TensorLeft<R> for MaxProduct {
+    type Tensor = R;
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor {
+        R::sdql_scale(a, b)
+    }
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
+        vec![(MaxProduct::sdql_one(), t.clone())]
+    }
+}
+
+impl<K: Ord + Clone, V: TensorLeft<R>, R: Clone> TensorLeft<R> for BTreeMap<K, V> {
+    type Tensor = BTreeMap<K, V::Tensor>;
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor {
+        let mut out = BTreeMap::new();
+        for (k, v) in a.iter() {
+            out.insert(k.clone(), V::mk_tensor_left(v, b));
+        }
+        out
+    }
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
+        let mut out = Vec::new();
+        for (k, v_tensor) in t.iter() {
+            for (v_left, r) in V::decompose_tensor(v_tensor) {
+                let mut left = BTreeMap::new();
+                left.insert(k.clone(), v_left);
+                out.push((left, r));
+            }
+        }
+        out
+    }
+}
+
+impl<R: Clone, A: TensorLeft<R> + SdqlZero> TensorLeft<R> for (A,) {
+    type Tensor = (A::Tensor,);
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor {
+        (A::mk_tensor_left(&a.0, b),)
+    }
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
+        let mut out = Vec::new();
+        for (a_left, r) in A::decompose_tensor(&t.0) {
+            out.push(((a_left,), r));
+        }
+        out
+    }
+}
+
+impl<R: Clone, A: TensorLeft<R> + SdqlZero, B: TensorLeft<R> + SdqlZero> TensorLeft<R> for (A, B) {
+    type Tensor = (A::Tensor, B::Tensor);
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor {
+        (A::mk_tensor_left(&a.0, b), B::mk_tensor_left(&a.1, b))
+    }
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
+        let mut out = Vec::new();
+        for (a_left, r) in A::decompose_tensor(&t.0) {
+            out.push(((a_left, B::sdql_zero()), r));
+        }
+        for (b_left, r) in B::decompose_tensor(&t.1) {
+            out.push(((A::sdql_zero(), b_left), r));
+        }
+        out
+    }
+}
+
+impl<R: Clone, A: TensorLeft<R> + SdqlZero, B: TensorLeft<R> + SdqlZero, C: TensorLeft<R> + SdqlZero> TensorLeft<R> for (A, B, C) {
+    type Tensor = (A::Tensor, B::Tensor, C::Tensor);
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor {
+        (A::mk_tensor_left(&a.0, b), B::mk_tensor_left(&a.1, b), C::mk_tensor_left(&a.2, b))
+    }
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
+        let mut out = Vec::new();
+        for (a_left, r) in A::decompose_tensor(&t.0) {
+            out.push(((a_left, B::sdql_zero(), C::sdql_zero()), r));
+        }
+        for (b_left, r) in B::decompose_tensor(&t.1) {
+            out.push(((A::sdql_zero(), b_left, C::sdql_zero()), r));
+        }
+        for (c_left, r) in C::decompose_tensor(&t.2) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), c_left), r));
+        }
+        out
+    }
+}
+
+impl<R: Clone, A: TensorLeft<R> + SdqlZero, B: TensorLeft<R> + SdqlZero, C: TensorLeft<R> + SdqlZero, D: TensorLeft<R> + SdqlZero> TensorLeft<R> for (A, B, C, D) {
+    type Tensor = (A::Tensor, B::Tensor, C::Tensor, D::Tensor);
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor {
+        (A::mk_tensor_left(&a.0, b), B::mk_tensor_left(&a.1, b), C::mk_tensor_left(&a.2, b), D::mk_tensor_left(&a.3, b))
+    }
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
+        let mut out = Vec::new();
+        for (a_left, r) in A::decompose_tensor(&t.0) {
+            out.push(((a_left, B::sdql_zero(), C::sdql_zero(), D::sdql_zero()), r));
+        }
+        for (b_left, r) in B::decompose_tensor(&t.1) {
+            out.push(((A::sdql_zero(), b_left, C::sdql_zero(), D::sdql_zero()), r));
+        }
+        for (c_left, r) in C::decompose_tensor(&t.2) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), c_left, D::sdql_zero()), r));
+        }
+        for (d_left, r) in D::decompose_tensor(&t.3) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), d_left), r));
+        }
+        out
+    }
+}
+
+impl<R: Clone, A: TensorLeft<R> + SdqlZero, B: TensorLeft<R> + SdqlZero, C: TensorLeft<R> + SdqlZero, D: TensorLeft<R> + SdqlZero, E: TensorLeft<R> + SdqlZero> TensorLeft<R> for (A, B, C, D, E) {
+    type Tensor = (A::Tensor, B::Tensor, C::Tensor, D::Tensor, E::Tensor);
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor {
+        (A::mk_tensor_left(&a.0, b), B::mk_tensor_left(&a.1, b), C::mk_tensor_left(&a.2, b), D::mk_tensor_left(&a.3, b), E::mk_tensor_left(&a.4, b))
+    }
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
+        let mut out = Vec::new();
+        for (a_left, r) in A::decompose_tensor(&t.0) {
+            out.push(((a_left, B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), E::sdql_zero()), r));
+        }
+        for (b_left, r) in B::decompose_tensor(&t.1) {
+            out.push(((A::sdql_zero(), b_left, C::sdql_zero(), D::sdql_zero(), E::sdql_zero()), r));
+        }
+        for (c_left, r) in C::decompose_tensor(&t.2) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), c_left, D::sdql_zero(), E::sdql_zero()), r));
+        }
+        for (d_left, r) in D::decompose_tensor(&t.3) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), d_left, E::sdql_zero()), r));
+        }
+        for (e_left, r) in E::decompose_tensor(&t.4) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), e_left), r));
+        }
+        out
+    }
+}
+
+impl<R: Clone, A: TensorLeft<R> + SdqlZero, B: TensorLeft<R> + SdqlZero, C: TensorLeft<R> + SdqlZero, D: TensorLeft<R> + SdqlZero, E: TensorLeft<R> + SdqlZero, F: TensorLeft<R> + SdqlZero> TensorLeft<R> for (A, B, C, D, E, F) {
+    type Tensor = (A::Tensor, B::Tensor, C::Tensor, D::Tensor, E::Tensor, F::Tensor);
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor {
+        (A::mk_tensor_left(&a.0, b), B::mk_tensor_left(&a.1, b), C::mk_tensor_left(&a.2, b), D::mk_tensor_left(&a.3, b), E::mk_tensor_left(&a.4, b), F::mk_tensor_left(&a.5, b))
+    }
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
+        let mut out = Vec::new();
+        for (a_left, r) in A::decompose_tensor(&t.0) {
+            out.push(((a_left, B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), E::sdql_zero(), F::sdql_zero()), r));
+        }
+        for (b_left, r) in B::decompose_tensor(&t.1) {
+            out.push(((A::sdql_zero(), b_left, C::sdql_zero(), D::sdql_zero(), E::sdql_zero(), F::sdql_zero()), r));
+        }
+        for (c_left, r) in C::decompose_tensor(&t.2) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), c_left, D::sdql_zero(), E::sdql_zero(), F::sdql_zero()), r));
+        }
+        for (d_left, r) in D::decompose_tensor(&t.3) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), d_left, E::sdql_zero(), F::sdql_zero()), r));
+        }
+        for (e_left, r) in E::decompose_tensor(&t.4) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), e_left, F::sdql_zero()), r));
+        }
+        for (f_left, r) in F::decompose_tensor(&t.5) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), E::sdql_zero(), f_left), r));
+        }
+        out
+    }
+}
+
+impl<R: Clone, A: TensorLeft<R> + SdqlZero, B: TensorLeft<R> + SdqlZero, C: TensorLeft<R> + SdqlZero, D: TensorLeft<R> + SdqlZero, E: TensorLeft<R> + SdqlZero, F: TensorLeft<R> + SdqlZero, G: TensorLeft<R> + SdqlZero> TensorLeft<R> for (A, B, C, D, E, F, G) {
+    type Tensor = (A::Tensor, B::Tensor, C::Tensor, D::Tensor, E::Tensor, F::Tensor, G::Tensor);
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor {
+        (A::mk_tensor_left(&a.0, b), B::mk_tensor_left(&a.1, b), C::mk_tensor_left(&a.2, b), D::mk_tensor_left(&a.3, b), E::mk_tensor_left(&a.4, b), F::mk_tensor_left(&a.5, b), G::mk_tensor_left(&a.6, b))
+    }
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
+        let mut out = Vec::new();
+        for (a_left, r) in A::decompose_tensor(&t.0) {
+            out.push(((a_left, B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), E::sdql_zero(), F::sdql_zero(), G::sdql_zero()), r));
+        }
+        for (b_left, r) in B::decompose_tensor(&t.1) {
+            out.push(((A::sdql_zero(), b_left, C::sdql_zero(), D::sdql_zero(), E::sdql_zero(), F::sdql_zero(), G::sdql_zero()), r));
+        }
+        for (c_left, r) in C::decompose_tensor(&t.2) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), c_left, D::sdql_zero(), E::sdql_zero(), F::sdql_zero(), G::sdql_zero()), r));
+        }
+        for (d_left, r) in D::decompose_tensor(&t.3) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), d_left, E::sdql_zero(), F::sdql_zero(), G::sdql_zero()), r));
+        }
+        for (e_left, r) in E::decompose_tensor(&t.4) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), e_left, F::sdql_zero(), G::sdql_zero()), r));
+        }
+        for (f_left, r) in F::decompose_tensor(&t.5) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), E::sdql_zero(), f_left, G::sdql_zero()), r));
+        }
+        for (g_left, r) in G::decompose_tensor(&t.6) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), E::sdql_zero(), F::sdql_zero(), g_left), r));
+        }
+        out
+    }
+}
+
+impl<R: Clone, A: TensorLeft<R> + SdqlZero, B: TensorLeft<R> + SdqlZero, C: TensorLeft<R> + SdqlZero, D: TensorLeft<R> + SdqlZero, E: TensorLeft<R> + SdqlZero, F: TensorLeft<R> + SdqlZero, G: TensorLeft<R> + SdqlZero, H: TensorLeft<R> + SdqlZero> TensorLeft<R> for (A, B, C, D, E, F, G, H) {
+    type Tensor = (A::Tensor, B::Tensor, C::Tensor, D::Tensor, E::Tensor, F::Tensor, G::Tensor, H::Tensor);
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor {
+        (A::mk_tensor_left(&a.0, b), B::mk_tensor_left(&a.1, b), C::mk_tensor_left(&a.2, b), D::mk_tensor_left(&a.3, b), E::mk_tensor_left(&a.4, b), F::mk_tensor_left(&a.5, b), G::mk_tensor_left(&a.6, b), H::mk_tensor_left(&a.7, b))
+    }
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
+        let mut out = Vec::new();
+        for (a_left, r) in A::decompose_tensor(&t.0) {
+            out.push(((a_left, B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), E::sdql_zero(), F::sdql_zero(), G::sdql_zero(), H::sdql_zero()), r));
+        }
+        for (b_left, r) in B::decompose_tensor(&t.1) {
+            out.push(((A::sdql_zero(), b_left, C::sdql_zero(), D::sdql_zero(), E::sdql_zero(), F::sdql_zero(), G::sdql_zero(), H::sdql_zero()), r));
+        }
+        for (c_left, r) in C::decompose_tensor(&t.2) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), c_left, D::sdql_zero(), E::sdql_zero(), F::sdql_zero(), G::sdql_zero(), H::sdql_zero()), r));
+        }
+        for (d_left, r) in D::decompose_tensor(&t.3) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), d_left, E::sdql_zero(), F::sdql_zero(), G::sdql_zero(), H::sdql_zero()), r));
+        }
+        for (e_left, r) in E::decompose_tensor(&t.4) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), e_left, F::sdql_zero(), G::sdql_zero(), H::sdql_zero()), r));
+        }
+        for (f_left, r) in F::decompose_tensor(&t.5) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), E::sdql_zero(), f_left, G::sdql_zero(), H::sdql_zero()), r));
+        }
+        for (g_left, r) in G::decompose_tensor(&t.6) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), E::sdql_zero(), F::sdql_zero(), g_left, H::sdql_zero()), r));
+        }
+        for (h_left, r) in H::decompose_tensor(&t.7) {
+            out.push(((A::sdql_zero(), B::sdql_zero(), C::sdql_zero(), D::sdql_zero(), E::sdql_zero(), F::sdql_zero(), G::sdql_zero(), h_left), r));
+        }
+        out
+    }
+}
+
+impl<V> SdqlSemiringTensor<V> for <V as TensorLeft<V>>::Tensor
+where
+    V: TensorLeft<V> + SdqlBilinear + Clone,
+    V::Scalar: SdqlAdd + SdqlZero + SdqlOne,
+    <V as TensorLeft<V>>::Tensor: SdqlScale<V::Scalar> + SdqlZero + SdqlAdd,
+{
+    type Scalar = V::Scalar;
+    fn decompose(&self) -> Vec<(V, V)> {
+        V::decompose_tensor(self)
+    }
+    fn mk_tensor(a: &V, b: &V) -> Self {
+        V::mk_tensor_left(a, b)
+    }
+    fn bilinear(a: &V, b: &V) -> Self::Scalar {
+        V::sdql_bilinear(a, b)
+    }
+    fn scale(s: &Self::Scalar, t: &Self) -> Self {
+        <Self as SdqlScale<Self::Scalar>>::sdql_scale(s, t)
+    }
+    fn zero() -> Self {
+        <Self as SdqlZero>::sdql_zero()
+    }
+    fn add(a: &Self, b: &Self) -> Self {
+        a.sdql_add(b)
+    }
+}
+
+// ============================================================================
 // Dictionary and Tuple Helpers
 // ============================================================================
 
@@ -228,8 +712,24 @@ pub fn dict_add<K: Ord + Clone, V: SdqlAdd + Clone>(a: BTreeMap<K, V>, b: BTreeM
     acc
 }
 
-pub fn sdql_semiring_mul<T>(_a: T, _b: T) -> T {
-    todo!("sdql_semiring_mul for square matrices not implemented")
+pub fn sdql_semiring_mul<T, V>(a: T, b: T) -> T
+where
+    T: SdqlSemiringTensor<V>,
+{
+    let left = a.decompose();
+    let right = b.decompose();
+    let mut acc = T::zero();
+    for (a_left, b_left) in left.into_iter() {
+        for pair in right.iter() {
+            let x = &pair.0;
+            let y = &pair.1;
+            let scalar = T::bilinear(&b_left, x);
+            let tensor = T::mk_tensor(&a_left, y);
+            let scaled = T::scale(&scalar, &tensor);
+            acc = T::add(&acc, &scaled);
+        }
+    }
+    acc
 }
 
 pub fn sdql_closure<T>(_a: T) -> T {
