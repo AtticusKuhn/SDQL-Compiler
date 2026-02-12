@@ -1,45 +1,7 @@
 #import "@preview/simplebnf:0.1.1": *
 #import "@preview/adaptive-dots:0.1.0": adaptive-dots
 #import "@preview/curryst:0.6.0": rule, prooftree, rule-set
-
-#let mathpar(
-  numbering: auto,
-  row-gutter: 1.2em, // can be set to 'auto'
-  column-gutter: 2.5em,
-  ..children
-) = layout(bounds => {
-  // Resolve parameters
-  let numbering = if numbering == auto { math.equation.numbering } else { numbering }
-  let row-gutter = if row-gutter == auto { par.leading } else { row-gutter.to-absolute() }
-  let column-gutter = column-gutter.to-absolute()
-  let children = children.pos().map(child => [#child])
-
-  // Spread children into lines
-  let widths = children.map(child => measure(child).width)
-  let lines = ((children: (), remaining: bounds.width),)
-  for (child, width) in children.zip(widths) {
-    if (
-      child.func() == linebreak or
-      (lines.last().remaining - width) / (lines.last().children.len() + 2) < column-gutter
-    ){
-      lines.push((children: (), remaining: bounds.width))
-    }
-
-    if child.func() != linebreak {
-      lines.last().children.push(child)
-      lines.last().remaining -= width
-    }
-  }
-
-  // Layout children in math mode for baseline alignment
-  par(leading: row-gutter, math.equation(numbering: numbering, block: true,
-    for (i, line) in lines.enumerate() {
-      let space = h(line.remaining / (line.children.len() + 1))
-      par(leading: par.leading, space + line.children.join(space) + space)
-      if i != lines.len() - 1 { linebreak() }
-    }
-  ))
-})
+#import "mathpar.typ": mathpar
 
 = Cover page
 
@@ -53,8 +15,24 @@
 = Chapter 1: Introduction
 
 == Motivation
+Data-science pipelines may contain both data-queries
+and linear algebra. PL researchers have designed
+DSLs to capture parts of this workflow. Relational
+Algebra DSLs model relational data, and linear algebra
+frameworks can efficiently compute over tensors. However,
+using different DSLs to model each stage introduces
+friction at the transition boundry of the data-science
+pipeline.
 
-== SDQL
+This dissertation implements and extends with new features SDQL, a
+DSL based on semi-rings which is flexible enough to
+serve as a hybrid DB and also support Linear Algebra
+workloads.
+
+SDQL achieves expressivity by modelling data operations
+as semi-rings over dictionaries.
+
+== Background on SDQL
 === Syntax and Typing Rules of SDQL
 #bnf(
   Prod(
@@ -72,6 +50,7 @@
       Or[startsWith][_string starts with_]
       Or[contains][_string contains_]
       Or[firstIndex][_first index in string_]
+      Or[lastIndex][_last index in string_]
       Or[subString][_substring of a string_]
       Or[dom][_domain of a dictionary_]
       Or[range][_The range $1 ... n$_]
@@ -258,11 +237,132 @@
   $Gamma tack r.i : t$,
 ))
 
-#let ty_builtin = prooftree(rule(
-  name: [T-Builtin],
-  $f : a => b$,
-  $Gamma tack e : a$,
-  $Gamma tack f(e) : b$,
+#let ty_or = prooftree(rule(
+  name: [T-Or],
+  $Gamma tack e_1 : BB$,
+  $Gamma tack e_2 : BB$,
+  $Gamma tack e_1 || e_2 : BB$,
+))
+
+#let ty_and = prooftree(rule(
+  name: [T-And],
+  $Gamma tack e_1 : BB$,
+  $Gamma tack e_2 : BB$,
+  $Gamma tack e_1 && e_2 : BB$,
+))
+
+#let ty_eq = prooftree(rule(
+  name: [T-Eq],
+  $Gamma tack e_1 : t$,
+  $Gamma tack e_2 : t$,
+  $Gamma tack e_1 = e_2 : BB$,
+))
+
+#let ty_leq = prooftree(rule(
+  name: [T-Leq],
+  $Gamma tack e_1 : t$,
+  $Gamma tack e_2 : t$,
+  $Gamma tack e_1 <= e_2 : BB$,
+))
+
+#let ty_lt = prooftree(rule(
+  name: [T-Lt],
+  $Gamma tack e_1 : t$,
+  $Gamma tack e_2 : t$,
+  $Gamma tack e_1 < e_2 : BB$,
+))
+
+#let ty_sub = prooftree(rule(
+  name: [T-Sub],
+  $Gamma tack e_1 : t$,
+  $Gamma tack e_2 : t$,
+  $Gamma tack e_1 - e_2 : t$,
+))
+
+#let ty_div = prooftree(rule(
+  name: [T-Div],
+  $Gamma tack e_1 : RR$,
+  $Gamma tack e_2 : RR$,
+  $Gamma tack e_1 \/ e_2 : RR$,
+))
+
+#let ty_ends_with = prooftree(rule(
+  name: [T-EndsWith],
+  $Gamma tack e_1 : "string"$,
+  $Gamma tack e_2 : "string"$,
+  $Gamma tack "endsWith"(e_1, e_2) : BB$,
+))
+
+#let ty_starts_with = prooftree(rule(
+  name: [T-StartsWith],
+  $Gamma tack e_1 : "string"$,
+  $Gamma tack e_2 : "string"$,
+  $Gamma tack "startsWith"(e_1, e_2) : BB$,
+))
+
+#let ty_contains = prooftree(rule(
+  name: [T-Contains],
+  $Gamma tack e_1 : "string"$,
+  $Gamma tack e_2 : "string"$,
+  $Gamma tack "contains"(e_1, e_2) : BB$,
+))
+
+#let ty_first_index = prooftree(rule(
+  name: [T-FirstIndex],
+  $Gamma tack e_1 : "string"$,
+  $Gamma tack e_2 : "string"$,
+  $Gamma tack "firstIndex"(e_1, e_2) : ZZ$,
+))
+
+#let ty_last_index = prooftree(rule(
+  name: [T-LastIndex],
+  $Gamma tack e_1 : "string"$,
+  $Gamma tack e_2 : "string"$,
+  $Gamma tack "lastIndex"(e_1, e_2) : ZZ$,
+))
+
+#let ty_substring = prooftree(rule(
+  name: [T-SubString],
+  $Gamma tack e : "string"$,
+  $Gamma tack i : ZZ$,
+  $Gamma tack j : ZZ$,
+  $Gamma tack "subString"(e, i, j) : "string"$,
+))
+
+#let ty_dom = prooftree(rule(
+  name: [T-Dom],
+  $Gamma tack d : \{t_1 arrow t_2\}$,
+  $Gamma tack "dom"(d) : \{t_1 arrow BB\}$,
+))
+
+#let ty_range = prooftree(rule(
+  name: [T-Range],
+  $Gamma tack e : ZZ$,
+  $Gamma tack "range"(e) : \{ZZ arrow BB\}$,
+))
+
+#let ty_size = prooftree(rule(
+  name: [T-Size],
+  $Gamma tack d : \{t_1 arrow t_2\}$,
+  $Gamma tack "size"(d) : ZZ$,
+))
+
+#let ty_date_lit = prooftree(rule(
+  name: [T-DateLit],
+  $Gamma tack "date"(n) : "date"$,
+))
+
+#let ty_year = prooftree(rule(
+  name: [T-Year],
+  $Gamma tack e : "date"$,
+  $Gamma tack "year"(e) : ZZ$,
+))
+
+#let ty_concat = prooftree(rule(
+  name: [T-Concat],
+  $Gamma tack e_1 : <t_1, \ldots, t_n>$,
+  $Gamma tack e_2 : <s_1, \ldots, s_m>$,
+  $Gamma tack "concat"(e_1, e_2) : <t_1, \ldots, t_n, s_1, \ldots, s_m>$,
 ))
 
 #align(center, rule-set(
@@ -285,13 +385,34 @@
   ty_promote,
   ty_sum,
   ty_proj,
-  ty_builtin,
+  ty_or,
+  ty_and,
+  ty_eq,
+  ty_leq,
+  ty_lt,
+  ty_sub,
+  ty_div,
+  ty_ends_with,
+  ty_starts_with,
+  ty_contains,
+  ty_first_index,
+  ty_last_index,
+  ty_substring,
+  ty_dom,
+  ty_range,
+  ty_size,
+  ty_date_lit,
+  ty_year,
+  ty_concat,
 ))
+
 == Previous Work on SDQL
 
 = Chapter 2: Preparation
 
 = Chapter 3: Implementation
+
+== Repository Overview
 
 = Chapter 4: Evaluation
 
