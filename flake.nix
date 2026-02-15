@@ -39,6 +39,7 @@
             ];
           };
           lake = pkgs.callPackage lean4-nix.lake { };
+          codex = pkgs.callPackage ./codex.nix { };
 
           # Rust toolchain for sdql-rs
           rustToolchain = pkgs.rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
@@ -262,6 +263,7 @@
             default = sdqlTestsWithRef;
             sdql-tests = sdqlTestsWithRef;
             sdql-tests-bare = sdqlTests;
+            codex = codex;
             performanceComparison = performanceComparison;
             optimisationPerformanceComparison = optimisationPerformanceComparison;
             flamegraph = flamegraphRunner;
@@ -329,7 +331,7 @@
                 pkgs.fontconfig
               ]
               ++ (with pkgs; [
-                git unzip codex uv
+                git unzip uv
                 gemini-cli
                 claude-code
                 sshpass
@@ -340,7 +342,9 @@
                 # clang clang-tools gcc gnumake gnused
                 # bench/report helpers
                 jq gnuplot
-              ]);
+              ])
+            # ++ [ codex ]
+            ;
           };
         };
     };
