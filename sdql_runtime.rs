@@ -293,6 +293,10 @@ impl SdqlOne for bool {
     fn sdql_one() -> Self { true }
 }
 
+impl SdqlOne for i64 {
+    fn sdql_one() -> Self { 1 }
+}
+
 impl SdqlOne for Real {
     fn sdql_one() -> Self { Real::new(1.0) }
 }
@@ -303,6 +307,18 @@ impl SdqlOne for MaxProduct {
 
 impl SdqlScale<bool> for bool {
     fn sdql_scale(s: &bool, v: &Self) -> Self { *s && *v }
+}
+
+impl SdqlScale<i64> for i64 {
+    fn sdql_scale(s: &i64, v: &Self) -> Self { *s * *v }
+}
+
+impl SdqlScale<i64> for Real {
+    fn sdql_scale(s: &i64, v: &Self) -> Self { Real((*s as f64) * v.0) }
+}
+
+impl SdqlScale<Real> for i64 {
+    fn sdql_scale(s: &Real, v: &Self) -> Self { (s.0 * (*v as f64)) as i64 }
 }
 
 impl SdqlScale<Real> for Real {
@@ -345,6 +361,13 @@ impl_sdql_scale_tuple!(T1, 0, T2, 1, T3, 2, T4, 3, T5, 4, T6, 5, T7, 6, T8, 7);
 impl SdqlBilinear for bool {
     type Scalar = bool;
     fn sdql_bilinear(a: &Self, b: &Self) -> Self::Scalar { *a && *b }
+}
+
+impl SdqlBilinear for i64 {
+    type Scalar = Real;
+    fn sdql_bilinear(a: &Self, b: &Self) -> Self::Scalar {
+        Real::new(*a as f64 * *b as f64)
+    }
 }
 
 impl SdqlBilinear for Real {
@@ -411,6 +434,16 @@ impl<R: SdqlScale<bool> + Clone> TensorLeft<R> for bool {
     }
     fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
         vec![(bool::sdql_one(), t.clone())]
+    }
+}
+
+impl<R: SdqlScale<i64> + Clone> TensorLeft<R> for i64 {
+    type Tensor = R;
+    fn mk_tensor_left(a: &Self, b: &R) -> Self::Tensor {
+        R::sdql_scale(a, b)
+    }
+    fn decompose_tensor(t: &Self::Tensor) -> Vec<(Self, R)> {
+        vec![(1_i64, t.clone())]
     }
 }
 
@@ -677,6 +710,84 @@ where
     fn add(a: &Self, b: &Self) -> Self {
         a.sdql_add(b)
     }
+}
+
+// ============================================================================
+// Tensor Product (SdqlMul)
+// ============================================================================
+
+/// Tensor product of two SDQL values.
+///
+/// `sdql_mul(a, b)` computes a value of type `tensor A B` where:
+/// - For scalars: `tensor s B = B`, via scaling `b` by `a`
+/// - For dicts:   `tensor (dict K V) B = dict K (tensor V B)`
+/// - For records: `tensor (A1, A2, ...) B = (tensor A1 B, tensor A2 B, ...)`
+pub trait SdqlMul<B> {
+    type Output;
+    fn sdql_mul(&self, b: &B) -> Self::Output;
+}
+
+impl<B: SdqlScale<bool> + Clone> SdqlMul<B> for bool {
+    type Output = B;
+    fn sdql_mul(&self, b: &B) -> Self::Output {
+        B::sdql_scale(self, b)
+    }
+}
+
+impl<B: SdqlScale<i64> + Clone> SdqlMul<B> for i64 {
+    type Output = B;
+    fn sdql_mul(&self, b: &B) -> Self::Output {
+        B::sdql_scale(self, b)
+    }
+}
+
+impl<B: SdqlScale<Real> + Clone> SdqlMul<B> for Real {
+    type Output = B;
+    fn sdql_mul(&self, b: &B) -> Self::Output {
+        B::sdql_scale(self, b)
+    }
+}
+
+impl<B: SdqlScale<MaxProduct> + Clone> SdqlMul<B> for MaxProduct {
+    type Output = B;
+    fn sdql_mul(&self, b: &B) -> Self::Output {
+        B::sdql_scale(self, b)
+    }
+}
+
+impl<K: Ord + Clone, V: SdqlMul<B>, B> SdqlMul<B> for BTreeMap<K, V> {
+    type Output = BTreeMap<K, V::Output>;
+    fn sdql_mul(&self, b: &B) -> Self::Output {
+        let mut out = BTreeMap::new();
+        for (k, v) in self.iter() {
+            out.insert(k.clone(), v.sdql_mul(b));
+        }
+        out
+    }
+}
+
+macro_rules! impl_sdql_mul_tuple {
+    ( $( $T:ident, $idx:tt ),+ ) => {
+        impl<R, $( $T: SdqlMul<R> ),+ > SdqlMul<R> for ( $( $T, )+ ) {
+            type Output = ( $( $T::Output, )+ );
+            fn sdql_mul(&self, b: &R) -> Self::Output {
+                ( $( self.$idx.sdql_mul(b), )+ )
+            }
+        }
+    };
+}
+
+impl_sdql_mul_tuple!(T1, 0);
+impl_sdql_mul_tuple!(T1, 0, T2, 1);
+impl_sdql_mul_tuple!(T1, 0, T2, 1, T3, 2);
+impl_sdql_mul_tuple!(T1, 0, T2, 1, T3, 2, T4, 3);
+impl_sdql_mul_tuple!(T1, 0, T2, 1, T3, 2, T4, 3, T5, 4);
+impl_sdql_mul_tuple!(T1, 0, T2, 1, T3, 2, T4, 3, T5, 4, T6, 5);
+impl_sdql_mul_tuple!(T1, 0, T2, 1, T3, 2, T4, 3, T5, 4, T6, 5, T7, 6);
+impl_sdql_mul_tuple!(T1, 0, T2, 1, T3, 2, T4, 3, T5, 4, T6, 5, T7, 6, T8, 7);
+
+pub fn sdql_mul<A: SdqlMul<B>, B>(a: A, b: B) -> A::Output {
+    SdqlMul::sdql_mul(&a, &b)
 }
 
 // ============================================================================
