@@ -138,6 +138,7 @@ mutual
     | ite : {ctx : Nat} → ExprLoc ctx → ExprLoc ctx → ExprLoc ctx → Expr ctx
     | letIn : {ctx : Nat} → ExprLoc ctx → ExprLoc ctx.succ → Expr ctx
     | callRuntimeFn : {ctx : Nat} → RuntimeFn → Exprs ctx → Expr ctx
+    | callRuntimeFnTurbo : {ctx : Nat} → RuntimeFn → List Ty → Exprs ctx → Expr ctx
     | block : {ctx : Nat} → {ctxOut : Nat} → StmtSeq ctx ctxOut → ExprLoc ctxOut → Expr ctx
     | lookupOrDefault : {ctx : Nat} → ExprLoc ctx → ExprLoc ctx → ExprLoc ctx → Expr ctx
     | containsKey : {ctx : Nat} → ExprLoc ctx → ExprLoc ctx → Expr ctx
@@ -352,6 +353,10 @@ mutual
     | .callRuntimeFn f args =>
         let argsStr  :=  (Exprs.toList args).map (fun a => showExprLoc a indent config)
         s!"{runtimeFnName f}({String.intercalate ", " argsStr})"
+    | .callRuntimeFnTurbo f tys args =>
+        let argsStr  :=  (Exprs.toList args).map (fun a => showExprLoc a indent config)
+        let tyStr := String.intercalate ", " (tys.map showTy)
+        s!"{runtimeFnName f}::<{tyStr}>({String.intercalate ", " argsStr})"
     | .block ss result =>
         let (bodyStr)  :=  showStmtSeq ss (indent+1) config
         let ri  :=  showExprLoc result (indent+1) config
@@ -509,6 +514,7 @@ namespace Rename1
       | .ite c t e => .ite (exprLoc f c) (exprLoc f t) (exprLoc f e)
       | .letIn v body => .letIn (exprLoc f v) (exprLoc (lift f) body)
       | .callRuntimeFn fn args => .callRuntimeFn fn (exprs f args)
+      | .callRuntimeFnTurbo fn tys args => .callRuntimeFnTurbo fn tys (exprs f args)
       | .block ss result =>
           let (ss', fOut) := stmtSeq f ss
           .block ss' (exprLoc fOut result)

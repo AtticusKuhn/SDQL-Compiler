@@ -191,8 +191,10 @@ mutual
             let arg := ExprLoc.withUnknownLoc (.tuple (Rust.Exprs.ofList [lhs, rhs]))
             .callRuntimeFn .extAnd (Rust.Exprs.singleton arg)
         | .realS => .binop .mul lhs rhs
-        | .squareMatrix _ =>
-            .callRuntimeFn .sdqlSemiringMul (Rust.Exprs.ofList [lhs, rhs])
+        | @HasMul.squareMatrix _ t sm =>
+            let tensorTy := coreTyToRustTy (tensor t t)
+            let vecTy := coreTyToRustTy t
+            .callRuntimeFnTurbo .sdqlSemiringMul [tensorTy, vecTy] (Rust.Exprs.ofList [lhs, rhs])
     | @Term2.closure _ _ hc e =>
         let arg := compileLoc2 e
         match hc with
