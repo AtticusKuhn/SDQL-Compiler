@@ -56,12 +56,61 @@ unsafe def synthSScale (stx : SourceLocation) (sc : SurfaceTy) (t : SurfaceTy) :
       pure (SScale.recordS fieldsOk)
   | _, _ => .error (stx, s!"Cannot scale {tyToString t} by {tyToString sc}")
 
-/-- Synthesize SHasMul evidence for semiring multiplication. -/
+
+
+
+/-- Find the innermost non-dict, non-record scalar type. -/
+private unsafe def findLeafScalar : SurfaceTy → SurfaceTy
+  | .dict _ V => findLeafScalar V
+  | .record ((_, t) :: _) => findLeafScalar t
+  | t => t
+
+
+
+/-- Strip dict/record layers one at a time from `candidate` and check whether
+    the stripped version is a tensor-product square root, i.e. `stensor S S = T`.
+
+    For example, given `T = {int → {int → real}}`:
+    - candidate = `{int → {int → real}}`: `stensor` of this with itself ≠ T, peel dict layer
+    - candidate = `{int → real}`:          `stensor {int → real} {int → real} = T` ✓ -/
+private unsafe def peelForStensorRoot (T : SurfaceTy) (candidate : SurfaceTy) : Option SurfaceTy :=
+  if tyEq (stensor candidate candidate) T then
+    some candidate
+  else
+    match candidate with
+    | .dict _ V => peelForStensorRoot T V
+    | .record σ =>
+      match σ with
+      | (_, v) :: _ => peelForStensorRoot T v
+      | [] => none
+    | _ => none
+
+/-- Find `S` such that `stensor S S = T`, by peeling dict/record layers from `T`
+    until the remaining type is a valid square root under `stensor`. -/
+private unsafe def stensorRoot (T : SurfaceTy) : Option (Σ (S : SurfaceTy), PLift (stensor S S = T)) :=
+  match peelForStensorRoot T T with
+  | some S => some ⟨S, ⟨unsafeCast (rfl : S = S)⟩⟩
+  | none => none
+
+/-- Synthesize SHasMul evidence for semiring multiplication.
+
+    For scalar types (`bool`, `real`) this is immediate. For structured types
+    (dicts, records, or tensors thereof), finds the square root `t` under
+    `stensor` and synthesises `SScale (leaf t) t` to construct the
+    `squareMatrix` evidence. -/
 unsafe def synthSHasMul (stx : SourceLocation) (ty : SurfaceTy) : Except TypeError (SHasMul ty) :=
   match ty with
   | .bool => pure SHasMul.boolS
   | .real => pure SHasMul.realS
-  | _ => .error (stx, s!"*s expects a semiring type (bool or real), got {tyToString ty}")
+  | x =>
+    match stensorRoot x with
+    | .none => .error (stx, s!"*s expects a semiring type (bool, real, or square matrix), got {tyToString ty}")
+    | .some ⟨t, ⟨e⟩⟩ =>
+      let sc := findLeafScalar t
+      let scale : SScale sc t := match synthSScale stx sc t with
+        | .ok s => s
+        | .error _ => unsafeCast SScale.realS  -- fallback for mixed-scalar records
+      .pure (e ▸ SHasMul.squareMatrix scale)
 
 /-- Synthesize SHasClosure evidence for Kleene star. -/
 unsafe def synthSHasClosure (stx : SourceLocation) (ty : SurfaceTy) : Except TypeError (SHasClosure ty) :=

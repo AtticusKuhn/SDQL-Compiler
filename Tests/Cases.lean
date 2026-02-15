@@ -86,7 +86,7 @@ unsafe def p_semiring_mul_matrix_2x2 : SProg2 :=
   ]
 
 unsafe def p_semiring_mul_record_tensor : SProg2 :=
-  [SDQLProg2 { <<int, real>, <int, real>> }|
+  [SDQLProg2 { <_1: <_1: int, _2: real>, _2: <_1: int, _2: real> > }|
     < <1, 2.0>, <3, 4.0> > *s < <5, 6.0>, <7, 8.0> >
   ]
 
