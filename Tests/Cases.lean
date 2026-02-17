@@ -90,6 +90,8 @@ unsafe def p_semiring_mul_record_tensor : SProg2 :=
     < <1, 2.0>, <3, 4.0> > *s < <5, 6.0>, <7, 8.0> >
   ]
 
+
+
 unsafe def p_semiring_mul_4d_tensor : SProg2 :=
   [SDQLProg2 { { int -> { int -> { int -> { int -> real } } } } }|
     let a = { 1 -> { 1 -> 1.0, 2 -> 2.0 } } in
@@ -104,6 +106,21 @@ unsafe def p_closure_bool : SProg2 :=
 
 unsafe def p_closure_real : SProg2 :=
   [SDQLProg2 { real }| closure(0.5) ]
+
+unsafe def p_closure_matrix_bool : SProg2 :=
+  [SDQLProg2 { { int -> { int -> bool } } }|
+    closure({ 1 -> { 2 -> true }, 2 -> { 1 -> true } })
+  ]
+
+unsafe def p_closure_matrix_bool_linear : SProg2 :=
+  [SDQLProg2 { { int -> { int -> bool } } }|
+    closure({ 1 -> { 2 -> true } })
+  ]
+
+unsafe def p_closure_matrix_real : SProg2 :=
+  [SDQLProg2 { { int -> { int -> real } } }|
+    closure({ 1 -> { 1 -> 0.5 } })
+  ]
 
 unsafe def smallCases : List TestCase :=
   [ TestCase.program "add_int" p_add_int "8"
@@ -122,6 +139,12 @@ unsafe def smallCases : List TestCase :=
       "{1 -> {1 -> {1 -> {1 -> 24, }, }, 2 -> {1 -> {1 -> 48, }, }, }, }"
   , TestCase.program "closure_bool" p_closure_bool "true"
   , TestCase.program "closure_real" p_closure_real "2"
+  , TestCase.program "closure_matrix_bool" p_closure_matrix_bool
+      "{1 -> {1 -> true, 2 -> true, }, 2 -> {1 -> true, 2 -> true, }, }"
+  , TestCase.program "closure_matrix_bool_linear" p_closure_matrix_bool_linear
+      "{1 -> {1 -> true, 2 -> true, }, 2 -> {2 -> true, }, }"
+  , TestCase.program "closure_matrix_real" p_closure_matrix_real
+      "{1 -> {1 -> 2, }, }"
   ]
 
 /- End-to-end optimisation correctness checks (Lean → Rust → binary). -/

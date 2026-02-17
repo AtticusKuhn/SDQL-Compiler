@@ -9,7 +9,7 @@
 //! - TBL file loading: load_tbl, build_col, FromTblField trait
 //! - Pretty-printing: SDQLShow trait and implementations
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::ops::{Add, Mul, Sub};
 use std::cmp::Ordering;
 use std::io::{BufRead, BufReader};
@@ -843,8 +843,108 @@ where
     acc
 }
 
-pub fn sdql_closure<T>(_a: T) -> T {
-    todo!("sdql_closure for square matrices not implemented")
+/// Kleene star (closure) for scalar values in a Kleene algebra.
+/// - bool: true
+/// - Real: 1/(1-a)
+pub trait SdqlStar {
+    fn sdql_star(&self) -> Self;
+}
+
+impl SdqlStar for bool {
+    fn sdql_star(&self) -> Self { true }
+}
+
+impl SdqlStar for Real {
+    fn sdql_star(&self) -> Self { Real(1.0 / (1.0 - self.0)) }
+}
+
+/// Semiring multiplication for scalar values in a Kleene algebra.
+/// - bool: AND
+/// - Real: standard multiplication
+pub trait SdqlRingMul {
+    fn ring_mul(&self, other: &Self) -> Self;
+}
+
+impl SdqlRingMul for bool {
+    fn ring_mul(&self, other: &Self) -> Self { *self && *other }
+}
+
+impl SdqlRingMul for Real {
+    fn ring_mul(&self, other: &Self) -> Self { Real(self.0 * other.0) }
+}
+
+/// Compute the Kleene closure (star) of a square matrix represented as
+/// `BTreeMap<K, BTreeMap<K, V>>` using Kleene's algorithm.
+///
+/// The algorithm computes M* = I + M + M^2 + M^3 + ...
+/// At each step k, the matrix is updated using the pivot key k:
+///   W[k,k] <- star(W[k,k])
+///   W[k,j] <- star(W[k,k]) * W[k,j]   for j != k
+///   W[i,k] <- W[i,k] * star(W[k,k])   for i != k
+///   W[i,j] <- W[i,j] + W[i,k] * star(W[k,k]) * W[k,j]  for i,j != k
+pub fn sdql_closure<K, V>(a: BTreeMap<K, BTreeMap<K, V>>) -> BTreeMap<K, BTreeMap<K, V>>
+where
+    K: Ord + Clone,
+    V: SdqlAdd + SdqlZero + SdqlStar + SdqlRingMul + PartialEq + Clone,
+{
+    // Collect all keys (union of outer keys and all inner keys)
+    let mut all_keys = BTreeSet::new();
+    for (k, row) in &a {
+        all_keys.insert(k.clone());
+        for (k2, _) in row {
+            all_keys.insert(k2.clone());
+        }
+    }
+    let keys: Vec<K> = all_keys.into_iter().collect();
+    let n = keys.len();
+
+    let get = |w: &BTreeMap<K, BTreeMap<K, V>>, i: &K, j: &K| -> V {
+        w.get(i)
+            .and_then(|row| row.get(j))
+            .cloned()
+            .unwrap_or_else(V::sdql_zero)
+    };
+
+    let mut w = a;
+    let zero = V::sdql_zero();
+
+    for ki in 0..n {
+        let k = &keys[ki];
+        let wkk_star = get(&w, k, k).sdql_star();
+
+        let mut w_new: BTreeMap<K, BTreeMap<K, V>> = BTreeMap::new();
+
+        for ii in 0..n {
+            let i = &keys[ii];
+            for ji in 0..n {
+                let j = &keys[ji];
+
+                let new_val = if ii == ki && ji == ki {
+                    wkk_star.clone()
+                } else if ii == ki {
+                    wkk_star.ring_mul(&get(&w, k, j))
+                } else if ji == ki {
+                    get(&w, i, k).ring_mul(&wkk_star)
+                } else {
+                    let wij = get(&w, i, j);
+                    let wik = get(&w, i, k);
+                    let wkj = get(&w, k, j);
+                    wij.sdql_add(&wik.ring_mul(&wkk_star).ring_mul(&wkj))
+                };
+
+                if new_val != zero {
+                    w_new
+                        .entry(i.clone())
+                        .or_insert_with(BTreeMap::new)
+                        .insert(j.clone(), new_val);
+                }
+            }
+        }
+
+        w = w_new;
+    }
+
+    w
 }
 
 /// Tuple/record addition for arity 0.
