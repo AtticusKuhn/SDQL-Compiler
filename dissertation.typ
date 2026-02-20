@@ -32,6 +32,11 @@ workloads.
 SDQL achieves expressivity by modelling data operations
 as semi-rings over dictionaries.
 
+A key domain where this is useful is in biomedical data.
+The original SDQL paper @asemiring covers this example,
+and I would like to try this as well, if I get
+the time to do it.
+
 == Background on SDQL
 === Syntax and Typing Rules of SDQL
 #bnf(
@@ -407,8 +412,18 @@ as semi-rings over dictionaries.
 ))
 
 == Previous Work on SDQL
+SDQL was introduced by researchers at the University
+of Edinburgh in @functionalcollection.
+
+They extended SDQL in @asemiring.
 
 = Chapter 2: Preparation
+
+== Research and Background reading
+
+== Proposal Refinement
+
+== Requirements Analysis
 
 = Chapter 3: Implementation
 
@@ -419,6 +434,7 @@ as semi-rings over dictionaries.
 = Chapter 5: Conclusions
 
 = Bibliography
+#bibliography("bib.bib")
 
 = Appendices
 

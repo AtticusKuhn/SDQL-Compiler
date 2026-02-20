@@ -15,6 +15,11 @@
 - optimisation pipeline is ugly, could this be improved by the use of a monad?
 - Current rust implementation is slowed down a lot by overused of `x.clone()` in BTreeMap. I'm not good enough with Rust to avoid this.
 - Use Rust profiling. Use a profiler for any serious performance analysis.
+- Need to make semi-ring multiplication actually work
+- need to implement `closure(e)`
+- need to document semi-ring nonsense in docs
+- need to write diss
+- it would be really helpful to have a CLI tool so I could just run `compile` or `run` on a string to easily test.
 
 ```bash
 [atticusk@nixos:~/coding/part_ii_project]$ find PartIiProject -name "*.lean" -exec wc -l {} + | sort -nr | head -n10
