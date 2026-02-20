@@ -134,7 +134,7 @@ unsafe def smallCases : List TestCase :=
   , TestCase.program "semiring_mul_real" p_semiring_mul_real "6"
   , TestCase.program "semiring_mul_matrix_2x2" p_semiring_mul_matrix_2x2
       "{1 -> {1 -> 19, 2 -> 22, }, 2 -> {1 -> 43, 2 -> 50, }, }"
-  , TestCase.compileOnly "semiring_mul_record_tensor" p_semiring_mul_record_tensor
+  , TestCase.program "semiring_mul_record_tensor" p_semiring_mul_record_tensor "<<19, 22>, <43, 50>>"
   , TestCase.program "semiring_mul_4d_tensor" p_semiring_mul_4d_tensor
       "{1 -> {1 -> {1 -> {1 -> 24, }, }, 2 -> {1 -> {1 -> 48, }, }, }, }"
   , TestCase.program "closure_bool" p_closure_bool "true"
