@@ -91,6 +91,23 @@ unsafe def p_semiring_mul_record_tensor : SProg2 :=
   ]
 
 
+unsafe def p_id_matrix : SProg2 :=
+  [SDQLProg2 { <
+                _1: <_1: int, _2: int, _3: int>,
+                _2: <_1: int, _2: int, _3: int>,
+                _3: <_1: int, _2: int, _3: int>
+               > }|
+    < <1, 0, 0>,
+    <0, 1, 0>,
+    <0, 0, 1>
+     >
+    *s
+    < <1, 2, 3>,
+    <4, 5, 6>,
+    <7, 8, 9>
+     >
+  ]
+
 
 unsafe def p_semiring_mul_4d_tensor : SProg2 :=
   [SDQLProg2 { { int -> { int -> { int -> { int -> real } } } } }|
@@ -122,6 +139,65 @@ unsafe def p_closure_matrix_real : SProg2 :=
     closure({ 1 -> { 1 -> 0.5 } })
   ]
 
+-- Graph closure test cases: represent graphs as {K -> {K -> bool}} adjacency matrices
+-- and verify reflexive-transitive closure via closure(e).
+
+-- Single node with a self-loop: closure should preserve it.
+unsafe def p_closure_graph_self_loop : SProg2 :=
+  [SDQLProg2 { { int -> { int -> bool } } }|
+    closure({ 1 -> { 1 -> true } })
+  ]
+
+-- Linear chain: 1 → 2 → 3.
+-- Reachability: 1→{1,2,3}, 2→{2,3}, 3→{3}.
+unsafe def p_closure_graph_chain_3 : SProg2 :=
+  [SDQLProg2 { { int -> { int -> bool } } }|
+    closure({ 1 -> { 2 -> true }, 2 -> { 3 -> true } })
+  ]
+
+-- Directed 3-cycle: 1 → 2 → 3 → 1.
+-- Every node reaches every other node.
+unsafe def p_closure_graph_cycle_3 : SProg2 :=
+  [SDQLProg2 { { int -> { int -> bool } } }|
+    closure({ 1 -> { 2 -> true }, 2 -> { 3 -> true }, 3 -> { 1 -> true } })
+  ]
+
+-- Star topology: 1 → {2,3,4}, no other edges.
+-- Reachability: 1→{1,2,3,4}, 2→{2}, 3→{3}, 4→{4}.
+unsafe def p_closure_graph_star : SProg2 :=
+  [SDQLProg2 { { int -> { int -> bool } } }|
+    closure({ 1 -> { 2 -> true, 3 -> true, 4 -> true } })
+  ]
+
+-- Diamond DAG: 1 → {2,3}, 2 → 4, 3 → 4.
+-- Reachability: 1→{1,2,3,4}, 2→{2,4}, 3→{3,4}, 4→{4}.
+unsafe def p_closure_graph_diamond : SProg2 :=
+  [SDQLProg2 { { int -> { int -> bool } } }|
+    closure({ 1 -> { 2 -> true, 3 -> true }, 2 -> { 4 -> true }, 3 -> { 4 -> true } })
+  ]
+
+-- Two disconnected edges: 1 → 2 and 3 → 4 (separate components).
+-- Reachability: 1→{1,2}, 2→{2}, 3→{3,4}, 4→{4}.
+unsafe def p_closure_graph_disconnected : SProg2 :=
+  [SDQLProg2 { { int -> { int -> bool } } }|
+    closure({ 1 -> { 2 -> true }, 3 -> { 4 -> true } })
+  ]
+
+-- Reverse chain: 3 → 2 → 1 (edges go from higher to lower keys).
+-- Tests that the algorithm is not sensitive to key ordering.
+-- Reachability: 1→{1}, 2→{1,2}, 3→{1,2,3}.
+unsafe def p_closure_graph_reverse_chain : SProg2 :=
+  [SDQLProg2 { { int -> { int -> bool } } }|
+    closure({ 3 -> { 2 -> true }, 2 -> { 1 -> true } })
+  ]
+
+-- Weighted graph over reals: a 2×2 matrix with self-loops of weight 0.5.
+-- A = [[0.5, 0.5], [0, 0.5]], so (I-A)^{-1} = [[2, 2], [0, 2]].
+unsafe def p_closure_graph_weighted_real : SProg2 :=
+  [SDQLProg2 { { int -> { int -> real } } }|
+    closure({ 1 -> { 1 -> 0.5, 2 -> 0.5 }, 2 -> { 2 -> 0.5 } })
+  ]
+
 unsafe def smallCases : List TestCase :=
   [ TestCase.program "add_int" p_add_int "8"
   , TestCase.program "dict_insert" p_dict_is "{1 -> \"one\", }"
@@ -135,6 +211,7 @@ unsafe def smallCases : List TestCase :=
   , TestCase.program "semiring_mul_matrix_2x2" p_semiring_mul_matrix_2x2
       "{1 -> {1 -> 19, 2 -> 22, }, 2 -> {1 -> 43, 2 -> 50, }, }"
   , TestCase.program "semiring_mul_record_tensor" p_semiring_mul_record_tensor "<<19, 22>, <43, 50>>"
+  , TestCase.program "p_id_matrix" p_id_matrix "<<1, 2, 3>, <4, 5, 6>, <7, 8, 9>>"
   , TestCase.program "semiring_mul_4d_tensor" p_semiring_mul_4d_tensor
       "{1 -> {1 -> {1 -> {1 -> 24, }, }, 2 -> {1 -> {1 -> 48, }, }, }, }"
   , TestCase.program "closure_bool" p_closure_bool "true"
@@ -145,6 +222,22 @@ unsafe def smallCases : List TestCase :=
       "{1 -> {1 -> true, 2 -> true, }, 2 -> {2 -> true, }, }"
   , TestCase.program "closure_matrix_real" p_closure_matrix_real
       "{1 -> {1 -> 2, }, }"
+  , TestCase.program "closure_graph_self_loop" p_closure_graph_self_loop
+      "{1 -> {1 -> true, }, }"
+  , TestCase.program "closure_graph_chain_3" p_closure_graph_chain_3
+      "{1 -> {1 -> true, 2 -> true, 3 -> true, }, 2 -> {2 -> true, 3 -> true, }, 3 -> {3 -> true, }, }"
+  , TestCase.program "closure_graph_cycle_3" p_closure_graph_cycle_3
+      "{1 -> {1 -> true, 2 -> true, 3 -> true, }, 2 -> {1 -> true, 2 -> true, 3 -> true, }, 3 -> {1 -> true, 2 -> true, 3 -> true, }, }"
+  , TestCase.program "closure_graph_star" p_closure_graph_star
+      "{1 -> {1 -> true, 2 -> true, 3 -> true, 4 -> true, }, 2 -> {2 -> true, }, 3 -> {3 -> true, }, 4 -> {4 -> true, }, }"
+  , TestCase.program "closure_graph_diamond" p_closure_graph_diamond
+      "{1 -> {1 -> true, 2 -> true, 3 -> true, 4 -> true, }, 2 -> {2 -> true, 4 -> true, }, 3 -> {3 -> true, 4 -> true, }, 4 -> {4 -> true, }, }"
+  , TestCase.program "closure_graph_disconnected" p_closure_graph_disconnected
+      "{1 -> {1 -> true, 2 -> true, }, 2 -> {2 -> true, }, 3 -> {3 -> true, 4 -> true, }, 4 -> {4 -> true, }, }"
+  , TestCase.program "closure_graph_reverse_chain" p_closure_graph_reverse_chain
+      "{1 -> {1 -> true, }, 2 -> {1 -> true, 2 -> true, }, 3 -> {1 -> true, 2 -> true, 3 -> true, }, }"
+  , TestCase.program "closure_graph_weighted_real" p_closure_graph_weighted_real
+      "{1 -> {1 -> 2, 2 -> 2, }, 2 -> {2 -> 2, }, }"
   ]
 
 /- End-to-end optimisation correctness checks (Lean → Rust → binary). -/
