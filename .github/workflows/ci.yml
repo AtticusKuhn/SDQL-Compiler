@@ -38,6 +38,9 @@ jobs:
       # - name: Run flamegraph profiler
       #   run: nix run .#flamegraph
 
+      - name: Run graph performance benchmark
+        run: nix run .#graphPerformance
+
       - name: Run optimisation performance comparison
         run: nix run .#optimisationPerformanceComparison
 

@@ -75,156 +75,58 @@ def starGraphViterbiJson (n : Nat) (w : Float) : String :=
   "{\"0\": {" ++ String.intercalate ", " succs ++ "}}"
 
 -- ============================================================================
--- SDQL programs: Chain topology (reachability)
+-- Parameterised SDQL program builders
 -- ============================================================================
 
-unsafe def reachability_chain_5 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(4)) { i -> { i + 1 -> true } }) ]
+inductive GraphTopology where
+  | chain | cycle | star
 
-unsafe def reachability_chain_10 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(9)) { i -> { i + 1 -> true } }) ]
+inductive GraphProblem where
+  | reachability
+  | viterbi (w : Float)
 
-unsafe def reachability_chain_20 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(19)) { i -> { i + 1 -> true } }) ]
+/-- Wrap a `LoadTerm'` with an unknown source location. -/
+private def mkLoc {rep : Type} (t : LoadTerm' rep) : LoadTermLoc rep :=
+  LoadTermLoc.mk SourceLocation.unknown t
 
-unsafe def reachability_chain_50 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(49)) { i -> { i + 1 -> true } }) ]
+/-- Build an SDQL `closure(...)` program for the given topology, problem type and
+    graph size `n` (number of nodes).
 
-unsafe def reachability_chain_100 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(99)) { i -> { i + 1 -> true } }) ]
+- `chain n`: closure of 0 → 1 → ... → (n-1)
+- `cycle n`: closure of 0 → 1 → ... → (n-1) → 0
+- `star  n`: closure of 0 → {1, ..., n-1}
 
--- ============================================================================
--- SDQL programs: Cycle topology (reachability)
--- Back-edge is included in the sum body; idempotent bool addition ensures
--- the graph is correct (true + true = true).
--- ============================================================================
-
-unsafe def reachability_cycle_5 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(4)) { i -> { i + 1 -> true } } + { 4 -> { 0 -> true } }) ]
-
-unsafe def reachability_cycle_10 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(9)) { i -> { i + 1 -> true } } + { 9 -> { 0 -> true } }) ]
-
-unsafe def reachability_cycle_20 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(19)) { i -> { i + 1 -> true } } + { 19 -> { 0 -> true } }) ]
-
-unsafe def reachability_cycle_50 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(49)) { i -> { i + 1 -> true } } + { 49 -> { 0 -> true } }) ]
-
-unsafe def reachability_cycle_100 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(99)) { i -> { i + 1 -> true } } + { 99 -> { 0 -> true } }) ]
-
--- ============================================================================
--- SDQL programs: Star topology (reachability)
--- Centre node 0 has edges to all other nodes.
--- ============================================================================
-
-unsafe def reachability_star_5 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(4)) { 0 -> { i + 1 -> true } }) ]
-
-unsafe def reachability_star_10 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(9)) { 0 -> { i + 1 -> true } }) ]
-
-unsafe def reachability_star_20 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(19)) { 0 -> { i + 1 -> true } }) ]
-
-unsafe def reachability_star_50 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(49)) { 0 -> { i + 1 -> true } }) ]
-
-unsafe def reachability_star_100 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> bool } } }|
-    closure(sum(<i, _> <- range(99)) { 0 -> { i + 1 -> true } }) ]
-
--- ============================================================================
--- SDQL programs: Chain topology (Viterbi / max_prod)
--- ============================================================================
-
-unsafe def viterbi_chain_5 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(4)) { i -> { i + 1 -> promote[max_prod](0.5) } }) ]
-
-unsafe def viterbi_chain_10 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(9)) { i -> { i + 1 -> promote[max_prod](0.5) } }) ]
-
-unsafe def viterbi_chain_20 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(19)) { i -> { i + 1 -> promote[max_prod](0.5) } }) ]
-
-unsafe def viterbi_chain_50 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(49)) { i -> { i + 1 -> promote[max_prod](0.5) } }) ]
-
-unsafe def viterbi_chain_100 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(99)) { i -> { i + 1 -> promote[max_prod](0.5) } }) ]
-
--- ============================================================================
--- SDQL programs: Cycle topology (Viterbi / max_prod)
--- ============================================================================
-
-unsafe def viterbi_cycle_5 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(4)) { i -> { i + 1 -> promote[max_prod](0.5) } }
-      + { 4 -> { 0 -> promote[max_prod](0.5) } }) ]
-
-unsafe def viterbi_cycle_10 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(9)) { i -> { i + 1 -> promote[max_prod](0.5) } }
-      + { 9 -> { 0 -> promote[max_prod](0.5) } }) ]
-
-unsafe def viterbi_cycle_20 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(19)) { i -> { i + 1 -> promote[max_prod](0.5) } }
-      + { 19 -> { 0 -> promote[max_prod](0.5) } }) ]
-
-unsafe def viterbi_cycle_50 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(49)) { i -> { i + 1 -> promote[max_prod](0.5) } }
-      + { 49 -> { 0 -> promote[max_prod](0.5) } }) ]
-
-unsafe def viterbi_cycle_100 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(99)) { i -> { i + 1 -> promote[max_prod](0.5) } }
-      + { 99 -> { 0 -> promote[max_prod](0.5) } }) ]
-
--- ============================================================================
--- SDQL programs: Star topology (Viterbi / max_prod)
--- ============================================================================
-
-unsafe def viterbi_star_5 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(4)) { 0 -> { i + 1 -> promote[max_prod](0.5) } }) ]
-
-unsafe def viterbi_star_10 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(9)) { 0 -> { i + 1 -> promote[max_prod](0.5) } }) ]
-
-unsafe def viterbi_star_20 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(19)) { 0 -> { i + 1 -> promote[max_prod](0.5) } }) ]
-
-unsafe def viterbi_star_50 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(49)) { 0 -> { i + 1 -> promote[max_prod](0.5) } }) ]
-
-unsafe def viterbi_star_100 : SProg2 :=
-  [SDQLProg2 { { int -> { int -> max_prod } } }|
-    closure(sum(<i, _> <- range(99)) { 0 -> { i + 1 -> promote[max_prod](0.5) } }) ]
+For `reachability`, edges carry `true : bool`.
+For `viterbi w`, edges carry `promote[max_prod](w)`. -/
+unsafe def mkGraphProg (topo : GraphTopology) (prob : GraphProblem) (n : Nat) : SProg2 :=
+  let valTy : SurfaceTy := match prob with
+    | .reachability => .bool
+    | .viterbi _    => .maxProduct
+  let term : LoadTerm := fun {rep} =>
+    let val : LoadTermLoc rep := match prob with
+      | .reachability => mkLoc (.constBool Bool.true)
+      | .viterbi w    => mkLoc (.promote .maxProduct (mkLoc (.constReal w)))
+    let edgeBody : rep → rep → LoadTermLoc rep := fun i _v =>
+      let src : LoadTermLoc rep := match topo with
+        | .star => mkLoc (.constInt 0)
+        | _     => mkLoc (.var i)
+      let tgt := mkLoc (.add (mkLoc (.var i)) (mkLoc (.constInt 1)))
+      mkLoc (.dictInsert src
+        (mkLoc (.dictInsert tgt val (mkLoc .emptyDict)))
+        (mkLoc .emptyDict))
+    let sumExpr := mkLoc (.sum
+      (mkLoc (.builtinRange (mkLoc (.constInt (n - 1)))))
+      edgeBody)
+    let graphExpr : LoadTermLoc rep := match topo with
+      | .cycle =>
+        let backEdge := mkLoc (.dictInsert
+          (mkLoc (.constInt (n - 1)))
+          (mkLoc (.dictInsert (mkLoc (.constInt 0)) val (mkLoc .emptyDict)))
+          (mkLoc .emptyDict))
+        mkLoc (.add sumExpr backEdge)
+      | _ => sumExpr
+    mkLoc (.closure graphExpr)
+  loadTermToSProg2 (.dict .int (.dict .int valTy)) term
 
 -- ============================================================================
 -- Benchmark infrastructure
@@ -237,8 +139,6 @@ unsafe structure GraphBenchCase where
   prog : SProg2
   pythonScript : FilePath
   jsonInput : String
-  /-- If true, output mismatch is a hard failure; if false, just a warning. -/
-  strictCompare : Bool := Bool.true
 
 structure TimingResult where
   name : String
@@ -261,7 +161,6 @@ def runBinaryCapture (binPath : FilePath) : IO (Except String (Nat × String)) :
 
 /-- Run a Python script with JSON input via a temp file, capture stdout. -/
 def runPythonCapture (script : FilePath) (jsonInput : String) : IO (Except String (Nat × String)) := do
-  -- Write JSON to a temp file to avoid stdin pipe deadlock
   let tmpFile := outDir / "python_input.json"
   IO.FS.writeFile tmpFile jsonInput
   let start ← IO.monoMsNow
@@ -314,10 +213,7 @@ unsafe def runGraphBenchCase (b : GraphBenchCase) : IO (Except String TimingResu
     IO.eprintln s!"    SDQL output   (first 200 chars): {sdqlOutput.take 200}"
     IO.eprintln s!"    Python output  (first 200 chars): {pythonOutput.take 200}"
     IO.eprintln s!"    {cmpResult.stderr.trim}"
-    if b.strictCompare then
-      return .error s!"Output mismatch for {b.name}"
-    else
-      IO.eprintln s!"    (non-strict mode: continuing despite mismatch)"
+    return .error s!"Output mismatch for {b.name}"
   else
     IO.println s!"  OK (outputs match, SDQL={sdqlMs}ms, Python={pythonMs}ms)"
 
@@ -329,117 +225,27 @@ unsafe def runGraphBenchCase (b : GraphBenchCase) : IO (Except String TimingResu
   }
 
 -- ============================================================================
--- Benchmark case lists
+-- Case list builder
 -- ============================================================================
 
-unsafe def reachabilityChainCases : List GraphBenchCase :=
-  let script := FilePath.mk "scripts/transitive_closure.py"
-  [ { name := "reach_chain_5",    n := 5,    topology := "chain",
-      prog := reachability_chain_5,   pythonScript := script, jsonInput := chainGraphBoolJson 5 }
-  , { name := "reach_chain_10",   n := 10,   topology := "chain",
-      prog := reachability_chain_10,  pythonScript := script, jsonInput := chainGraphBoolJson 10 }
-  , { name := "reach_chain_20",   n := 20,   topology := "chain",
-      prog := reachability_chain_20,  pythonScript := script, jsonInput := chainGraphBoolJson 20 }
-  , { name := "reach_chain_50",   n := 50,   topology := "chain",
-      prog := reachability_chain_50,  pythonScript := script, jsonInput := chainGraphBoolJson 50 }
-  , { name := "reach_chain_100",  n := 100,  topology := "chain",
-      prog := reachability_chain_100, pythonScript := script, jsonInput := chainGraphBoolJson 100 }
-  ]
-
-unsafe def reachabilityCycleCases : List GraphBenchCase :=
-  let script := FilePath.mk "scripts/transitive_closure.py"
-  [ { name := "reach_cycle_5",    n := 5,    topology := "cycle",
-      prog := reachability_cycle_5,   pythonScript := script, jsonInput := cycleGraphBoolJson 5 }
-  , { name := "reach_cycle_10",   n := 10,   topology := "cycle",
-      prog := reachability_cycle_10,  pythonScript := script, jsonInput := cycleGraphBoolJson 10 }
-  , { name := "reach_cycle_20",   n := 20,   topology := "cycle",
-      prog := reachability_cycle_20,  pythonScript := script, jsonInput := cycleGraphBoolJson 20 }
-  , { name := "reach_cycle_50",   n := 50,   topology := "cycle",
-      prog := reachability_cycle_50,  pythonScript := script, jsonInput := cycleGraphBoolJson 50 }
-  , { name := "reach_cycle_100",  n := 100,  topology := "cycle",
-      prog := reachability_cycle_100, pythonScript := script, jsonInput := cycleGraphBoolJson 100 }
-  ]
-
-unsafe def reachabilityStarCases : List GraphBenchCase :=
-  let script := FilePath.mk "scripts/transitive_closure.py"
-  [ { name := "reach_star_5",    n := 5,    topology := "star",
-      prog := reachability_star_5,   pythonScript := script, jsonInput := starGraphBoolJson 5 }
-  , { name := "reach_star_10",   n := 10,   topology := "star",
-      prog := reachability_star_10,  pythonScript := script, jsonInput := starGraphBoolJson 10 }
-  , { name := "reach_star_20",   n := 20,   topology := "star",
-      prog := reachability_star_20,  pythonScript := script, jsonInput := starGraphBoolJson 20 }
-  , { name := "reach_star_50",   n := 50,   topology := "star",
-      prog := reachability_star_50,  pythonScript := script, jsonInput := starGraphBoolJson 50 }
-  , { name := "reach_star_100",  n := 100,  topology := "star",
-      prog := reachability_star_100, pythonScript := script, jsonInput := starGraphBoolJson 100 }
-  ]
-
-unsafe def viterbiChainCases : List GraphBenchCase :=
-  let script := FilePath.mk "scripts/viterbi.py"
-  let w : Float := 0.5
-  [ { name := "viterbi_chain_5",    n := 5,    topology := "chain",
-      prog := viterbi_chain_5,   pythonScript := script,
-      jsonInput := chainGraphViterbiJson 5 w, strictCompare := Bool.true }
-  , { name := "viterbi_chain_10",   n := 10,   topology := "chain",
-      prog := viterbi_chain_10,  pythonScript := script,
-      jsonInput := chainGraphViterbiJson 10 w, strictCompare := Bool.true }
-  , { name := "viterbi_chain_20",   n := 20,   topology := "chain",
-      prog := viterbi_chain_20,  pythonScript := script,
-      jsonInput := chainGraphViterbiJson 20 w, strictCompare := Bool.true }
-  , { name := "viterbi_chain_50",   n := 50,   topology := "chain",
-      prog := viterbi_chain_50,  pythonScript := script,
-      jsonInput := chainGraphViterbiJson 50 w, strictCompare := Bool.true }
-  , { name := "viterbi_chain_100",  n := 100,  topology := "chain",
-      prog := viterbi_chain_100, pythonScript := script,
-      jsonInput := chainGraphViterbiJson 100 w, strictCompare := Bool.true }
-  ]
-
-unsafe def viterbiCycleCases : List GraphBenchCase :=
-  let script := FilePath.mk "scripts/viterbi.py"
-  let w : Float := 0.5
-  [ { name := "viterbi_cycle_5",    n := 5,    topology := "cycle",
-      prog := viterbi_cycle_5,   pythonScript := script,
-      jsonInput := cycleGraphViterbiJson 5 w, strictCompare := Bool.true }
-  , { name := "viterbi_cycle_10",   n := 10,   topology := "cycle",
-      prog := viterbi_cycle_10,  pythonScript := script,
-      jsonInput := cycleGraphViterbiJson 10 w, strictCompare := Bool.true }
-  , { name := "viterbi_cycle_20",   n := 20,   topology := "cycle",
-      prog := viterbi_cycle_20,  pythonScript := script,
-      jsonInput := cycleGraphViterbiJson 20 w, strictCompare := Bool.true }
-  , { name := "viterbi_cycle_50",   n := 50,   topology := "cycle",
-      prog := viterbi_cycle_50,  pythonScript := script,
-      jsonInput := cycleGraphViterbiJson 50 w, strictCompare := Bool.true }
-  , { name := "viterbi_cycle_100",  n := 100,  topology := "cycle",
-      prog := viterbi_cycle_100, pythonScript := script,
-      jsonInput := cycleGraphViterbiJson 100 w, strictCompare := Bool.true }
-  ]
-
-unsafe def viterbiStarCases : List GraphBenchCase :=
-  let script := FilePath.mk "scripts/viterbi.py"
-  let w : Float := 0.5
-  [ { name := "viterbi_star_5",    n := 5,    topology := "star",
-      prog := viterbi_star_5,   pythonScript := script,
-      jsonInput := starGraphViterbiJson 5 w, strictCompare := Bool.true }
-  , { name := "viterbi_star_10",   n := 10,   topology := "star",
-      prog := viterbi_star_10,  pythonScript := script,
-      jsonInput := starGraphViterbiJson 10 w, strictCompare := Bool.true }
-  , { name := "viterbi_star_20",   n := 20,   topology := "star",
-      prog := viterbi_star_20,  pythonScript := script,
-      jsonInput := starGraphViterbiJson 20 w, strictCompare := Bool.true }
-  , { name := "viterbi_star_50",   n := 50,   topology := "star",
-      prog := viterbi_star_50,  pythonScript := script,
-      jsonInput := starGraphViterbiJson 50 w, strictCompare := Bool.true }
-  , { name := "viterbi_star_100",  n := 100,  topology := "star",
-      prog := viterbi_star_100, pythonScript := script,
-      jsonInput := starGraphViterbiJson 100 w, strictCompare := Bool.true }
-  ]
+/-- Build a list of benchmark cases for one (topology, problem) combination. -/
+unsafe def mkCases (probName topoName : String) (topo : GraphTopology) (prob : GraphProblem)
+    (script : FilePath) (mkJson : Nat → String) (sizes : List Nat) : List GraphBenchCase :=
+  sizes.map fun n => {
+    name := s!"{probName}_{topoName}_{n}"
+    n := n
+    topology := topoName
+    prog := mkGraphProg topo prob n
+    pythonScript := script
+    jsonInput := mkJson n
+  }
 
 -- ============================================================================
 -- Main
 -- ============================================================================
 
 /-- Run a list of benchmark cases and collect results and failures. -/
-unsafe def runBenchSuite (label : String) (desc : String) (cases : List GraphBenchCase) :
+unsafe def runBenchSuite (label desc : String) (cases : List GraphBenchCase) :
     IO (List TimingResult × List (String × String)) := do
   IO.println s!"--- {label} ---"
   IO.println s!"  {desc}"
@@ -448,8 +254,8 @@ unsafe def runBenchSuite (label : String) (desc : String) (cases : List GraphBen
   let mut failures : List (String × String) := []
   for b in cases do
     match ← runGraphBenchCase b with
-    | .ok r => readings := readings.concat r
-    | .error e => failures := failures.concat (b.name, e)
+    | .ok r => readings := readings ++ [r]
+    | .error e => failures := failures ++ [(b.name, e)]
   IO.println ""
   return (readings, failures)
 
@@ -457,6 +263,11 @@ unsafe def main (_args : List String) : IO UInt32 := do
   if (← outDir.pathExists) then
     IO.FS.removeDirAll outDir
   IO.FS.createDirAll outDir
+
+  let sizes := [10, 50, 100, 200, 500]
+  let w : Float := 0.5
+  let reachScript := FilePath.mk "scripts/transitive_closure.py"
+  let viterbiScript := FilePath.mk "scripts/viterbi.py"
 
   let mut allReachReadings : List TimingResult := []
   let mut allViterbiReadings : List TimingResult := []
@@ -466,26 +277,32 @@ unsafe def main (_args : List String) : IO UInt32 := do
   IO.println "=== Graph Reachability (transitive closure over bool) ==="
   IO.println ""
 
-  let (r, f) ← runBenchSuite "Chain" "0 → 1 → 2 → ... → (n-1)" reachabilityChainCases
+  let (r, f) ← runBenchSuite "Chain" "0 → 1 → 2 → ... → (n-1)"
+    (mkCases "reach" "chain" .chain .reachability reachScript (chainGraphBoolJson ·) sizes)
   allReachReadings := allReachReadings ++ r; failures := failures ++ f
 
-  let (r, f) ← runBenchSuite "Cycle" "0 → 1 → ... → (n-1) → 0" reachabilityCycleCases
+  let (r, f) ← runBenchSuite "Cycle" "0 → 1 → ... → (n-1) → 0"
+    (mkCases "reach" "cycle" .cycle .reachability reachScript (cycleGraphBoolJson ·) sizes)
   allReachReadings := allReachReadings ++ r; failures := failures ++ f
 
-  let (r, f) ← runBenchSuite "Star" "0 → {1, 2, ..., n-1}" reachabilityStarCases
+  let (r, f) ← runBenchSuite "Star" "0 → {1, 2, ..., n-1}"
+    (mkCases "reach" "star" .star .reachability reachScript (starGraphBoolJson ·) sizes)
   allReachReadings := allReachReadings ++ r; failures := failures ++ f
 
   -- === Viterbi benchmarks ===
   IO.println "=== Viterbi (most probable path, max_prod closure) ==="
   IO.println ""
 
-  let (r, f) ← runBenchSuite "Chain (w=0.5)" "0 → 1 → ... → (n-1)" viterbiChainCases
+  let (r, f) ← runBenchSuite "Chain (w=0.5)" "0 → 1 → ... → (n-1)"
+    (mkCases "viterbi" "chain" .chain (.viterbi w) viterbiScript (chainGraphViterbiJson · w) sizes)
   allViterbiReadings := allViterbiReadings ++ r; failures := failures ++ f
 
-  let (r, f) ← runBenchSuite "Cycle (w=0.5)" "0 → 1 → ... → (n-1) → 0" viterbiCycleCases
+  let (r, f) ← runBenchSuite "Cycle (w=0.5)" "0 → 1 → ... → (n-1) → 0"
+    (mkCases "viterbi" "cycle" .cycle (.viterbi w) viterbiScript (cycleGraphViterbiJson · w) sizes)
   allViterbiReadings := allViterbiReadings ++ r; failures := failures ++ f
 
-  let (r, f) ← runBenchSuite "Star (w=0.5)" "0 → {1, 2, ..., n-1}" viterbiStarCases
+  let (r, f) ← runBenchSuite "Star (w=0.5)" "0 → {1, 2, ..., n-1}"
+    (mkCases "viterbi" "star" .star (.viterbi w) viterbiScript (starGraphViterbiJson · w) sizes)
   allViterbiReadings := allViterbiReadings ++ r; failures := failures ++ f
 
   -- === Summary tables ===

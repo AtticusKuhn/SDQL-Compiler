@@ -8,6 +8,7 @@ task2.md
 .sdql-test-out/*.bin
 .sdql-test-out/*
 .sdql-perf-out/*
+.sdql-graph-perf-out/*
 .sdql-perf-out/*.bin
 .sdql-opt-perf-out/*
 .sdql-opt-perf-out/*.bin
