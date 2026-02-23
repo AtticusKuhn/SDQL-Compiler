@@ -37,6 +37,14 @@ The original SDQL paper @asemiring covers this example,
 and I would like to try this as well, if I get
 the time to do it.
 
+My motivation for undertaking this project was:
+
++ To test Lean in a real-world compilers project
++ To demonstrate that the unique features of Lean4 as a language, such as dependent types and syntax macros, lead to a cleaner architecture and design of a compiler 
++ To extend the original SDQL paper with semi-rings and closure constructs and apply this to graph problems
+
+@tarjan1981 demonstrates a unified techinque for using semi-rings to solve graph-problems. This approach was referenced, but not implemented, in the original SDQL paper.
+
 == Background on SDQL
 === Syntax and Typing Rules of SDQL
 #bnf(
@@ -95,8 +103,8 @@ the time to do it.
       Or[$r$][_real literal_]
       Or[$b$][_BBean literal_]
       Or[$s$][_string literal_]
-      Or[$<n_1 = e_1, n_2 = e_2, \ldots, n_m = e_m>$][_record literal_]
-      Or[$\{n_1 = e_1, n_2 = e_2, \ldots, n_m = e_m\}$][_dictionary literal_]
+      Or[$<n_1 = e_1, n_2 = e_2, dots, n_m = e_m>$][_record literal_]
+      Or[$\{n_1 = e_1, n_2 = e_2, dots, n_m = e_m\}$][_dictionary literal_]
       Or[$e_1(e_2)$][_dictionary lookup_]
       Or[not(e)][_not_]
       Or[if $e_1$ then $e_2$ else $e_3$][_if-then-else_]
@@ -143,7 +151,7 @@ the time to do it.
   $Gamma tack e_1 : t_1$,
   $dots$,
   $Gamma tack e_n : t_n$,
-  $Gamma tack <e_1, \ldots, e_n> : <t_1, \ldots, t_n>$,
+  $Gamma tack <e_1, dots, e_n> : <t_1, dots, t_n>$,
 ))
 
 #let ty_empty_dict = prooftree(rule(
@@ -237,8 +245,8 @@ the time to do it.
 
 #let ty_proj = prooftree(rule(
   name: [T-Proj],
-  $"has_proj"\ <t_1, \ldots, t_n>\ i\ t$,
-  $Gamma tack r : <t_1, \ldots, t_n>$,
+  $"has_proj"\ <t_1, dots, t_n>\ i\ t$,
+  $Gamma tack r : <t_1, dots, t_n>$,
   $Gamma tack r.i : t$,
 ))
 
@@ -365,9 +373,9 @@ the time to do it.
 
 #let ty_concat = prooftree(rule(
   name: [T-Concat],
-  $Gamma tack e_1 : <t_1, \ldots, t_n>$,
-  $Gamma tack e_2 : <s_1, \ldots, s_m>$,
-  $Gamma tack "concat"(e_1, e_2) : <t_1, \ldots, t_n, s_1, \ldots, s_m>$,
+  $Gamma tack e_1 : <t_1, dots, t_n>$,
+  $Gamma tack e_2 : <s_1, dots, s_m>$,
+  $Gamma tack "concat"(e_1, e_2) : <t_1, dots, t_n, s_1, dots, s_m>$,
 ))
 
 #align(center, rule-set(
@@ -421,15 +429,81 @@ They extended SDQL in @asemiring.
 
 == Research and Background reading
 
+I began my preparation by doing background reading
+on the following papers,
+
+- @functionalcollection for the original introduction to SDQL
+- @asemiring for an updated version of SDQL
+- @tarjan1981 for background on my algebraic paths extension.
+
+In particular, @tarjan1981 introduces new theory
+related to semi-rings and @functionalcollection introduces theory related to linear algebra (in the
+section of denotational semantics). I taught myself
+this theory in preparation for the project.
+
 == Proposal Refinement
+
+I refined my proposal by consulting with my day-to-day
+supervisor, and by proactively reaching out to the
+authors of the original SDQL paper.
+
+I was sure to get several rounds of draft and review from my day-to-day supervisor in order to ...
+
+See @email.
+
+From
 
 == Requirements Analysis
 
+
+I was sure to plan out appropriate software engineering
+techniques fitting for this project.
+
+=== The Use of Lean
+
+While not many compilers have been written
+in Lean4 yet, I chose it for this project based on
+the requirements of the project
+
++ Lean's features as a functional language make it easy to define transformations over an AST as functions.
++ Lean's dependent types allow ASTs to hold evidence which is used in synthesis.
+
+=== Continuous Integration and Testing
+
+
+
 = Chapter 3: Implementation
 
+== Theory Semi-Rings in Square Vector Spaces
+
+For any vector space $V$, I will called the vector space
+$V times.o V$ square.
+
+Let $V$ be a semi-module over $k$.
+Let $B : V * V -> K$ be a bilinear form.
+
+$V times.o V$ is a semi-ring, where multiplication is given by
+$ (a times.o b) * (x times.o y) = B(b, x) dot (a times.o y) $.
+
+Let $u = a times.o b$ be an element of $V times.o V$. The Kleene Star is given by:
+$ (a times.o b)^* = 1 + B(b, a)^* dot (a times.o b) $
+
+Note that all semi-modules in SDQL have a bilinear form. 
+When $V$ is finite-dimensional and $B$ is non-degenerate, the semi-ring $(V times.o V, +, *)$ is isomorphic to the *matrix algebra* $"End"(V) tilde.equiv M_n(k)$:
+
+== The Compilation Pipeline
 == Repository Overview
 
 = Chapter 4: Evaluation
+
+
+== Correctness of compilation testbench
+
+== Optimisation Performance tests
+
+== Reference Performance Comparison
+
+== The Use of a Profiler
 
 = Chapter 5: Conclusions
 
@@ -437,5 +511,10 @@ They extended SDQL in @asemiring.
 #bibliography("bib.bib")
 
 = Appendices
+
+#figure(
+    image("email_to_alex_mascolo.png", width: 80%),
+  caption: [Email to authors of the original SDQL implementation],
+) <email>
 
 = Project Proposal
