@@ -858,6 +858,11 @@ impl SdqlStar for Real {
     fn sdql_star(&self) -> Self { Real(1.0 / (1.0 - self.0)) }
 }
 
+/// MaxProduct (Viterbi semiring): star(a) = 1 when a ≤ 1 (probabilities).
+impl SdqlStar for MaxProduct {
+    fn sdql_star(&self) -> Self { MaxProduct(Real(1.0)) }
+}
+
 /// Semiring multiplication for scalar values in a Kleene algebra.
 /// - bool: AND
 /// - Real: standard multiplication
@@ -871,6 +876,11 @@ impl SdqlRingMul for bool {
 
 impl SdqlRingMul for Real {
     fn ring_mul(&self, other: &Self) -> Self { Real(self.0 * other.0) }
+}
+
+/// MaxProduct: ring multiplication is standard real multiplication.
+impl SdqlRingMul for MaxProduct {
+    fn ring_mul(&self, other: &Self) -> Self { MaxProduct(Real((self.0).0 * (other.0).0)) }
 }
 
 /// Compute the Kleene closure (star) of a square matrix represented as

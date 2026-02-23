@@ -132,8 +132,13 @@ unsafe def synthSHasClosure (stx : SourceLocation) (ty : SurfaceTy) : Except Typ
                 let sDict : SScale .real (.dict dom .real) := SScale.dictS sRange
                 let h := SHasClosure.squareMatrix sDict
                 pure (unsafeCast h)
+            | .maxProduct =>
+                let sRange : SScale .maxProduct .maxProduct := SScale.maxProductS
+                let sDict : SScale .maxProduct (.dict dom .maxProduct) := SScale.dictS sRange
+                let h := SHasClosure.squareMatrix sDict
+                pure (unsafeCast h)
             | _ =>
-                .error (stx, s!"closure expects bool, real, or a square matrix over bool/real, got {tyToString ty}")
+                .error (stx, s!"closure expects bool, real, or a square matrix over bool/real/max_prod, got {tyToString ty}")
           else
             .error (stx, s!"closure expects a square matrix (matching domains), got {tyToString ty}")
       | _ =>

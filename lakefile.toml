@@ -32,3 +32,7 @@ root = "OptimisationPerformanceComparison"
 [[lean_exe]]
 name = "flamegraph"
 root = "Flamegraph"
+
+[[lean_exe]]
+name = "graphPerformance"
+root = "GraphPerformance"
