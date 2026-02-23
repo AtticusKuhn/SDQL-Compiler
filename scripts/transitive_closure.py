@@ -50,7 +50,11 @@ def format_sdql(reach: dict[int, set[int]]) -> str:
 
 
 def main() -> None:
-    data = json.load(sys.stdin)
+    if len(sys.argv) > 1:
+        with open(sys.argv[1]) as f:
+            data = json.load(f)
+    else:
+        data = json.load(sys.stdin)
     adj = {int(k): v for k, v in data.items()}
     reach = transitive_closure(adj)
     print(format_sdql(reach))

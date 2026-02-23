@@ -72,10 +72,18 @@ def viterbi_closure(adj: dict[int, dict[int, float]]) -> dict[int, dict[int, flo
 
 
 def format_value(v: float) -> str:
-    """Format a float: use integer representation if exact."""
+    """Format a float: use integer representation if exact.
+
+    Uses decimal notation (no scientific notation) to match
+    Rust's f64::to_string() output used by the SDQL runtime.
+    """
     if v == int(v):
         return str(int(v))
-    return str(v)
+    s = repr(v)
+    if 'e' in s or 'E' in s:
+        from decimal import Decimal
+        s = format(Decimal(s), 'f')
+    return s
 
 
 def format_sdql(matrix: dict[int, dict[int, float]]) -> str:
@@ -91,7 +99,11 @@ def format_sdql(matrix: dict[int, dict[int, float]]) -> str:
 
 
 def main() -> None:
-    data = json.load(sys.stdin)
+    if len(sys.argv) > 1:
+        with open(sys.argv[1]) as f:
+            data = json.load(f)
+    else:
+        data = json.load(sys.stdin)
     adj: dict[int, dict[int, float]] = {}
     for k, v in data.items():
         adj[int(k)] = {int(dst): float(w) for dst, w in v.items()}
