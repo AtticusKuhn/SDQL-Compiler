@@ -65,6 +65,11 @@
             src = ./.;
           };
 
+          sdqlGraphPerf = lake.mkPackage {
+            name = "graphPerformance";
+            src = ./.;
+          };
+
           # Wrapper script that sets up datasets for tests and runs the Lean test runner.
           # TPCH reference binaries are built on-demand by `Tests/Main.lean`.
           sdqlTestsWithRef = pkgs.writeShellApplication {
@@ -154,6 +159,30 @@
               fi
 
               exec ${sdqlFlamegraph}/bin/flamegraph "$@"
+            '';
+          };
+          graphPerformance = pkgs.writeShellApplication {
+            name = "graphPerformance";
+            runtimeInputs = [ rustToolchain pkgs.python3 ];
+            text = ''
+              set -euo pipefail
+
+              if [ ! -f "sdql_runtime.rs" ]; then
+                echo "Error: must be run from the project root directory (sdql_runtime.rs not found)" >&2
+                exit 1
+              fi
+
+              if [ ! -f "scripts/transitive_closure.py" ]; then
+                echo "Error: scripts/transitive_closure.py not found" >&2
+                exit 1
+              fi
+
+              if [ ! -f "scripts/viterbi.py" ]; then
+                echo "Error: scripts/viterbi.py not found" >&2
+                exit 1
+              fi
+
+              exec ${sdqlGraphPerf}/bin/graphPerformance "$@"
             '';
           };
           buildDissertation = pkgs.writeShellApplication {
@@ -267,6 +296,7 @@
             performanceComparison = performanceComparison;
             optimisationPerformanceComparison = optimisationPerformanceComparison;
             flamegraph = flamegraphRunner;
+            graphPerformance = graphPerformance;
             buildDissertation = buildDissertation;
             sdql-reference-tests = sdqlRefTestRunner;
             sdql-reference-tpch-0_01 = sdqlRefTPCH001;
@@ -310,6 +340,10 @@
             flamegraph = {
               type = "app";
               program = "${flamegraphRunner}/bin/flamegraph";
+            };
+            graphPerformance = {
+              type = "app";
+              program = "${graphPerformance}/bin/graphPerformance";
             };
             buildDissertation = {
               type = "app";
