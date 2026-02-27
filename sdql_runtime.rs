@@ -892,6 +892,9 @@ impl SdqlRingMul for MaxProduct {
 ///   W[k,j] <- star(W[k,k]) * W[k,j]   for j != k
 ///   W[i,k] <- W[i,k] * star(W[k,k])   for i != k
 ///   W[i,j] <- W[i,j] + W[i,k] * star(W[k,k]) * W[k,j]  for i,j != k
+///
+/// This implementation operates in-place and only iterates over non-zero
+/// entries, giving significant speedups on sparse matrices.
 pub fn sdql_closure<K, V>(a: BTreeMap<K, BTreeMap<K, V>>) -> BTreeMap<K, BTreeMap<K, V>>
 where
     K: Ord + Clone,
@@ -908,50 +911,69 @@ where
     let keys: Vec<K> = all_keys.into_iter().collect();
     let n = keys.len();
 
-    let get = |w: &BTreeMap<K, BTreeMap<K, V>>, i: &K, j: &K| -> V {
-        w.get(i)
-            .and_then(|row| row.get(j))
-            .cloned()
-            .unwrap_or_else(V::sdql_zero)
-    };
-
     let mut w = a;
     let zero = V::sdql_zero();
 
     for ki in 0..n {
         let k = &keys[ki];
-        let wkk_star = get(&w, k, k).sdql_star();
 
-        let mut w_new: BTreeMap<K, BTreeMap<K, V>> = BTreeMap::new();
+        // Remove row k to take ownership (avoids cloning the whole matrix)
+        let mut old_row_k = w.remove(k).unwrap_or_default();
+        let wkk = old_row_k.remove(k).unwrap_or_else(V::sdql_zero);
+        let wkk_star = wkk.sdql_star();
+        // old_row_k now contains only off-diagonal entries: {j -> W[k,j]} for j != k
 
-        for ii in 0..n {
-            let i = &keys[ii];
-            for ji in 0..n {
-                let j = &keys[ji];
+        // Collect column k entries from remaining rows: (i, W[i,k]) where W[i,k] != 0
+        // Row k is not in w, so all collected i are != k.
+        let col_k_entries: Vec<(K, V)> = w.iter()
+            .filter_map(|(i, row)| {
+                row.get(k)
+                    .filter(|v| **v != zero)
+                    .map(|v| (i.clone(), v.clone()))
+            })
+            .collect();
 
-                let new_val = if ii == ki && ji == ki {
-                    wkk_star.clone()
-                } else if ii == ki {
-                    wkk_star.ring_mul(&get(&w, k, j))
-                } else if ji == ki {
-                    get(&w, i, k).ring_mul(&wkk_star)
-                } else {
-                    let wij = get(&w, i, j);
-                    let wik = get(&w, i, k);
-                    let wkj = get(&w, k, j);
-                    wij.sdql_add(&wik.ring_mul(&wkk_star).ring_mul(&wkj))
-                };
+        // Build new row k: W'[k,k] = star(W[k,k]), W'[k,j] = star(W[k,k]) * W[k,j]
+        let mut new_row_k = BTreeMap::new();
+        if wkk_star != zero {
+            new_row_k.insert(k.clone(), wkk_star.clone());
+        }
+        for (j, wkj) in &old_row_k {
+            let new_val = wkk_star.ring_mul(wkj);
+            if new_val != zero {
+                new_row_k.insert(j.clone(), new_val);
+            }
+        }
+        w.insert(k.clone(), new_row_k);
 
-                if new_val != zero {
-                    w_new
-                        .entry(i.clone())
-                        .or_insert_with(BTreeMap::new)
-                        .insert(j.clone(), new_val);
+        // Update each row i that had a non-zero W[i,k]
+        for (i, wik) in &col_k_entries {
+            let wik_scaled = wik.ring_mul(&wkk_star);
+
+            let row_i = w.get_mut(i).unwrap();
+
+            // W'[i,k] = W[i,k] * star(W[k,k])
+            if wik_scaled != zero {
+                row_i.insert(k.clone(), wik_scaled.clone());
+            } else {
+                row_i.remove(k);
+            }
+
+            // W'[i,j] = W[i,j] + W[i,k] * star(W[k,k]) * W[k,j]  for j != k
+            // Only iterate over non-zero W[k,j] entries (from old_row_k snapshot)
+            for (j, wkj) in &old_row_k {
+                let increment = wik_scaled.ring_mul(wkj);
+                if increment != zero {
+                    let old_val = row_i.get(j).cloned().unwrap_or_else(V::sdql_zero);
+                    let new_val = old_val.sdql_add(&increment);
+                    if new_val != zero {
+                        row_i.insert(j.clone(), new_val);
+                    } else {
+                        row_i.remove(j);
+                    }
                 }
             }
         }
-
-        w = w_new;
     }
 
     w
