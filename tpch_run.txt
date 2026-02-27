@@ -1,0 +1,75 @@
+[PASS] add_int
+[PASS] dict_insert
+[PASS] lookup_hit
+[PASS] lookup_miss
+[PASS] sum_vals
+[PASS] underscore_ident
+[PASS] if_then_true
+[PASS] if_then_false
+[PASS] semiring_mul_real
+[PASS] semiring_mul_matrix_2x2
+[PASS] semiring_mul_record_tensor
+[PASS] p_id_matrix
+[PASS] semiring_mul_4d_tensor
+[PASS] closure_bool
+[PASS] closure_real
+[PASS] closure_matrix_bool
+[PASS] closure_matrix_bool_linear
+[PASS] closure_matrix_real
+[PASS] closure_graph_self_loop
+[PASS] closure_graph_chain_3
+[PASS] closure_graph_cycle_3
+[PASS] closure_graph_star
+[PASS] closure_graph_diamond
+[PASS] closure_graph_disconnected
+[PASS] closure_graph_reverse_chain
+[PASS] closure_graph_weighted_real
+[PASS] vertical_loop_fusion_key_map (optimised matches unoptimised)
+[PASS] vertical_loop_fusion_value_map (optimised matches unoptimised)
+[PASS] horizontal_loop_fusion (optimised matches unoptimised)
+[PASS] loop_factorization_left (optimised matches unoptimised)
+[PASS] loop_factorization_right (optimised matches unoptimised)
+[PASS] loop_invariant_code_motion (optimised matches unoptimised)
+[PASS] loop_memoization_lookup (optimised matches unoptimised)
+[PASS] loop_memoization_partition (optimised matches unoptimised)
+[PASS] tpch_q01 (matches sdql-rs/target/release/tpch_q01_tiny)
+[PASS] tpch_q02 (matches sdql-rs/target/release/tpch_q02_tiny)
+[PASS] tpch_q03 (matches sdql-rs/target/release/tpch_q03_tiny)
+[PASS] tpch_q04 (matches sdql-rs/target/release/tpch_q04_tiny)
+[PASS] tpch_q05 (matches sdql-rs/target/release/tpch_q05_tiny)
+[PASS] tpch_q06 (matches sdql-rs/target/release/tpch_q06_tiny)
+[PASS] tpch_q07 (matches sdql-rs/target/release/tpch_q07_tiny)
+[PASS] tpch_q09 (matches sdql-rs/target/release/tpch_q09_tiny)
+[PASS] tpch_q10 (matches sdql-rs/target/release/tpch_q10_tiny)
+[PASS] tpch_q11 (matches sdql-rs/target/release/tpch_q11_tiny)
+[PASS] tpch_q12 (matches sdql-rs/target/release/tpch_q12_tiny)
+[PASS] tpch_q13 (matches sdql-rs/target/release/tpch_q13_tiny)
+[PASS] tpch_q14 (matches sdql-rs/target/release/tpch_q14_tiny)
+[PASS] tpch_q16 (matches sdql-rs/target/release/tpch_q16_tiny)
+[PASS] tpch_q17 (matches sdql-rs/target/release/tpch_q17_tiny)
+[PASS] tpch_q18 (matches sdql-rs/target/release/tpch_q18_tiny)
+[PASS] tpch_q19 (matches sdql-rs/target/release/tpch_q19_tiny)
+[PASS] tpch_q20 (matches sdql-rs/target/release/tpch_q20_tiny)
+[PASS] tpch_q21 (matches sdql-rs/target/release/tpch_q21_tiny)
+[PASS] tpch_q22 (matches sdql-rs/target/release/tpch_q22_tiny)
+[PASS] tpch_q01_sf001 (matches sdql-rs/target/release/tpch_q01_tiny)
+[PASS] tpch_q02_sf001 (matches sdql-rs/target/release/tpch_q02_tiny)
+[PASS] tpch_q03_sf001 (matches sdql-rs/target/release/tpch_q03_tiny)
+[PASS] tpch_q04_sf001 (matches sdql-rs/target/release/tpch_q04_tiny)
+[PASS] tpch_q05_sf001 (matches sdql-rs/target/release/tpch_q05_tiny)
+[PASS] tpch_q06_sf001 (matches sdql-rs/target/release/tpch_q06_tiny)
+[PASS] tpch_q07_sf001 (matches sdql-rs/target/release/tpch_q07_tiny)
+[PASS] tpch_q09_sf001 (matches sdql-rs/target/release/tpch_q09_tiny)
+[PASS] tpch_q10_sf001 (matches sdql-rs/target/release/tpch_q10_tiny)
+[PASS] tpch_q11_sf001 (matches sdql-rs/target/release/tpch_q11_tiny)
+[PASS] tpch_q12_sf001 (matches sdql-rs/target/release/tpch_q12_tiny)
+[PASS] tpch_q13_sf001 (matches sdql-rs/target/release/tpch_q13_tiny)
+[PASS] tpch_q14_sf001 (matches sdql-rs/target/release/tpch_q14_tiny)
+[PASS] tpch_q15_sf001 (matches sdql-rs/target/release/tpch_q15_tiny)
+[PASS] tpch_q16_sf001 (matches sdql-rs/target/release/tpch_q16_tiny)
+[PASS] tpch_q17_sf001 (matches sdql-rs/target/release/tpch_q17_tiny)
+[PASS] tpch_q18_sf001 (matches sdql-rs/target/release/tpch_q18_tiny)
+[PASS] tpch_q19_sf001 (matches sdql-rs/target/release/tpch_q19_tiny)
+[PASS] tpch_q20_sf001 (matches sdql-rs/target/release/tpch_q20_tiny)
+[PASS] tpch_q21_sf001 (matches sdql-rs/target/release/tpch_q21_tiny)
+[PASS] tpch_q22_sf001 (matches sdql-rs/target/release/tpch_q22_tiny)
