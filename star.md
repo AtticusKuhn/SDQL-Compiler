@@ -78,3 +78,14 @@ computations, dict1 * dict2 is evaluated to { "a"->{ "a"->8, "c"->10 }, "b"->{
 "a"->12, "c"->15 } }. On the other hand, dict2 * dict1 is { "a"->4 * dict1,
 "c"->5 * dict1 }. After performing similar computations, the expression is evaluated
 to { "a"->{ "a"->8, "b"->12 }, "c"->{ "a"->10, "b"->15 } }.
+
+
+
+| Semiring (⊕, ⊗) | $M^*_{ij}$ computes |
+|---|---|
+| (min, +) — the **tropical** semiring | Shortest path distance |
+| (max, ×) — the **Viterbi** semiring | Most reliable path |
+| (max, min) — the **bottleneck** semiring | Maximum-capacity path |
+| (+, ×) — over reals (if it converges) | Total weight summed over all paths (related to matrix inverse $(I - M)^{-1}$) |
+| (∨, ∧) — **Boolean** | Transitive closure (reachability) |
+

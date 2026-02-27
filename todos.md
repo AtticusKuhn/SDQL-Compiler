@@ -18,8 +18,9 @@
 - Need to make semi-ring multiplication actually work
 - need to implement `closure(e)`
 - need to document semi-ring nonsense in docs
-- need to write diss
+- need to write dissertation
 - it would be really helpful to have a CLI tool so I could just run `compile` or `run` on a string to easily test.
+- refactor viterbi.py to use numpy.
 
 ```bash
 [atticusk@nixos:~/coding/part_ii_project]$ find PartIiProject -name "*.lean" -exec wc -l {} + | sort -nr | head -n10
@@ -168,3 +169,47 @@ TOTAL                                 3172ms         345ms        0.108×
 
 Interactive view
 file:///home/atticusk/coding/part_ii_project/.sdql-flamegraph-out/svgs/
+
+============================================================
+
+Graph Reachability: SDQL vs Python (wall-clock ms)
+case                             SDQL        Python   SDQL/Python
+-----------------------------------------------------------------
+reach_chain_10 (n=10)             2ms          22ms       11.000×
+reach_chain_50 (n=50)             9ms          24ms        2.666×
+reach_chain_100 (n=100)          43ms          24ms        0.558×
+reach_chain_200 (n=200)         304ms          29ms        0.095×
+reach_chain_500 (n=500)        5401ms          78ms        0.014×
+reach_cycle_10 (n=10)             2ms          24ms       12.000×
+reach_cycle_50 (n=50)             9ms          29ms        3.222×
+reach_cycle_100 (n=100)          49ms          27ms        0.551×
+reach_cycle_200 (n=200)         349ms          34ms        0.097×
+reach_cycle_500 (n=500)        5808ms         112ms        0.019×
+reach_star_10 (n=10)              3ms          25ms        8.333×
+reach_star_50 (n=50)              7ms          22ms        3.142×
+reach_star_100 (n=100)           29ms          27ms        0.931×
+reach_star_200 (n=200)          226ms          27ms        0.119×
+reach_star_500 (n=500)         4223ms          36ms        0.008×
+-----------------------------------------------------------------
+TOTAL                         16464ms         540ms        0.032×
+
+Viterbi (max-product closure): SDQL vs Python (wall-clock ms)
+case                               SDQL        Python   SDQL/Python
+-------------------------------------------------------------------
+viterbi_chain_10 (n=10)             2ms         133ms       66.500×
+viterbi_chain_50 (n=50)            20ms         267ms       13.350×
+viterbi_chain_100 (n=100)          77ms         205ms        2.662×
+viterbi_chain_200 (n=200)         904ms         310ms        0.342×
+viterbi_chain_500 (n=500)        9100ms        1468ms        0.161×
+viterbi_cycle_10 (n=10)             3ms         131ms       43.666×
+viterbi_cycle_50 (n=50)            14ms         116ms        8.285×
+viterbi_cycle_100 (n=100)          70ms         129ms        1.842×
+viterbi_cycle_200 (n=200)         460ms         414ms        0.900×
+viterbi_cycle_500 (n=500)        6900ms        1023ms        0.148×
+viterbi_star_10 (n=10)              2ms          90ms       45.000×
+viterbi_star_50 (n=50)              8ms          85ms       10.625×
+viterbi_star_100 (n=100)           61ms          98ms        1.606×
+viterbi_star_200 (n=200)          263ms         100ms        0.380×
+viterbi_star_500 (n=500)         4622ms         402ms        0.086×
+-------------------------------------------------------------------
+TOTAL                           22506ms        4971ms        0.220×

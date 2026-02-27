@@ -1,74 +1,36 @@
 #!/usr/bin/env python3
-"""Compute the Kleene closure of a max-product (Viterbi) adjacency matrix.
+"""Kleene closure of a max-product (Viterbi) adjacency matrix via log-domain Floyd-Warshall.
 
-This solves the all-pairs most-probable-path problem.
+Semiring: (max, ×) over [0,1] probabilities.
+Log-domain trick: log turns (max, ×) into (max, +), giving standard Floyd-Warshall.
 
-Semiring: (max, ×) over non-negative reals.
-  - "addition" = max
-  - "multiplication" = × (standard real multiplication)
-  - star(a) = 1.0 for a ≤ 1 (probability weights)
-
-Input (stdin, JSON):
-  { "1": {"2": 0.8, "3": 0.5}, "2": {"3": 0.9} }
-  Keys are node IDs (ints as strings), values are dicts mapping successor to weight.
-
-Output (stdout):
-  SDQL dictionary format with values rounded to integers where exact, e.g.:
-  {1 -> {1 -> 1, 2 -> 0.8, 3 -> 0.72, }, ...}
+Input  (JSON): {"1": {"2": 0.8, "3": 0.5}, "2": {"3": 0.9}}
+Output (SDQL): {1 -> {1 -> 1, 2 -> 0.8, 3 -> 0.72, }, ...}
 """
-import json
-import sys
+import json, sys
+import numpy as np
 
 
 def viterbi_closure(adj: dict[int, dict[int, float]]) -> dict[int, dict[int, float]]:
-    """Kleene's algorithm for the (max, ×) semiring."""
-    # Collect all nodes
-    nodes: set[int] = set()
-    for src, dsts in adj.items():
-        nodes.add(src)
-        nodes.update(dsts.keys())
+    """Kleene closure for (max, ×) via Floyd-Warshall in log-domain."""
+    nodes = sorted({n for s, ds in adj.items() for n in (s, *ds)})
+    idx = {v: i for i, v in enumerate(nodes)}
+    n = len(nodes)
 
-    node_list = sorted(nodes)
-    n = len(node_list)
+    w = np.full((n, n), -np.inf)
+    for s, ds in adj.items():
+        for d, p in ds.items():
+            w[idx[s], idx[d]] = np.log2(p)
 
-    # Initialise W from adjacency matrix (zero = 0.0)
-    w: dict[int, dict[int, float]] = {}
-    for i in node_list:
-        w[i] = {}
-        for j in node_list:
-            w[i][j] = 0.0
-    for src, dsts in adj.items():
-        for dst, weight in dsts.items():
-            w[src][dst] = weight
+    for k in range(n):
+        w[k, k] = 0.0  # star(a) = 1 ⟹ log₂(1) = 0
+        w = np.maximum(w, w[:, k:k+1] + w[k:k+1, :])
 
-    # Kleene's algorithm with (max, ×) semiring
-    for k in node_list:
-        wkk_star = 1.0  # star(a) = 1.0 for probabilities ≤ 1
-        w_new: dict[int, dict[int, float]] = {i: {} for i in node_list}
-        for i in node_list:
-            for j in node_list:
-                if i == k and j == k:
-                    val = wkk_star
-                elif i == k:
-                    val = wkk_star * w[k][j]
-                elif j == k:
-                    val = w[i][k] * wkk_star
-                else:
-                    val = max(w[i][j], w[i][k] * wkk_star * w[k][j])
-                w_new[i][j] = val
-        w = w_new
-
-    # Remove zero entries (sparse representation)
-    result: dict[int, dict[int, float]] = {}
-    for i in node_list:
-        row = {}
-        for j in node_list:
-            if w[i][j] != 0.0:
-                row[j] = w[i][j]
-        if row:
-            result[i] = row
-
-    return result
+    prob = np.exp2(w)
+    return {
+        nodes[i]: {nodes[j]: float(prob[i, j]) for j in range(n) if prob[i, j] > 0}
+        for i in range(n) if np.any(prob[i] > 0)
+    }
 
 
 def format_value(v: float) -> str:
@@ -86,16 +48,12 @@ def format_value(v: float) -> str:
     return s
 
 
-def format_sdql(matrix: dict[int, dict[int, float]]) -> str:
+def format_sdql(m: dict[int, dict[int, float]]) -> str:
     """Format as SDQL dictionary string."""
-    parts = []
-    for src in sorted(matrix):
-        inner_parts = []
-        for dst in sorted(matrix[src]):
-            inner_parts.append(f"{dst} -> {format_value(matrix[src][dst])}")
-        inner = ", ".join(inner_parts)
-        parts.append(f"{src} -> {{{inner}, }}")
-    return "{" + ", ".join(parts) + ", }"
+    def row(src):
+        inner = ", ".join(f"{d} -> {format_value(m[src][d])}" for d in sorted(m[src]))
+        return f"{src} -> {{{inner}, }}"
+    return "{" + ", ".join(row(s) for s in sorted(m)) + ", }"
 
 
 def main() -> None:
@@ -104,11 +62,8 @@ def main() -> None:
             data = json.load(f)
     else:
         data = json.load(sys.stdin)
-    adj: dict[int, dict[int, float]] = {}
-    for k, v in data.items():
-        adj[int(k)] = {int(dst): float(w) for dst, w in v.items()}
-    result = viterbi_closure(adj)
-    print(format_sdql(result))
+    adj = {int(k): {int(d): float(w) for d, w in v.items()} for k, v in data.items()}
+    print(format_sdql(viterbi_closure(adj)))
 
 
 if __name__ == "__main__":

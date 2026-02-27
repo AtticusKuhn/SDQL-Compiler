@@ -163,7 +163,7 @@
           };
           graphPerformance = pkgs.writeShellApplication {
             name = "graphPerformance";
-            runtimeInputs = [ rustToolchain pkgs.python3 ];
+            runtimeInputs = [ rustToolchain (pkgs.python3.withPackages (ps: [ ps.numpy ])) ];
             text = ''
               set -euo pipefail
 

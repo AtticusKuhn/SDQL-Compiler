@@ -2,6 +2,7 @@
 #import "@preview/adaptive-dots:0.1.0": adaptive-dots
 #import "@preview/curryst:0.6.0": rule, prooftree, rule-set
 #import "mathpar.typ": mathpar
+#import "@preview/mmdr:0.2.0": mermaid
 
 = Cover page
 
@@ -474,6 +475,27 @@ the requirements of the project
 
 = Chapter 3: Implementation
 
+== Compilation Pipeline
+
+=== High-Level Overview
+#mermaid(read("pipeline.mmd"))
+
+=== Intermediate Representations
+#mermaid(read("pipeline-irs.mmd"))
+
+=== Elaboration-Time vs Runtime Split
+#mermaid(read("pipeline-elab-runtime.mmd"))
+
+=== Optimisation Passes
+#mermaid(read("pipeline-optimisations.mmd"))
+
+=== Key Source Files
+#mermaid(read("pipeline-source-files.mmd"))
+
+
+
+
+
 == Theory Semi-Rings in Square Vector Spaces
 
 For any vector space $V$, I will called the vector space
@@ -497,17 +519,29 @@ When $V$ is finite-dimensional and $B$ is non-degenerate, the semi-ring $(V time
 = Chapter 4: Evaluation
 
 
-== Correctness of compilation testbench
+== Correctness of compilation testbench (TPC-H Benchmark)
+
+The reference implementation of SDQL implements
+the TPC-H benchmark (see @tpch).
+
+I implemented a harness to run both the reference
+implementation and the Lean4 implementation on the
+TPC-H benchmark at scale factor $S F=0.01$.
+
+In this benchmark are also micro-tests of simple
+language constructs to allow for fast iteration and
+prototyping.
+
+The output is in <tpch_run>.
 
 == Optimisation Performance tests
 
 == Reference Performance Comparison
 
 == The Use of a Profiler
-
+== Graph Comparison
 = Chapter 5: Conclusions
 
-= Bibliography
 #bibliography("bib.bib")
 
 = Appendices
@@ -516,5 +550,10 @@ When $V$ is finite-dimensional and $B$ is non-degenerate, the semi-ring $(V time
     image("email_to_alex_mascolo.png", width: 80%),
   caption: [Email to authors of the original SDQL implementation],
 ) <email>
+
+#figure(
+read("tpch_run.txt"),
+  caption: [TPC-H run output],
+) <tpch_run>
 
 = Project Proposal
