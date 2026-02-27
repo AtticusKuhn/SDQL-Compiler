@@ -1,0 +1,13 @@
+flowchart LR
+    IR1["LoadTermLoc: PHOAS, untyped"] -->|"extractLoads2"| IR2["UntypedTermLoc: DeBruijn, untyped"]
+    IR2 -->|"infer2"| IR3["STermLoc2: DeBruijn, typed SurfaceTy"]
+    IR3 -->|"trProg2"| IR4["TermLoc2: DeBruijn, typed Ty"]
+    IR4 -->|"compile2"| IR5["Rust.ExprLoc: DeBruijn, untyped"]
+    IR5 -->|"showExpr"| IR6["String: Rust source text"]
+
+    style IR1 fill:#fff3e0,stroke:#f57c00
+    style IR2 fill:#fff3e0,stroke:#f57c00
+    style IR3 fill:#e3f2fd,stroke:#1565c0
+    style IR4 fill:#e3f2fd,stroke:#1565c0
+    style IR5 fill:#fce4ec,stroke:#c62828
+    style IR6 fill:#e8f5e9,stroke:#388e3c

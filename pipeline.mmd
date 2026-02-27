@@ -1,0 +1,43 @@
+flowchart TD
+    SRC["SDQL Source Text"] -->|"Lean syntax macros"| PARSE["elabSDQLToLoad"]
+    PARSE --> LT["LoadTermLoc: PHOAS AST"]
+
+    LT -->|"extractLoads2"| EXTRACT["Load Extraction + DeBruijn Conversion"]
+    EXTRACT --> UT["UntypedTermLoc: DeBruijn, untyped"]
+    EXTRACT --> EL["ExtractedLoads2: ctx + loadPaths"]
+
+    UT -->|"typeinferOpen2"| TI["Bidirectional Type Inference"]
+    TI --> TOF["typeof2"]
+    TI --> EV["Evidence Synthesis"]
+    TOF --> TI
+    EV --> TI
+    TI --> ST["STermLoc2: DeBruijn, typed, SurfaceTy"]
+
+    ST -->|"ToCore2.trProg2"| TC["Surface-to-Core Translation"]
+    TC --> CT["TermLoc2: DeBruijn, typed, Ty"]
+
+    CT -->|"applyOptimisations"| OPT["Optimisation Passes"]
+    OPT --> OCT["TermLoc2: optimised"]
+
+    OCT -->|"compile2"| COMP["Compilation to Rust AST"]
+    COMP --> RA["Rust.ExprLoc: Rust AST"]
+
+    RA -->|"renderRustProg2Shown"| PP["Pretty-Printing"]
+    PP --> RS["Rust Source Code"]
+
+    RS -->|"rustc"| BIN["Native Binary"]
+    RT["sdql_runtime.rs"] -->|"linked with"| BIN
+    BIN --> OUT["Program Output"]
+
+    style SRC fill:#e1f5fe,stroke:#0288d1
+    style LT fill:#fff3e0,stroke:#f57c00
+    style UT fill:#fff3e0,stroke:#f57c00
+    style EL fill:#f3e5f5,stroke:#7b1fa2
+    style ST fill:#fff3e0,stroke:#f57c00
+    style CT fill:#fff3e0,stroke:#f57c00
+    style OCT fill:#fff3e0,stroke:#f57c00
+    style RA fill:#fff3e0,stroke:#f57c00
+    style RS fill:#e8f5e9,stroke:#388e3c
+    style BIN fill:#e8f5e9,stroke:#388e3c
+    style RT fill:#fce4ec,stroke:#c62828
+    style OUT fill:#e8f5e9,stroke:#388e3c

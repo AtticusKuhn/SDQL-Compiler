@@ -1,0 +1,24 @@
+flowchart TD
+    INPUT["Prog2"] --> APPLY["applyOptimisations: iterate to fixpoint"]
+    APPLY --> ONCE["applyOptimisationsOnceTerm: bottom-up traversal"]
+
+    ONCE --> VKM["Vertical Loop Fusion: Key-Map"]
+    ONCE --> VVM["Vertical Loop Fusion: Value-Map"]
+    ONCE --> HF["Horizontal Loop Fusion"]
+    ONCE --> LF["Loop Factorization"]
+    ONCE --> LICM2["Loop-Invariant Code Motion"]
+    ONCE --> LM2["Loop Memoization"]
+
+    VKM --> CHECK{Any pass fired?}
+    VVM --> CHECK
+    HF --> CHECK
+    LF --> CHECK
+    LICM2 --> CHECK
+    LM2 --> CHECK
+
+    CHECK -->|Yes| APPLY
+    CHECK -->|"No: fixpoint"| OUTPUT["Optimised Prog2"]
+
+    style INPUT fill:#fff3e0,stroke:#f57c00
+    style OUTPUT fill:#e8f5e9,stroke:#388e3c
+    style APPLY fill:#e3f2fd,stroke:#1565c0

@@ -1,0 +1,11 @@
+flowchart TD
+    A["Parsing: SyntaxSDQL.lean, SyntaxSDQLProg.lean"]
+    B["IRs: LoadTerm.lean, ExtractLoads.lean, UntypedTerm.lean"]
+    C["Type System: Infer.lean, TypeOf.lean, Evidence.lean"]
+    D["Surface Core: SurfaceCore2.lean"]
+    E["Core: Term.lean, Term2.lean"]
+    F["Optimisations: Apply.lean, VerticalLoopFusion.lean, ..."]
+    G["Codegen: CodegenRust.lean, Rust.lean"]
+    H["Runtime: sdql_runtime.rs"]
+
+    A --> B --> C --> D --> E --> F --> G --> H
