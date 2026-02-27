@@ -481,10 +481,51 @@ the requirements of the project
 #mermaid(read("pipeline.mmd"))
 
 === Intermediate Representations
-#mermaid(read("pipeline-irs.mmd"))
+
+#figure(
+    mermaid(read("pipeline-irs.mmd")),
+    caption: [Intermediate representations]
+)<irs>
+
+The compilation pipeline works in the following stages.
+The stages are described in @irs.
+
+==== Load Syntax
+The syntax macros produce a simple, untyped AST
+very close to the user's input.
+
+This contains ```sdql Load[T]("path")``` as a syntax
+node.
+
+This representation uses PHAOS.
+==== Untyped Syntax
+The `load`s are all replaced with free variables.
+
+PHAOS is transformed into an untyped DeBruijn representation.
+==== Typed Named Syntax
+We infer the types using a "bidirectional algorithm".
+(I'm not sure if this is actually bidirectional
+typechecking, because this is an algorithm I just
+invented ad-hoc, and may not bare any correspondance
+to how bidirectional typechecking is defined in the literature.)
+
+In this stage, we synthesize evidence.
+The following pieces of evidence are synthesized:
++ Add
++ Scale
++ Mul
++ Closure
++ hasField
+==== Typed Unnamed Syntax
+The compiler forget the names of records, just refering to them by positions.
+
+This erasure has a subdtly that we can't re-order `Load[<t1, t2>](...)`, because this
+would change the semantics.
+
+==== Abstract Rust Syntax
 
 === Elaboration-Time vs Runtime Split
-#mermaid(read("pipeline-elab-runtime.mmd"))
+#mermaid(read("pipeline-elab-runtime.mmd")) 
 
 === Optimisation Passes
 #mermaid(read("pipeline-optimisations.mmd"))
@@ -492,9 +533,37 @@ the requirements of the project
 === Key Source Files
 #mermaid(read("pipeline-source-files.mmd"))
 
+== Graph Extension
+
+One of my extensions was to use Kleene's
+Algorithm to implement graph algorithms in SDQL --
+essentially turning SDQL into a graph database.
+
+#figure(
+ table(
+  columns: 3,
+  [*Graph Problem*],[*Traditional Algorithm*], [*Semi-Ring*],
+     [all-pairs shortest path], [Floyd-Warshall], [$(NN union infinity, min, +)$],
+     [reachability], [Transitive Closure], [$(BB, and, or)$],
+     [Most Probably Path], [Viterbi Algorithm] , [$([0,1], max, *)$],
+),
+  caption: [Examples of how Kleene's algorithm transforms any semi-ring into a corresponding graph problem],
+) <kleene_semiring>
 
 
+In @tarjan1981, Tarjan explores how different graph
+problems can be viewed as running Kleene's Algorithm
+over various semi-rings. See @kleene_semiring for
+example of the bijection between semirings and
+graph-problems.
 
+In general, all square vector spaces over a starred
+semi-ring form a starred semi-ring. For this project
+I only implemented Kleene's Algorithm over the type
+${K -> {K -> V}}$ for $V$ bein a Kleene Algebra.
+(It would be feasible to implement Kleene's Algorithm
+over any $V times.o V$, but I am only exploring the
+case of a graph for now).
 
 == Theory Semi-Rings in Square Vector Spaces
 
@@ -513,7 +582,6 @@ $ (a times.o b)^* = 1 + B(b, a)^* dot (a times.o b) $
 Note that all semi-modules in SDQL have a bilinear form. 
 When $V$ is finite-dimensional and $B$ is non-degenerate, the semi-ring $(V times.o V, +, *)$ is isomorphic to the *matrix algebra* $"End"(V) tilde.equiv M_n(k)$:
 
-== The Compilation Pipeline
 == Repository Overview
 
 = Chapter 4: Evaluation
@@ -539,7 +607,7 @@ The output is in <tpch_run>.
 == Reference Performance Comparison
 
 == The Use of a Profiler
-== Graph Comparison
+== Graph Database Comparison
 = Chapter 5: Conclusions
 
 #bibliography("bib.bib")
