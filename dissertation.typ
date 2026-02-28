@@ -471,7 +471,8 @@ the requirements of the project
 
 === Continuous Integration and Testing
 
-
+From the beginning, I employed professional techniques,
+including continuous integration and testing of my code.
 
 = Chapter 3: Implementation
 
@@ -523,6 +524,9 @@ This erasure has a subdtly that we can't re-order `Load[<t1, t2>](...)`, because
 would change the semantics.
 
 ==== Abstract Rust Syntax
+
+I created an AST to represent a simplified subset
+of Rust.
 
 === Elaboration-Time vs Runtime Split
 #mermaid(read("pipeline-elab-runtime.mmd")) 
@@ -581,6 +585,28 @@ $ (a times.o b)^* = 1 + B(b, a)^* dot (a times.o b) $
 
 Note that all semi-modules in SDQL have a bilinear form. 
 When $V$ is finite-dimensional and $B$ is non-degenerate, the semi-ring $(V times.o V, +, *)$ is isomorphic to the *matrix algebra* $"End"(V) tilde.equiv M_n(k)$:
+
+== Algebraic Optimisations
+The original SDQL paper mentions algebraic optimisations.
+I implemented these and implemented a test suite
+to test them. The optimisations are in @tab_opt
+
+
+#figure(
+    table(
+  columns: 3,
+    [*Optimisation*], [*Before*], [*After*],
+        [Vertical Loop Fusion 1], [```sdql let y = sum(<x, x_v> in e1) {f1(x) -> x_v} in sum(<x,x_v> in y) {f2(x) -> x_v}```],  [```sdql sum(<x,x_v> in e1) { f2(f1(x)) -> x_v } ```],
+        [Vertical Loop Fusion 2], [```sdql let y=sum(<x,x_v> in e1){x->f1(x_v)} in sum(<x,x_v> in y){x->f2(x_v)}```],  [```sdql sum(<x,x_v> in e1) { x -> f2(f1(x_v)) }```],
+        [Horizontal Loop Fusion], [```sdql  let y1=sum(x in e1) f1(x) in let y2=sum(x in e1) f2(x) in f3(y1, y2)```],  [```sdql let tmp = sum(x in e1) <y1 = f1(x), y2 = f2(x)> in f3(tmp.y1, tmp.y2)```],
+        [Loop Factorization 1], [```sdql sum(x in e1) (e2 * f(x))```],  [```sdql e2 * (sum(x in e1) f(x))```],
+        [Loop Factorization 2], [```sdql sum(x in e1) (f(x) * e2)```],  [```sdql (sum(x in e1) f(x)) * e2```],
+        [Loop-Invariant Code Motion], [```sdql sum(x in e1) let y = e2 in f(x, y)```],  [```sdql let y = e2 in sum(x in e1) f(x, y)```],
+        [Loop Memoization 1], [```sdql sum(x in e1) if(p(x) == e2) then g(x, e3) ```],  [```sdql let tmp = sum(<k,v> in e1) {p(x) -> {k -> v}} in sum(x in tmp(e2)) g(x, e3)```],
+        [Loop Memoization 2], [```sdql sum(x in e1) if(p(x) == e2) then f(x)```],  [```sdql  let tmp = sum(x in e1) {p(x) -> f(x)} in tmp(e2)```],
+    ),
+    caption: [Table of optimisations in SDQL]
+) <tab_opt>
 
 == Repository Overview
 
