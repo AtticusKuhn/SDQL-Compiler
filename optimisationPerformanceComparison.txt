@@ -1,0 +1,14 @@
+SDQL optimisation performance comparison (mean of 3 run(s); wall-clock ms)
+Params: dictN=200000, memoN=100000, memoM=1000
+case                                   unopt           opt     opt/unopt
+------------------------------------------------------------------------
+vertical_loop_fusion_key_map           101ms          69ms        0.683×
+vertical_loop_fusion_value_map          96ms          46ms        0.479×
+horizontal_loop_fusion                  28ms          28ms        1.000×
+loop_factorization_left                 27ms          27ms        1.000×
+loop_factorization_right                30ms          30ms        1.000×
+loop_invariant_code_motion              28ms          26ms        0.928×
+loop_memoization_lookup                139ms          31ms        0.223×
+loop_memoization_partition             136ms          39ms        0.286×
+------------------------------------------------------------------------
+TOTAL                                  585ms         296ms        0.505×

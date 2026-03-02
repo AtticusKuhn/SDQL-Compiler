@@ -3,6 +3,7 @@
 #import "@preview/curryst:0.6.0": rule, prooftree, rule-set
 #import "mathpar.typ": mathpar
 #import "@preview/mmdr:0.2.0": mermaid
+#set heading(numbering: "1.")
 
 = Cover page
 
@@ -537,7 +538,7 @@ of Rust.
 === Key Source Files
 #mermaid(read("pipeline-source-files.mmd"))
 
-== Graph Extension
+== Graph Extension <graph_extension>
 
 One of my extensions was to use Kleene's
 Algorithm to implement graph algorithms in SDQL --
@@ -626,14 +627,49 @@ In this benchmark are also micro-tests of simple
 language constructs to allow for fast iteration and
 prototyping.
 
-The output is in <tpch_run>.
+The output is in @tpch_run.
 
 == Optimisation Performance tests
+I wrote a script to benchmark pre-optimised code
+against post-optimised code in terms of runtime
+performance.
+The output is in @opt_txt.
+Loop factorization produces no speedup, because
+the LLVM compiler that Rust uses already
+performs this optimisation.
+
+
 
 == Reference Performance Comparison
+I compared the performance of Lean SDQL against the
+reference implementation of SDQL.
 
+@perf_txt
 == The Use of a Profiler
+When doing serious performance analysis, it is important to a profiler, rather than merely timing the runtime.
+
+The output of the profiler is in
+@profiler.
+
 == Graph Database Comparison
+The graph extension of SDQL (see @graph_extension)
+turns SDQL into a graph database.
+
+I wrote a bespoke implementation of transitive closure
+and Viterbi's algorithm in Python, comparing that
+implementation against the auto-generated
+SDQL implementation.
+
+The first implementation achieved 0.02x the speed
+of Python, due to cloning of BTrees.
+The next implementation was faster than Python, by
+avoiding cloning.
+
+I compared the two implementations on a chain topology,
+on a star topology, and on a cycle topology.
+I ran the transitive closure algorithm and the viterbi algorithm.
+See @graph_txt.
+
 = Chapter 5: Conclusions
 
 #bibliography("bib.bib")
@@ -649,5 +685,117 @@ The output is in <tpch_run>.
 read("tpch_run.txt"),
   caption: [TPC-H run output],
 ) <tpch_run>
+
+#figure(
+read("optimisationPerformanceComparison.txt"),
+  caption: [Optimisation Performance Comparison],
+) <opt_txt>
+
+#figure(
+read("graphPerformance.txt"),
+  caption: [graph performance],
+) <graph_txt>
+
+
+#figure(
+read("performanceComparison.txt"),
+  caption: [performance comparison],
+) <perf_txt>
+
+
+
+#let cell = rect.with(
+  inset: 0pt,
+)
+
+#figure(grid(
+  columns: (auto, auto, auto),
+  rows: (10%),
+  gutter: 0pt,
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q01.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q02.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q03.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q04.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q05.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q06.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q07.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q09.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q10.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q11.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q12.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q13.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q14.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q16.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q17.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q18.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q19.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q20.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q21.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q22.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q01_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q02_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q03_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q04_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q05_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q06_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q07_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q09_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q10_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q11_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q12_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q13_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q14_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q15_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q16_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q17_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q18_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q19_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q20_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q21_sf001.svg")],
+ cell[#image("./.sdql-flamegraph-out/svgs/tpch_q22_sf001.svg")],
+// tpch_q03.svg
+// tpch_q04_sf001.svg
+// tpch_q04.svg
+// tpch_q05_sf001.svg
+// tpch_q05.svg
+// tpch_q06_sf001.svg
+// tpch_q06.svg
+// tpch_q07_sf001.svg
+// tpch_q07.svg
+// tpch_q09_sf001.svg
+// tpch_q09.svg
+// tpch_q10_sf001.svg
+// tpch_q10.svg
+// tpch_q11_sf001.svg
+// tpch_q11.svg
+// tpch_q12_sf001.svg
+// tpch_q12.svg
+// tpch_q13_sf001.svg
+// tpch_q13.svg
+// tpch_q14_sf001.svg
+// tpch_q14.svg
+// tpch_q15_sf001.svg
+// tpch_q16_sf001.svg
+// tpch_q16.svg
+// tpch_q17_sf001.svg
+// tpch_q17.svg
+// tpch_q18_sf001.svg
+// tpch_q18.svg
+// tpch_q19_sf001.svg
+// tpch_q19.svg
+// tpch_q20_sf001.svg
+// tpch_q20.svg
+// tpch_q21_sf001.svg
+// tpch_q21.svg
+// tpch_q22_sf001.svg
+// tpch_q22.svg
+
+  // cell[#image("./images/2.png")],
+  // cell[#image("./images/3.png")],
+  // cell[#image("./images/4.png")],
+  // cell[#image("./images/5.png")],
+  // cell[#image("./images/6.png")],
+  // cell[#image("./images/7.png")],
+)) <profiler>
 
 = Project Proposal

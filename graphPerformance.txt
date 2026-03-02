@@ -1,0 +1,43 @@
+============================================================
+
+Graph Reachability: SDQL vs Python (wall-clock ms)
+case                             SDQL        Python   SDQL/Python
+-----------------------------------------------------------------
+reach_chain_10 (n=10)             2ms          20ms       10.000×
+reach_chain_50 (n=50)             2ms          22ms       11.000×
+reach_chain_100 (n=100)           2ms          22ms       11.000×
+reach_chain_200 (n=200)           8ms          25ms        3.125×
+reach_chain_500 (n=500)          35ms          65ms        1.857×
+reach_cycle_10 (n=10)             2ms          21ms       10.500×
+reach_cycle_50 (n=50)             3ms          19ms        6.333×
+reach_cycle_100 (n=100)           5ms          26ms        5.200×
+reach_cycle_200 (n=200)          17ms          29ms        1.705×
+reach_cycle_500 (n=500)          60ms          91ms        1.516×
+reach_star_10 (n=10)              2ms          20ms       10.000×
+reach_star_50 (n=50)              2ms          21ms       10.500×
+reach_star_100 (n=100)            2ms          21ms       10.500×
+reach_star_200 (n=200)            3ms          25ms        8.333×
+reach_star_500 (n=500)            5ms          26ms        5.200×
+-----------------------------------------------------------------
+TOTAL                           150ms         453ms        3.020×
+
+Viterbi (max-product closure): SDQL vs Python (wall-clock ms)
+case                               SDQL        Python   SDQL/Python
+-------------------------------------------------------------------
+viterbi_chain_10 (n=10)             3ms          73ms       24.333×
+viterbi_chain_50 (n=50)             2ms          78ms       39.000×
+viterbi_chain_100 (n=100)           7ms          85ms       12.142×
+viterbi_chain_200 (n=200)          13ms         132ms       10.153×
+viterbi_chain_500 (n=500)          80ms         552ms        6.900×
+viterbi_cycle_10 (n=10)             2ms          71ms       35.500×
+viterbi_cycle_50 (n=50)             4ms          77ms       19.250×
+viterbi_cycle_100 (n=100)           6ms         108ms       18.000×
+viterbi_cycle_200 (n=200)          26ms         173ms        6.653×
+viterbi_cycle_500 (n=500)         173ms         853ms        4.930×
+viterbi_star_10 (n=10)              2ms          68ms       34.000×
+viterbi_star_50 (n=50)              2ms          76ms       38.000×
+viterbi_star_100 (n=100)            2ms          72ms       36.000×
+viterbi_star_200 (n=200)            3ms          82ms       27.333×
+viterbi_star_500 (n=500)            5ms         257ms       51.400×
+-------------------------------------------------------------------
+TOTAL                             330ms        2757ms        8.354×
