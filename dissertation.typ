@@ -4,9 +4,19 @@
 #import "mathpar.typ": mathpar
 #import "@preview/mmdr:0.2.0": mermaid
 #set heading(numbering: "1.")
+#let bgn = "3961J"
 
+#set page(
+  header: align(right)[
+    #bgn
+  ],
+)
 = Cover page
+#title[SDQL Compiler]
 
+#set page(
+    header:[],
+)
 = Declaration of originality
 
 = Proforma
@@ -23,7 +33,7 @@ DSLs to capture parts of this workflow. Relational
 Algebra DSLs model relational data, and linear algebra
 frameworks can efficiently compute over tensors. However,
 using different DSLs to model each stage introduces
-friction at the transition boundry of the data-science
+friction at the transition boundary of the data-science
 pipeline.
 
 This dissertation implements and extends with new features SDQL, a
@@ -45,7 +55,7 @@ My motivation for undertaking this project was:
 + To demonstrate that the unique features of Lean4 as a language, such as dependent types and syntax macros, lead to a cleaner architecture and design of a compiler 
 + To extend the original SDQL paper with semi-rings and closure constructs and apply this to graph problems
 
-@tarjan1981 demonstrates a unified techinque for using semi-rings to solve graph-problems. This approach was referenced, but not implemented, in the original SDQL paper.
+@tarjan1981 demonstrates a unified technique for using semi-rings to solve graph-problems. This approach was referenced, but not implemented, in the original SDQL paper.
 
 == Background on SDQL
 === Syntax and Typing Rules of SDQL
@@ -82,7 +92,7 @@ My motivation for undertaking this project was:
     $t$,
     annot: "Type",
     {
-      Or[BB][_BBean_]
+      Or[BB][_Boolean_]
       Or[real][_real number_]
       Or[date][_date_]
       Or[$\{t_1 arrow t_2}$][_dictionary_]
@@ -103,7 +113,7 @@ My motivation for undertaking this project was:
       Or[$x$][_variable_]
       Or[$i$][_integer literal_]
       Or[$r$][_real literal_]
-      Or[$b$][_BBean literal_]
+      Or[$b$][_Boolean literal_]
       Or[$s$][_string literal_]
       Or[$<n_1 = e_1, n_2 = e_2, dots, n_m = e_m>$][_record literal_]
       Or[$\{n_1 = e_1, n_2 = e_2, dots, n_m = e_m\}$][_dictionary literal_]
@@ -171,7 +181,7 @@ My motivation for undertaking this project was:
 
 #let ty_lookup = prooftree(rule(
   name: [T-Lookup],
-  $"AddM"\ t_2$,
+  $"AddM" t_2$,
   $Gamma tack d : \{t_1 arrow t_2\}$,
   $Gamma tack k : t_1$,
   $Gamma tack d(k) : t_2$,
@@ -200,7 +210,7 @@ My motivation for undertaking this project was:
 
 #let ty_add = prooftree(rule(
   name: [T-Add],
-  $"AddM"\ t$,
+  $"AddM" t$,
   $Gamma tack e_1 : t$,
   $Gamma tack e_2 : t$,
   $Gamma tack e_1 + e_2 : t$,
@@ -208,17 +218,16 @@ My motivation for undertaking this project was:
 
 #let ty_mul = prooftree(rule(
   name: [T-Mul],
-  $"ScaleM"\ s\ t_1$,
-  $"ScaleM"\ s\ t_2$,
-  $"has_tensor"\ t_1\ t_2\ t_3$,
+  $"ScaleM" s t_1$,
+  $"ScaleM" s t_2$,
   $Gamma tack e_1 : t_1$,
   $Gamma tack e_2 : t_2$,
-  $Gamma tack e_1 * e_2 : t_3$,
+    $Gamma tack e_1 * e_2 : t_1 times.o t_2$,
 ))
 
 #let ty_semiring_mul = prooftree(rule(
   name: [T-SemiringMul],
-  $"HasMul"\ t$,
+  $"HasMul" t$,
   $Gamma tack e_1 : t$,
   $Gamma tack e_2 : t$,
   $Gamma tack e_1 *s e_2 : t$,
@@ -226,7 +235,7 @@ My motivation for undertaking this project was:
 
 #let ty_closure = prooftree(rule(
   name: [T-Closure],
-  $"HasClosure"\ t$,
+  $"HasClosure" t$,
   $Gamma tack e : t$,
   $Gamma tack "closure"(e) : t$,
 ))
@@ -239,7 +248,7 @@ My motivation for undertaking this project was:
 
 #let ty_sum = prooftree(rule(
   name: [T-Sum],
-  $"AddM"\ t$,
+  $"AddM" t$,
   $Gamma tack d : \{t_1 arrow t_2\}$,
   $Gamma, t_1, t_2 tack e : t$,
   $Gamma tack "sum"(<k, v> "in" d) e : t$,
@@ -247,7 +256,7 @@ My motivation for undertaking this project was:
 
 #let ty_proj = prooftree(rule(
   name: [T-Proj],
-  $"has_proj"\ <t_1, dots, t_n>\ i\ t$,
+  $"has_proj" <t_1, dots, t_n> i t$,
   $Gamma tack r : <t_1, dots, t_n>$,
   $Gamma tack r.i : t$,
 ))
@@ -381,46 +390,22 @@ My motivation for undertaking this project was:
 ))
 
 #align(center, rule-set(
-  ty_var,
-  ty_const_int,
-  ty_const_real,
-  ty_const_BB,
-  ty_const_string,
   ty_record,
-  ty_empty_dict,
-  ty_dict_insert,
   ty_lookup,
-  ty_not,
-  ty_ite,
-  ty_letin,
   ty_add,
   ty_mul,
-  ty_semiring_mul,
   ty_closure,
   ty_promote,
   ty_sum,
   ty_proj,
-  ty_or,
-  ty_and,
-  ty_eq,
-  ty_leq,
-  ty_lt,
-  ty_sub,
-  ty_div,
-  ty_ends_with,
-  ty_starts_with,
-  ty_contains,
-  ty_first_index,
-  ty_last_index,
-  ty_substring,
-  ty_dom,
-  ty_range,
-  ty_size,
-  ty_date_lit,
-  ty_year,
-  ty_concat,
 ))
+In the typing rules for SDQL, the key rules to notice
+are ty_mul and ty_add, which show the semi-module
+structure of SDQL. Notice that the return type of
+multiplication corresponds to the tensor product
+of a vector space: $t_1 times.o t_2$.
 
+For the full SDQL typing rules, see @sdql_typing_rules.
 == Previous Work on SDQL
 SDQL was introduced by researchers at the University
 of Edinburgh in @functionalcollection.
@@ -441,7 +426,17 @@ on the following papers,
 In particular, @tarjan1981 introduces new theory
 related to semi-rings and @functionalcollection introduces theory related to linear algebra (in the
 section of denotational semantics). I taught myself
-this theory in preparation for the project.
+this theory (of semi-rings, semi-modules, and closed semi-rings) in preparation for the project.
+
+== Starting Point
+I started off having access to the reference implementation of SDQL. I did not copy the design nor the architecture of the reference
+implementation. The
+purpose of the reference
+implementation was as
+a "black box comparison".
+
+
+
 
 == Proposal Refinement
 
@@ -449,17 +444,23 @@ I refined my proposal by consulting with my day-to-day
 supervisor, and by proactively reaching out to the
 authors of the original SDQL paper.
 
-I was sure to get several rounds of draft and review from my day-to-day supervisor in order to ...
+I was sure to get several rounds of draft and review from my day-to-day supervisor in order to ensure a polished proposal.
 
-See @email.
-
-From
+See @email for my email conversation with the original SDQL authors.
 
 == Requirements Analysis
 
 
 I was sure to plan out appropriate software engineering
 techniques fitting for this project.
+
+I came up with the following list of requirements for my core:
++ The compiler must take in any valid string in SDQL, and generate Rust code for it
++ The compiler must generate somewhat local error messages in the case of a type-error
++ The performance of the generated Rust code must be fast enough to be practically usable (within 1 order-of-magnitude of the reference implementation)
++ The testbench must provide reasonable confidence that the Lean4 compiler has correct behavior.
++ The performance comparison should give statistically significant evidence that the performance of the generated Rust code is sufficient.
+
 
 === The Use of Lean
 
@@ -480,7 +481,12 @@ including continuous integration and testing of my code.
 == Compilation Pipeline
 
 === High-Level Overview
-#mermaid(read("pipeline.mmd"))
+
+#figure(
+mermaid(read("pipeline.mmd")),
+    caption: [Compilation Pipeline]
+) <comp>
+
 
 === Intermediate Representations
 
@@ -519,9 +525,9 @@ The following pieces of evidence are synthesized:
 + Closure
 + hasField
 ==== Typed Unnamed Syntax
-The compiler forget the names of records, just refering to them by positions.
+The compiler forget the names of records, just referring to them by positions.
 
-This erasure has a subdtly that we can't re-order `Load[<t1, t2>](...)`, because this
+This erasure has a sublety that we can't re-order `Load[<t1, t2>](...)`, because this
 would change the semantics.
 
 ==== Abstract Rust Syntax
@@ -529,14 +535,35 @@ would change the semantics.
 I created an AST to represent a simplified subset
 of Rust.
 
+We use this AST to codegenerate to Rust.
+
+I made the following design decisions in the code-generated Rust:
+
++ Represent ```sdql {K -> V}``` as ```rust BTreeMap<K,V>```
++ Represent each piece of evidence as a trait for clean code generation. 
+
+Difficulties of Code-generating to Rust:
++ ```rust float``` isn't ordered in Rust
++ I used an inefficient workaround ```rust x.clone()``` to avoid the borrow checker, but this resulted in slower performance.
+
 === Elaboration-Time vs Runtime Split
-#mermaid(read("pipeline-elab-runtime.mmd")) 
+#figure(
+mermaid(read("pipeline-elab-runtime.mmd")) ,
+    caption: [Elaboration vs runtime split]
+) <elab>
 
 === Optimisation Passes
-#mermaid(read("pipeline-optimisations.mmd"))
+#figure(
+mermaid(read("pipeline-optimisations.mmd")),
+    caption: [Optimisation Passes]
+) <opts>
 
 === Key Source Files
-#mermaid(read("pipeline-source-files.mmd"))
+#figure(
+mermaid(read("pipeline-source-files.mmd")),
+    caption: [Key Source Files]
+) <keyfiles>
+
 
 == Graph Extension <graph_extension>
 
@@ -565,11 +592,16 @@ graph-problems.
 In general, all square vector spaces over a starred
 semi-ring form a starred semi-ring. For this project
 I only implemented Kleene's Algorithm over the type
-${K -> {K -> V}}$ for $V$ bein a Kleene Algebra.
+${K -> {K -> V}}$ for $V$ being a Kleene Algebra.
 (It would be feasible to implement Kleene's Algorithm
 over any $V times.o V$, but I am only exploring the
 case of a graph for now).
 
+This work extends the defintion of the
+```sdql closure(e)``` operator to be defined on
+more types. The ```sdql closure(e)``` operator was
+defined in @functionalcollection, but not implemented
+in the reference implementation.
 == Theory Semi-Rings in Square Vector Spaces
 
 For any vector space $V$, I will called the vector space
@@ -585,7 +617,30 @@ Let $u = a times.o b$ be an element of $V times.o V$. The Kleene Star is given b
 $ (a times.o b)^* = 1 + B(b, a)^* dot (a times.o b) $
 
 Note that all semi-modules in SDQL have a bilinear form. 
-When $V$ is finite-dimensional and $B$ is non-degenerate, the semi-ring $(V times.o V, +, *)$ is isomorphic to the *matrix algebra* $"End"(V) tilde.equiv M_n(k)$:
+When $V$ is finite-dimensional and $B$ is non-degenerate, the semi-ring $(V times.o V, +, *)$ is isomorphic to the *matrix algebra* $"End"(V) tilde.equiv M_n(k)$.
+
+This theory is used to implement semi-ring multiplication ```sdql *s : T -> T -> T ```.
+
+```python
+# pseudo code for *s : T -> T -> T
+def semiring_multiply(a : V ⊗ V, b : V ⊗ V) -> V ⊗ V:
+    acc = 0 : T
+    for (al, ar) in decompose(a):
+        for (bl, br) in decompose(b):
+            acc = acc + <ar, bl> * (al ⊗ br)
+    return acc
+```
+
+Note that under the specific example of multiplying
+an $n times n$ matrix, this algorithm be exactly the
+same as the standard matrix-multiplication algorithm, and would use $O(n^3)$ multiplications.
+
+However, the benefit of using this approach is that
+it doesn't incur a significant performance overhead, but
+it can also generically extend to any "square" semi-module in SDQL,
+including (for example):
++ ```sdql <a : <a : int, b : int>, b : <a : int, b : int>```
++ ```sdql {int -> {int  -> real}}```
 
 == Algebraic Optimisations
 The original SDQL paper mentions algebraic optimisations.
@@ -610,6 +665,12 @@ to test them. The optimisations are in @tab_opt
 ) <tab_opt>
 
 == Repository Overview
+#figure(
+    raw(read("project_tree.txt")),
+    caption: [project tree]
+) <projtree>
+
+See @projtree.
 
 = Chapter 4: Evaluation
 
@@ -628,6 +689,9 @@ language constructs to allow for fast iteration and
 prototyping.
 
 The output is in @tpch_run.
+
+The output shows that the lean4 implementation is
+approximately 5-7x slower than the reference implementation at $S F = 0.01$. I don't know why.
 
 == Optimisation Performance tests
 I wrote a script to benchmark pre-optimised code
@@ -651,6 +715,7 @@ When doing serious performance analysis, it is important to a profiler, rather t
 The output of the profiler is in
 @profiler.
 
+I made flamegraphs for testcase at the $S F = 0.01$ level.
 == Graph Database Comparison
 The graph extension of SDQL (see @graph_extension)
 turns SDQL into a graph database.
@@ -797,5 +862,47 @@ read("performanceComparison.txt"),
   // cell[#image("./images/6.png")],
   // cell[#image("./images/7.png")],
 )) <profiler>
+#figure(
+align(center, rule-set(
+  ty_var,
+  ty_const_int,
+  ty_const_real,
+  ty_const_BB,
+  ty_const_string,
+  ty_record,
+  ty_empty_dict,
+  ty_dict_insert,
+  ty_lookup,
+  ty_not,
+  ty_ite,
+  ty_letin,
+  ty_add,
+  ty_mul,
+  ty_semiring_mul,
+  ty_closure,
+  ty_promote,
+  ty_sum,
+  ty_proj,
+  ty_or,
+  ty_and,
+  ty_eq,
+  ty_leq,
+  ty_lt,
+  ty_sub,
+  ty_div,
+  ty_ends_with,
+  ty_starts_with,
+  ty_contains,
+  ty_first_index,
+  ty_last_index,
+  ty_substring,
+  ty_dom,
+  ty_range,
+  ty_size,
+  ty_date_lit,
+  ty_year,
+  ty_concat,
+))) <sdql_typing_rules>
+
 
 = Project Proposal
