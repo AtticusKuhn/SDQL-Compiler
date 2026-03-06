@@ -1,43 +1,79 @@
 ============================================================
 
 Graph Reachability: SDQL vs Python (wall-clock ms)
-case                             SDQL        Python   SDQL/Python
------------------------------------------------------------------
-reach_chain_10 (n=10)             2ms          20ms       10.000×
-reach_chain_50 (n=50)             2ms          22ms       11.000×
-reach_chain_100 (n=100)           2ms          22ms       11.000×
-reach_chain_200 (n=200)           8ms          25ms        3.125×
-reach_chain_500 (n=500)          35ms          65ms        1.857×
-reach_cycle_10 (n=10)             2ms          21ms       10.500×
-reach_cycle_50 (n=50)             3ms          19ms        6.333×
-reach_cycle_100 (n=100)           5ms          26ms        5.200×
-reach_cycle_200 (n=200)          17ms          29ms        1.705×
-reach_cycle_500 (n=500)          60ms          91ms        1.516×
-reach_star_10 (n=10)              2ms          20ms       10.000×
-reach_star_50 (n=50)              2ms          21ms       10.500×
-reach_star_100 (n=100)            2ms          21ms       10.500×
-reach_star_200 (n=200)            3ms          25ms        8.333×
-reach_star_500 (n=500)            5ms          26ms        5.200×
------------------------------------------------------------------
-TOTAL                           150ms         453ms        3.020×
-
-Viterbi (max-product closure): SDQL vs Python (wall-clock ms)
 case                               SDQL        Python   SDQL/Python
 -------------------------------------------------------------------
-viterbi_chain_10 (n=10)             3ms          73ms       24.333×
-viterbi_chain_50 (n=50)             2ms          78ms       39.000×
-viterbi_chain_100 (n=100)           7ms          85ms       12.142×
-viterbi_chain_200 (n=200)          13ms         132ms       10.153×
-viterbi_chain_500 (n=500)          80ms         552ms        6.900×
-viterbi_cycle_10 (n=10)             2ms          71ms       35.500×
-viterbi_cycle_50 (n=50)             4ms          77ms       19.250×
-viterbi_cycle_100 (n=100)           6ms         108ms       18.000×
-viterbi_cycle_200 (n=200)          26ms         173ms        6.653×
-viterbi_cycle_500 (n=500)         173ms         853ms        4.930×
-viterbi_star_10 (n=10)              2ms          68ms       34.000×
-viterbi_star_50 (n=50)              2ms          76ms       38.000×
-viterbi_star_100 (n=100)            2ms          72ms       36.000×
-viterbi_star_200 (n=200)            3ms          82ms       27.333×
-viterbi_star_500 (n=500)            5ms         257ms       51.400×
+reach_chain_2 (n=2)                 2ms          23ms       11.500×
+reach_chain_4 (n=4)                 2ms          23ms       11.500×
+reach_chain_8 (n=8)                 2ms          21ms       10.500×
+reach_chain_16 (n=16)               2ms          23ms       11.500×
+reach_chain_32 (n=32)               3ms          26ms        8.666×
+reach_chain_64 (n=64)               3ms          29ms        9.666×
+reach_chain_128 (n=128)             6ms          26ms        4.333×
+reach_chain_256 (n=256)            16ms          40ms        2.500×
+reach_chain_512 (n=512)            45ms          81ms        1.800×
+reach_chain_1024 (n=1024)         172ms         203ms        1.180×
+reach_chain_2048 (n=2048)         825ms         813ms        0.985×
+reach_cycle_2 (n=2)                 2ms          24ms       12.000×
+reach_cycle_4 (n=4)                 2ms          23ms       11.500×
+reach_cycle_8 (n=8)                 2ms          26ms       13.000×
+reach_cycle_16 (n=16)               2ms          26ms       13.000×
+reach_cycle_32 (n=32)               2ms          24ms       12.000×
+reach_cycle_64 (n=64)               3ms          27ms        9.000×
+reach_cycle_128 (n=128)             6ms          28ms        4.666×
+reach_cycle_256 (n=256)            25ms          43ms        1.720×
+reach_cycle_512 (n=512)            70ms          99ms        1.414×
+reach_cycle_1024 (n=1024)         285ms         323ms        1.133×
+reach_cycle_2048 (n=2048)        1289ms        1335ms        1.035×
+reach_star_2 (n=2)                  2ms          24ms       12.000×
+reach_star_4 (n=4)                  3ms          26ms        8.666×
+reach_star_8 (n=8)                  2ms          22ms       11.000×
+reach_star_16 (n=16)                2ms          25ms       12.500×
+reach_star_32 (n=32)                3ms          25ms        8.333×
+reach_star_64 (n=64)                2ms          22ms       11.000×
+reach_star_128 (n=128)              3ms          26ms        8.666×
+reach_star_256 (n=256)              4ms          26ms        6.500×
+reach_star_512 (n=512)              6ms          32ms        5.333×
+reach_star_1024 (n=1024)           16ms          49ms        3.062×
+reach_star_2048 (n=2048)           39ms         129ms        3.307×
 -------------------------------------------------------------------
-TOTAL                             330ms        2757ms        8.354×
+TOTAL                            2848ms        3692ms        1.296×
+
+Viterbi (max-product closure): SDQL vs Python (wall-clock ms)
+case                                 SDQL        Python   SDQL/Python
+---------------------------------------------------------------------
+viterbi_chain_2 (n=2)                 2ms          77ms       38.500×
+viterbi_chain_4 (n=4)                 2ms          76ms       38.000×
+viterbi_chain_8 (n=8)                 2ms          79ms       39.500×
+viterbi_chain_16 (n=16)               3ms          83ms       27.666×
+viterbi_chain_32 (n=32)               3ms          76ms       25.333×
+viterbi_chain_64 (n=64)               3ms          95ms       31.666×
+viterbi_chain_128 (n=128)             7ms         112ms       16.000×
+viterbi_chain_256 (n=256)            25ms         183ms        7.320×
+viterbi_chain_512 (n=512)            94ms         584ms        6.212×
+viterbi_chain_1024 (n=1024)         453ms        3938ms        8.693×
+viterbi_chain_2048 (n=2048)        1669ms       34547ms       20.699×
+viterbi_cycle_2 (n=2)                 2ms          85ms       42.500×
+viterbi_cycle_4 (n=4)                 3ms          76ms       25.333×
+viterbi_cycle_8 (n=8)                 3ms          79ms       26.333×
+viterbi_cycle_16 (n=16)               3ms          79ms       26.333×
+viterbi_cycle_32 (n=32)               4ms          80ms       20.000×
+viterbi_cycle_64 (n=64)               7ms          92ms       13.142×
+viterbi_cycle_128 (n=128)            19ms         121ms        6.368×
+viterbi_cycle_256 (n=256)            44ms         244ms        5.545×
+viterbi_cycle_512 (n=512)           188ms         936ms        4.978×
+viterbi_cycle_1024 (n=1024)         953ms        5656ms        5.934×
+viterbi_cycle_2048 (n=2048)        2417ms       38177ms       15.795×
+viterbi_star_2 (n=2)                  5ms          84ms       16.800×
+viterbi_star_4 (n=4)                  6ms          80ms       13.333×
+viterbi_star_8 (n=8)                  7ms          97ms       13.857×
+viterbi_star_16 (n=16)                7ms          81ms       11.571×
+viterbi_star_32 (n=32)                6ms          78ms       13.000×
+viterbi_star_64 (n=64)                7ms          82ms       11.714×
+viterbi_star_128 (n=128)              8ms          83ms       10.375×
+viterbi_star_256 (n=256)             10ms         111ms       11.100×
+viterbi_star_512 (n=512)             17ms         260ms       15.294×
+viterbi_star_1024 (n=1024)           20ms        2725ms      136.250×
+viterbi_star_2048 (n=2048)           47ms       35289ms      750.829×
+---------------------------------------------------------------------
+TOTAL                              6046ms      124445ms       20.583×

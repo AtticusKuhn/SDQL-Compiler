@@ -264,7 +264,7 @@ unsafe def main (_args : List String) : IO UInt32 := do
     IO.FS.removeDirAll outDir
   IO.FS.createDirAll outDir
 
-  let sizes := [10, 50, 100, 200, 500]
+  let sizes := [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048]
   let w : Float := 0.5
   let reachScript := FilePath.mk "scripts/transitive_closure.py"
   let viterbiScript := FilePath.mk "scripts/viterbi.py"

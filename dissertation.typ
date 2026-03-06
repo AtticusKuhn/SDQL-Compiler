@@ -1,3 +1,4 @@
+#import "@preview/dashy-todo:0.1.3": todo
 #import "@preview/simplebnf:0.1.1": *
 #import "@preview/adaptive-dots:0.1.0": adaptive-dots
 #import "@preview/curryst:0.6.0": rule, prooftree, rule-set
@@ -5,7 +6,6 @@
 #import "@preview/mmdr:0.2.0": mermaid
 #set heading(numbering: "1.")
 #let bgn = "3961J"
-
 #set page(
   header: align(right)[
     #bgn
@@ -134,7 +134,7 @@ My motivation for undertaking this project was:
 )
 #let ty_var = prooftree(rule(
   name: [T-Var],
-  $in\ A\ Gamma$,
+  $A in Gamma$,
   $Gamma tack x : A$,
 ))
 
@@ -435,8 +435,10 @@ purpose of the reference
 implementation was as
 a "black box comparison".
 
-
-
+I also used `tpch-dbgen`
+#footnote[https://github.com/electrum/tpch-dbgen]
+to generate the TPC-H
+dataset.
 
 == Proposal Refinement
 
@@ -470,6 +472,7 @@ the requirements of the project
 
 + Lean's features as a functional language make it easy to define transformations over an AST as functions.
 + Lean's dependent types allow ASTs to hold evidence which is used in synthesis.
++ Lean's advanced syntax-macro system allowed me to create an EDSL, embedding SDQL inside Lean. This allowed a tight editor-integration experience and for the clean display of local error information.
 
 === Continuous Integration and Testing
 
@@ -505,9 +508,20 @@ very close to the user's input.
 This contains ```sdql Load[T]("path")``` as a syntax
 node.
 
-This representation uses PHAOS.
+This representation uses PHOAS. This design decision was
+made so that the Lean frontend would handle issues
+of variable shadowing. PHOAS can be easily be converted
+to DeBruijn indexing.
+
+At first, I attempted to use PHOAS for type inference.
+This was painful, so I switched to using DeBruijn
+indexing for the type inference stage.
 ==== Untyped Syntax
 The `load`s are all replaced with free variables.
+If a path is loaded twice, it will be relaced by the
+same free variable in each case. This step also
+produces a mapping `FV -> Path` which is used
+at Rust code-gen time.
 
 PHAOS is transformed into an untyped DeBruijn representation.
 ==== Typed Named Syntax
@@ -524,6 +538,12 @@ The following pieces of evidence are synthesized:
 + Mul
 + Closure
 + hasField
+
+These pieces of evidence are used at Rust code-gen time.
+If the synthesizer cannot synthesize any needed piece
+of evidence, it throws a type-error with local location
+information.
+
 ==== Typed Unnamed Syntax
 The compiler forget the names of records, just referring to them by positions.
 
@@ -546,6 +566,20 @@ Difficulties of Code-generating to Rust:
 + ```rust float``` isn't ordered in Rust
 + I used an inefficient workaround ```rust x.clone()``` to avoid the borrow checker, but this resulted in slower performance.
 
+Builtin functions were implemented in `sdql_runtime.rs`,
+a Rust runtime.
+
+
+I created Rust macros to generate instaces for tuples of length 1 - 8. Technically, this is incorrect, as I should have dynamically created the instances based on what lengths could occur in the program, but I found it difficult to generate a new runtime for each compilation, so that's a tradeoff.
+
+
+The reference implementation allows for type-hints
+such as `@vec` which hint to the compiler to compile this dictionary to a vector instead
+of a hashtable. My implementation ignores these type
+hints.
+#todo[
+    I should quantify the degree to which data-structure selection impacts performance. This could be good for my evaluation, but I don't do it.
+]
 === Elaboration-Time vs Runtime Split
 #figure(
 mermaid(read("pipeline-elab-runtime.mmd")) ,
@@ -602,7 +636,7 @@ This work extends the defintion of the
 more types. The ```sdql closure(e)``` operator was
 defined in @functionalcollection, but not implemented
 in the reference implementation.
-== Theory Semi-Rings in Square Vector Spaces
+== Theory of Semi-Rings in Square Vector Spaces
 
 For any vector space $V$, I will called the vector space
 $V times.o V$ square.
@@ -666,7 +700,7 @@ to test them. The optimisations are in @tab_opt
 
 == Repository Overview
 #figure(
-    raw(read("project_tree.txt")),
+    raw(read("project_tree.txt"), block:true),
     caption: [project tree]
 ) <projtree>
 
@@ -691,7 +725,11 @@ prototyping.
 The output is in @tpch_run.
 
 The output shows that the lean4 implementation is
-approximately 5-7x slower than the reference implementation at $S F = 0.01$. I don't know why.
+approximately 3-7x slower than the reference implementation at $S F = 0.01$. I don't know why.
+
+It was a concious design decision to choose
+$S F = 0.01$ because larger scale-factors would crash
+my laptop.
 
 == Optimisation Performance tests
 I wrote a script to benchmark pre-optimised code
@@ -702,13 +740,18 @@ Loop factorization produces no speedup, because
 the LLVM compiler that Rust uses already
 performs this optimisation.
 
-
-
 == Reference Performance Comparison
 I compared the performance of Lean SDQL against the
 reference implementation of SDQL.
 
-@perf_txt
+See @perf_txt.
+
+My implementation achieves a 3x-5x slowdown on the
+TPC-H at $S F = 0.01$.
+
+This performance can be analysed by the use of
+a profiler.
+
 == The Use of a Profiler
 When doing serious performance analysis, it is important to a profiler, rather than merely timing the runtime.
 
@@ -716,6 +759,11 @@ The output of the profiler is in
 @profiler.
 
 I made flamegraphs for testcase at the $S F = 0.01$ level.
+
+From analysing these flamegraphs, we can see
+where the performance penalty is coming from.
+#todo[I need to figure out how to analyse these flamegraphs so I can actually figure out where the performance penalty is coming from]
+
 == Graph Database Comparison
 The graph extension of SDQL (see @graph_extension)
 turns SDQL into a graph database.
