@@ -7,178 +7,181 @@ namespace PartIiProject.Optimisations
 abbrev Optimisation : Type :=
   {ctx : List Ty} → {ty : Ty} → Term2 ctx ty → Option (Term2 ctx ty)
 
-def tryOptimisations {ctx : List Ty} {ty : Ty} (opts : List Optimisation) (t : Term2 ctx ty) :
-    Option (Term2 ctx ty) :=
-  match opts with
-  | [] => none
-  | o :: os =>
-      match o t with
-      | some t' => some t'
-      | none => tryOptimisations os t
+def fail : Optimisation :=
+  fun _ => none
+
+def seq (o1 o2 : Optimisation) : Optimisation :=
+  fun t =>
+    match o1 t with
+    | some t' => some t'
+    | none => o2 t
 
 mutual
-  def applyOptimisationsOnceTerm {ctx : List Ty} {ty : Ty} (opts : List Optimisation) :
-      Term2 ctx ty → Term2 ctx ty × Bool
-    | .var m => (.var m, false)
-    | .constInt n => (.constInt n, false)
-    | .constReal r => (.constReal r, false)
-    | .constBool b => (.constBool b, false)
-    | .constString s => (.constString s, false)
-    | .constRecord fields =>
-        let (fields', ch) := applyOptimisationsOnceFields opts fields
-        let t' := Term2.constRecord fields'
-        match tryOptimisations opts t' with
-        | some t'' => (t'', true)
-        | none => (t', ch)
-    | .emptyDict => (.emptyDict, false)
-    | .dictInsert k v d =>
-        let (k', chK) := applyOptimisationsOnceLoc opts k
-        let (v', chV) := applyOptimisationsOnceLoc opts v
-        let (d', chD) := applyOptimisationsOnceLoc opts d
-        let ch := chK || chV || chD
-        let t' := Term2.dictInsert k' v' d'
-        match tryOptimisations opts t' with
-        | some t'' => (t'', true)
-        | none => (t', ch)
-    | .lookup aRange d k =>
-        let (d', chD) := applyOptimisationsOnceLoc opts d
-        let (k', chK) := applyOptimisationsOnceLoc opts k
-        let ch := chD || chK
-        let t' := Term2.lookup aRange d' k'
-        match tryOptimisations opts t' with
-        | some t'' => (t'', true)
-        | none => (t', ch)
-    | .not e =>
-        let (e', chE) := applyOptimisationsOnceLoc opts e
-        let t' := Term2.not e'
-        match tryOptimisations opts t' with
-        | some t'' => (t'', true)
-        | none => (t', chE)
-    | .ite c t f =>
-        let (c', chC) := applyOptimisationsOnceLoc opts c
-        let (t', chT) := applyOptimisationsOnceLoc opts t
-        let (f', chF) := applyOptimisationsOnceLoc opts f
-        let ch := chC || chT || chF
-        let term' := Term2.ite c' t' f'
-        match tryOptimisations opts term' with
-        | some term'' => (term'', true)
-        | none => (term', ch)
-    | .letin bound body =>
-        let (bound', chB) := applyOptimisationsOnceLoc opts bound
-        let (body', chBody) := applyOptimisationsOnceLoc opts body
-        let ch := chB || chBody
-        let t' := Term2.letin bound' body'
-        match tryOptimisations opts t' with
-        | some t'' => (t'', true)
-        | none => (t', ch)
-    | .add a t1 t2 =>
-        let (t1', ch1) := applyOptimisationsOnceLoc opts t1
-        let (t2', ch2) := applyOptimisationsOnceLoc opts t2
-        let ch := ch1 || ch2
-        let t' := Term2.add a t1' t2'
-        match tryOptimisations opts t' with
-        | some t'' => (t'', true)
-        | none => (t', ch)
-    | @Term2.mul _ sc t1Ty t2Ty t3 s1 s2 inst e1 e2 =>
-        let (t1', ch1) := applyOptimisationsOnceLoc opts e1
-        let (t2', ch2) := applyOptimisationsOnceLoc opts e2
-        let ch := ch1 || ch2
-        let t' := @Term2.mul _ sc t1Ty t2Ty t3 s1 s2 inst t1' t2'
-        match tryOptimisations opts t' with
-        | some t'' => (t'', true)
-        | none => (t', ch)
-    | .semiringMul hm e1 e2 =>
-        let (t1', ch1) := applyOptimisationsOnceLoc opts e1
-        let (t2', ch2) := applyOptimisationsOnceLoc opts e2
-        let ch := ch1 || ch2
-        let t' := Term2.semiringMul hm t1' t2'
-        match tryOptimisations opts t' with
-        | some t'' => (t'', true)
-        | none => (t', ch)
-    | .closure hc e =>
-        let (e', chE) := applyOptimisationsOnceLoc opts e
-        let t' := Term2.closure hc e'
-        match tryOptimisations opts t' with
-        | some t'' => (t'', true)
-        | none => (t', chE)
-    | .promote e =>
-        let (e', chE) := applyOptimisationsOnceLoc opts e
-        let t' := Term2.promote e'
-        match tryOptimisations opts t' with
-        | some t'' => (t'', true)
-        | none => (t', chE)
-    | .sum a d body =>
-        let (d', chD) := applyOptimisationsOnceLoc opts d
-        let (body', chBody) := applyOptimisationsOnceLoc opts body
-        let ch := chD || chBody
-        let t' := Term2.sum a d' body'
-        match tryOptimisations opts t' with
-        | some t'' => (t'', true)
-        | none => (t', ch)
-    | @Term2.proj _ l t record i inst =>
-        let (record', chR) := applyOptimisationsOnceLoc opts record
-        let t' := @Term2.proj _ l t record' i inst
-        match tryOptimisations opts t' with
-        | some t'' => (t'', true)
-        | none => (t', chR)
-    | .builtin f arg =>
-        let (arg', chA) := applyOptimisationsOnceLoc opts arg
-        let t' := Term2.builtin f arg'
-        match tryOptimisations opts t' with
-        | some t'' => (t'', true)
-        | none => (t', chA)
+  partial def anySubexpressionTerm (o : Optimisation) {ctx : List Ty} {ty : Ty} :
+      Term2 ctx ty → Option (Term2 ctx ty)
+    | t =>
+        match o t with
+        | some t' => some t'
+        | none =>
+            match t with
+            | .var _ => none
+            | .constInt _ => none
+            | .constReal _ => none
+            | .constBool _ => none
+            | .constString _ => none
+            | .constRecord fields =>
+                match anySubexpressionFields o fields with
+                | some fields' => some (Term2.constRecord fields')
+                | none => none
+            | .emptyDict => none
+            | .dictInsert k v d =>
+                match anySubexpressionLoc o k with
+                | some k' => some (Term2.dictInsert k' v d)
+                | none =>
+                    match anySubexpressionLoc o v with
+                    | some v' => some (Term2.dictInsert k v' d)
+                    | none =>
+                        match anySubexpressionLoc o d with
+                        | some d' => some (Term2.dictInsert k v d')
+                        | none => none
+            | .lookup aRange d k =>
+                match anySubexpressionLoc o d with
+                | some d' => some (Term2.lookup aRange d' k)
+                | none =>
+                    match anySubexpressionLoc o k with
+                    | some k' => some (Term2.lookup aRange d k')
+                    | none => none
+            | .not e =>
+                match anySubexpressionLoc o e with
+                | some e' => some (Term2.not e')
+                | none => none
+            | .ite c t f =>
+                match anySubexpressionLoc o c with
+                | some c' => some (Term2.ite c' t f)
+                | none =>
+                    match anySubexpressionLoc o t with
+                    | some t' => some (Term2.ite c t' f)
+                    | none =>
+                        match anySubexpressionLoc o f with
+                        | some f' => some (Term2.ite c t f')
+                        | none => none
+            | .letin bound body =>
+                match anySubexpressionLoc o bound with
+                | some bound' => some (Term2.letin bound' body)
+                | none =>
+                    match anySubexpressionLoc o body with
+                    | some body' => some (Term2.letin bound body')
+                    | none => none
+            | .add a t1 t2 =>
+                match anySubexpressionLoc o t1 with
+                | some t1' => some (Term2.add a t1' t2)
+                | none =>
+                    match anySubexpressionLoc o t2 with
+                    | some t2' => some (Term2.add a t1 t2')
+                    | none => none
+            | @Term2.mul _ sc t1Ty t2Ty t3 s1 s2 inst e1 e2 =>
+                match anySubexpressionLoc o e1 with
+                | some e1' => some (@Term2.mul _ sc t1Ty t2Ty t3 s1 s2 inst e1' e2)
+                | none =>
+                    match anySubexpressionLoc o e2 with
+                    | some e2' => some (@Term2.mul _ sc t1Ty t2Ty t3 s1 s2 inst e1 e2')
+                    | none => none
+            | .semiringMul hm e1 e2 =>
+                match anySubexpressionLoc o e1 with
+                | some e1' => some (Term2.semiringMul hm e1' e2)
+                | none =>
+                    match anySubexpressionLoc o e2 with
+                    | some e2' => some (Term2.semiringMul hm e1 e2')
+                    | none => none
+            | .closure hc e =>
+                match anySubexpressionLoc o e with
+                | some e' => some (Term2.closure hc e')
+                | none => none
+            | .promote e =>
+                match anySubexpressionLoc o e with
+                | some e' => some (Term2.promote e')
+                | none => none
+            | .sum a d body =>
+                match anySubexpressionLoc o d with
+                | some d' => some (Term2.sum a d' body)
+                | none =>
+                    match anySubexpressionLoc o body with
+                    | some body' => some (Term2.sum a d body')
+                    | none => none
+            | @Term2.proj _ l t record i inst =>
+                match anySubexpressionLoc o record with
+                | some record' => some (@Term2.proj _ l t record' i inst)
+                | none => none
+            | .builtin f arg =>
+                match anySubexpressionLoc o arg with
+                | some arg' => some (Term2.builtin f arg')
+                | none => none
 
-  def applyOptimisationsOnceLoc {ctx : List Ty} {ty : Ty} (opts : List Optimisation) :
-      TermLoc2 ctx ty → TermLoc2 ctx ty × Bool
+  partial def anySubexpressionLoc (o : Optimisation) {ctx : List Ty} {ty : Ty} :
+      TermLoc2 ctx ty → Option (TermLoc2 ctx ty)
     | .mk loc inner =>
-        let (inner', ch) := applyOptimisationsOnceTerm opts inner
-        (.mk loc inner', ch)
+        match anySubexpressionTerm o inner with
+        | some inner' => some (.mk loc inner')
+        | none => none
 
-  def applyOptimisationsOnceFields {ctx : List Ty} (opts : List Optimisation) :
-      {l : List Ty} → TermFields2 ctx l → TermFields2 ctx l × Bool
-    | [], .nil => (.nil, false)
+  partial def anySubexpressionFields (o : Optimisation) {ctx : List Ty} :
+      {l : List Ty} → TermFields2 ctx l → Option (TermFields2 ctx l)
+    | [], .nil => none
     | _ :: _, .cons h t =>
-        let (h', chH) := applyOptimisationsOnceLoc opts h
-        let (t', chT) := applyOptimisationsOnceFields opts t
-        (.cons h' t', chH || chT)
+        match anySubexpressionLoc o h with
+        | some h' => some (.cons h' t)
+        | none =>
+            match anySubexpressionFields o t with
+            | some t' => some (.cons h t')
+            | none => none
 end
 
-def applyOptimisationOnce {ctx : List Ty} {ty : Ty} (opt : Optimisation) (t : Term2 ctx ty) :
-    Term2 ctx ty :=
-  (applyOptimisationsOnceTerm [opt] t).fst
+def anySubexpression (o : Optimisation) : Optimisation :=
+  fun t => anySubexpressionTerm o t
 
-def applyOptimisationOnceLoc {ctx : List Ty} {ty : Ty} (opt : Optimisation) (t : TermLoc2 ctx ty) :
+partial def fixpointTerm {ctx : List Ty} {ty : Ty} (o : Optimisation) (t : Term2 ctx ty) :
+    Option (Term2 ctx ty) :=
+  match o t with
+  | some t' =>
+      match fixpointTerm o t' with
+      | some t'' => some t''
+      | none => some t'
+  | none => none
+
+def fixpoint (o : Optimisation) : Optimisation :=
+  fun t => fixpointTerm o t
+
+def seqAll (opts : List Optimisation) : Optimisation :=
+  match opts with
+  | [] => fail
+  | o :: os => seq o (seqAll os)
+
+def seqAnySubexpression (opts : List Optimisation) : Optimisation :=
+  match opts with
+  | [] => fail
+  | o :: os => seq (anySubexpression o) (seqAnySubexpression os)
+
+def optimiseUntilStable (opts : List Optimisation) : Optimisation :=
+  fixpoint (seqAnySubexpression opts)
+
+def runOptimisation {ctx : List Ty} {ty : Ty} (o : Optimisation) (t : Term2 ctx ty) :
+    Term2 ctx ty :=
+  match o t with
+  | some t' => t'
+  | none => t
+
+def runOptimisationLoc {ctx : List Ty} {ty : Ty}
+    (o : Optimisation) (t : TermLoc2 ctx ty) : TermLoc2 ctx ty :=
+  match t with
+  | .mk loc inner =>
+      .mk loc (runOptimisation o inner)
+
+def optimiseTerm {ctx : List Ty} {ty : Ty} (opts : List Optimisation) (t : Term2 ctx ty) :
+    Term2 ctx ty :=
+  runOptimisation (optimiseUntilStable opts) t
+
+def optimiseLoc {ctx : List Ty} {ty : Ty} (opts : List Optimisation) (t : TermLoc2 ctx ty) :
     TermLoc2 ctx ty :=
-  (applyOptimisationsOnceLoc [opt] t).fst
-
-partial def applyOptimisations {ctx : List Ty} {ty : Ty}
-    (opts : List Optimisation) (t : Term2 ctx ty) (fuel : Nat := 32) : Term2 ctx ty :=
-  match fuel with
-  | 0 => t
-  | fuel + 1 =>
-      let (t', changed) := applyOptimisationsOnceTerm opts t
-      if changed then
-        applyOptimisations opts t' fuel
-      else
-        t'
-
-partial def applyOptimisationsLoc {ctx : List Ty} {ty : Ty}
-    (opts : List Optimisation) (t : TermLoc2 ctx ty) (fuel : Nat := 32) : TermLoc2 ctx ty :=
-  match fuel with
-  | 0 => t
-  | fuel + 1 =>
-      let (t', changed) := applyOptimisationsOnceLoc opts t
-      if changed then
-        applyOptimisationsLoc opts t' fuel
-      else
-        t'
-
-def applyOptimisation {ctx : List Ty} {ty : Ty} (opt : Optimisation) (t : Term2 ctx ty) (fuel : Nat := 32) :
-    Term2 ctx ty :=
-  applyOptimisations [opt] t fuel
-
-def applyOptimisationLoc {ctx : List Ty} {ty : Ty}
-    (opt : Optimisation) (t : TermLoc2 ctx ty) (fuel : Nat := 32) : TermLoc2 ctx ty :=
-  applyOptimisationsLoc [opt] t fuel
+  runOptimisationLoc (optimiseUntilStable opts) t
 
 end PartIiProject.Optimisations

@@ -9,7 +9,7 @@ namespace Tests.Optimisations.HorizontalLoopFusion
 open ToCore2 in
 unsafe def optimiseCoreTerm (p : SProg2) : String :=
   let core := trProg2 p
-  let term' := applyOptimisationsLoc [horizontalLoopFusion2] core.term
+  let term' := optimiseLoc [horizontalLoopFusion2] core.term
   Term2.showTermLoc2 [] term'
 
 /-- info: "let x = {1 -> 10} ++ {2 -> 20} ++ {} in let y = sum(y, z in x) <z, z + 1> in let z = y.0 in let k = y.1 in z + k" -/
