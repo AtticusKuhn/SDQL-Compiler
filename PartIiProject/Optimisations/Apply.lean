@@ -11,111 +11,58 @@ def fail : Optimisation :=
   fun _ => none
 
 def seq (o1 o2 : Optimisation) : Optimisation :=
-  fun t =>
-    match o1 t with
-    | some t' => some t'
-    | none => o2 t
+  fun t => o1 t <|> o2 t
 
 mutual
   partial def anySubexpressionTerm (o : Optimisation) {ctx : List Ty} {ty : Ty} :
       Term2 ctx ty → Option (Term2 ctx ty)
     | t =>
-        match o t with
-        | some t' => some t'
-        | none =>
-            match t with
-            | .var _ => none
-            | .constInt _ => none
-            | .constReal _ => none
-            | .constBool _ => none
-            | .constString _ => none
-            | .constRecord fields =>
-                match anySubexpressionFields o fields with
-                | some fields' => some (Term2.constRecord fields')
-                | none => none
-            | .emptyDict => none
-            | .dictInsert k v d =>
-                match anySubexpressionLoc o k with
-                | some k' => some (Term2.dictInsert k' v d)
-                | none =>
-                    match anySubexpressionLoc o v with
-                    | some v' => some (Term2.dictInsert k v' d)
-                    | none =>
-                        match anySubexpressionLoc o d with
-                        | some d' => some (Term2.dictInsert k v d')
-                        | none => none
-            | .lookup aRange d k =>
-                match anySubexpressionLoc o d with
-                | some d' => some (Term2.lookup aRange d' k)
-                | none =>
-                    match anySubexpressionLoc o k with
-                    | some k' => some (Term2.lookup aRange d k')
-                    | none => none
-            | .not e =>
-                match anySubexpressionLoc o e with
-                | some e' => some (Term2.not e')
-                | none => none
-            | .ite c t f =>
-                match anySubexpressionLoc o c with
-                | some c' => some (Term2.ite c' t f)
-                | none =>
-                    match anySubexpressionLoc o t with
-                    | some t' => some (Term2.ite c t' f)
-                    | none =>
-                        match anySubexpressionLoc o f with
-                        | some f' => some (Term2.ite c t f')
-                        | none => none
-            | .letin bound body =>
-                match anySubexpressionLoc o bound with
-                | some bound' => some (Term2.letin bound' body)
-                | none =>
-                    match anySubexpressionLoc o body with
-                    | some body' => some (Term2.letin bound body')
-                    | none => none
-            | .add a t1 t2 =>
-                match anySubexpressionLoc o t1 with
-                | some t1' => some (Term2.add a t1' t2)
-                | none =>
-                    match anySubexpressionLoc o t2 with
-                    | some t2' => some (Term2.add a t1 t2')
-                    | none => none
-            | @Term2.mul _ sc t1Ty t2Ty t3 s1 s2 inst e1 e2 =>
-                match anySubexpressionLoc o e1 with
-                | some e1' => some (@Term2.mul _ sc t1Ty t2Ty t3 s1 s2 inst e1' e2)
-                | none =>
-                    match anySubexpressionLoc o e2 with
-                    | some e2' => some (@Term2.mul _ sc t1Ty t2Ty t3 s1 s2 inst e1 e2')
-                    | none => none
-            | .semiringMul hm e1 e2 =>
-                match anySubexpressionLoc o e1 with
-                | some e1' => some (Term2.semiringMul hm e1' e2)
-                | none =>
-                    match anySubexpressionLoc o e2 with
-                    | some e2' => some (Term2.semiringMul hm e1 e2')
-                    | none => none
-            | .closure hc e =>
-                match anySubexpressionLoc o e with
-                | some e' => some (Term2.closure hc e')
-                | none => none
-            | .promote e =>
-                match anySubexpressionLoc o e with
-                | some e' => some (Term2.promote e')
-                | none => none
-            | .sum a d body =>
-                match anySubexpressionLoc o d with
-                | some d' => some (Term2.sum a d' body)
-                | none =>
-                    match anySubexpressionLoc o body with
-                    | some body' => some (Term2.sum a d body')
-                    | none => none
-            | @Term2.proj _ l t record i inst =>
-                match anySubexpressionLoc o record with
-                | some record' => some (@Term2.proj _ l t record' i inst)
-                | none => none
-            | .builtin f arg =>
-                match anySubexpressionLoc o arg with
-                | some arg' => some (Term2.builtin f arg')
-                | none => none
+        o t <|>
+        match t with
+        | .var _
+        | .constInt _
+        | .constReal _
+        | .constBool _
+        | .constString _
+        | .emptyDict => none
+        | .constRecord fields =>
+            Term2.constRecord <$> anySubexpressionFields o fields
+        | .dictInsert k v d =>
+            ((Term2.dictInsert · v d) <$> anySubexpressionLoc o k) <|>
+            ((Term2.dictInsert k · d) <$> anySubexpressionLoc o v) <|>
+            ((Term2.dictInsert k v) <$> anySubexpressionLoc o d)
+        | .lookup aRange d k =>
+            ((fun d' => Term2.lookup aRange d' k) <$> anySubexpressionLoc o d) <|>
+            ((fun k' => Term2.lookup aRange d k') <$> anySubexpressionLoc o k)
+        | .not e =>
+            Term2.not <$> anySubexpressionLoc o e
+        | .ite c t f =>
+            ((fun c' => Term2.ite c' t f) <$> anySubexpressionLoc o c) <|>
+            ((fun t' => Term2.ite c t' f) <$> anySubexpressionLoc o t) <|>
+            ((fun f' => Term2.ite c t f') <$> anySubexpressionLoc o f)
+        | .letin bound body =>
+            ((fun bound' => Term2.letin bound' body) <$> anySubexpressionLoc o bound) <|>
+            ((fun body' => Term2.letin bound body') <$> anySubexpressionLoc o body)
+        | .add a t1 t2 =>
+            ((fun t1' => Term2.add a t1' t2) <$> anySubexpressionLoc o t1) <|>
+            ((fun t2' => Term2.add a t1 t2') <$> anySubexpressionLoc o t2)
+        | @Term2.mul _ sc t1Ty t2Ty t3 s1 s2 inst e1 e2 =>
+            ((fun e1' => @Term2.mul _ sc t1Ty t2Ty t3 s1 s2 inst e1' e2) <$> anySubexpressionLoc o e1) <|>
+            ((fun e2' => @Term2.mul _ sc t1Ty t2Ty t3 s1 s2 inst e1 e2') <$> anySubexpressionLoc o e2)
+        | .semiringMul hm e1 e2 =>
+            ((fun e1' => Term2.semiringMul hm e1' e2) <$> anySubexpressionLoc o e1) <|>
+            ((fun e2' => Term2.semiringMul hm e1 e2') <$> anySubexpressionLoc o e2)
+        | .closure hc e =>
+            (fun e' => Term2.closure hc e') <$> anySubexpressionLoc o e
+        | .promote e =>
+            Term2.promote <$> anySubexpressionLoc o e
+        | .sum a d body =>
+            ((fun d' => Term2.sum a d' body) <$> anySubexpressionLoc o d) <|>
+            ((fun body' => Term2.sum a d body') <$> anySubexpressionLoc o body)
+        | @Term2.proj _ l t record i inst =>
+            (fun record' => @Term2.proj _ l t record' i inst) <$> anySubexpressionLoc o record
+        | .builtin f arg =>
+            (fun arg' => Term2.builtin f arg') <$> anySubexpressionLoc o arg
 
   partial def anySubexpressionLoc (o : Optimisation) {ctx : List Ty} {ty : Ty} :
       TermLoc2 ctx ty → Option (TermLoc2 ctx ty)
@@ -137,38 +84,27 @@ mutual
 end
 
 def anySubexpression (o : Optimisation) : Optimisation :=
-  fun t => anySubexpressionTerm o t
+    anySubexpressionTerm o
 
-partial def fixpointTerm {ctx : List Ty} {ty : Ty} (o : Optimisation) (t : Term2 ctx ty) :
-    Option (Term2 ctx ty) :=
-  match o t with
-  | some t' =>
-      match fixpointTerm o t' with
-      | some t'' => some t''
-      | none => some t'
-  | none => none
+partial def fixpointTerm (o : Optimisation) : Optimisation:= seq o (fixpointTerm o)
+
 
 def fixpoint (o : Optimisation) : Optimisation :=
-  fun t => fixpointTerm o t
+  fixpointTerm o
 
 def seqAll (opts : List Optimisation) : Optimisation :=
-  match opts with
-  | [] => fail
-  | o :: os => seq o (seqAll os)
+    opts.foldr (β := Optimisation) seq fail
+
 
 def seqAnySubexpression (opts : List Optimisation) : Optimisation :=
-  match opts with
-  | [] => fail
-  | o :: os => seq (anySubexpression o) (seqAnySubexpression os)
+    opts.foldr (β := Optimisation) (seq ∘ anySubexpression) fail
 
 def optimiseUntilStable (opts : List Optimisation) : Optimisation :=
   fixpoint (seqAnySubexpression opts)
 
 def runOptimisation {ctx : List Ty} {ty : Ty} (o : Optimisation) (t : Term2 ctx ty) :
     Term2 ctx ty :=
-  match o t with
-  | some t' => t'
-  | none => t
+    (o t).getD t
 
 def runOptimisationLoc {ctx : List Ty} {ty : Ty}
     (o : Optimisation) (t : TermLoc2 ctx ty) : TermLoc2 ctx ty :=

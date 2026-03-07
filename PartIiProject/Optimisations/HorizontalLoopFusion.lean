@@ -23,12 +23,8 @@ def horizontalLoopFusion2 : Optimisation :=
           (.mk _ (@Term2.sum _ dom' range' _ a₂ (.mk _ (.var dVar2)) b₂))
           body)) =>
         match (inferInstance : Decidable (dom = dom')), (inferInstance : Decidable (range = range')) with
-        | isTrue hDom, isTrue hRange =>
-            match hDom with
-            | rfl =>
-              match hRange with
-              | rfl =>
-                match dVar2 with
+        | isTrue rfl, isTrue rfl =>
+          match dVar2 with
             | .tail _ dVar' =>
                 if PartIiProject.Optimisations.Mem.index dVar' != PartIiProject.Optimisations.Mem.index dVar then
                   none
