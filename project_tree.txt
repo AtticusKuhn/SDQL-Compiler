@@ -1,0 +1,92 @@
+docs
+├── activeContext.md
+├── grammar.md
+├── optimisations.md
+├── pipeline.md
+├── productContext.md
+├── progress.md
+├── projectbrief.md
+├── semi-ring.md
+├── systemPatterns.md
+└── techContext.md
+Flamegraph.lean
+GraphPerformance.lean
+OptimisationPerformanceComparison.lean
+PartIiProject
+├── Bench
+│   ├── Common.lean
+│   └── Table.lean
+├── CodegenRust.lean
+├── Dict.lean
+├── HList.lean
+├── Mem.lean
+├── Optimisations
+│   ├── Apply.lean
+│   ├── HorizontalLoopFusion.lean
+│   ├── LoopFactorization.lean
+│   ├── LoopInvariantCodeMotion.lean
+│   ├── LoopMemoization.lean
+│   ├── Term2Utils.lean
+│   └── VerticalLoopFusion.lean
+├── Optimisations.lean
+├── Rust.lean
+├── SurfaceCore.lean
+├── SurfaceCore2.lean
+├── SyntaxSDQL.lean
+├── SyntaxSDQLProg.lean
+├── Term.lean
+├── Term2.lean
+├── Untyped
+│   ├── Errors.lean
+│   ├── Evidence.lean
+│   ├── ExtractLoads.lean
+│   ├── Infer.lean
+│   ├── LoadTerm.lean
+│   ├── Pipeline.lean
+│   ├── Tests.lean
+│   ├── TypeOf.lean
+│   ├── TypeUtil.lean
+│   └── UntypedTerm.lean
+└── untyped.lean
+PartIiProject.lean
+Performance.lean
+scripts
+├── compare_sdql_output.py
+├── import_tpch_sdql.py
+├── transitive_closure.py
+└── viterbi.py
+sdql_runtime.rs
+test.lean
+Tests
+├── Cases.lean
+├── GuardMsgs.lean
+├── Main.lean
+├── Optimisations
+│   ├── HorizontalLoopFusion.lean
+│   ├── LoopFactorization.lean
+│   ├── LoopInvariantCodeMotion.lean
+│   ├── LoopMemoization.lean
+│   └── VerticalLoopFusion.lean
+└── TPCH
+    ├── Q01.lean
+    ├── Q02.lean
+    ├── Q03.lean
+    ├── Q04.lean
+    ├── Q05.lean
+    ├── Q06.lean
+    ├── Q07.lean
+    ├── Q08.lean
+    ├── Q09.lean
+    ├── Q10.lean
+    ├── Q11.lean
+    ├── Q12.lean
+    ├── Q13.lean
+    ├── Q14.lean
+    ├── Q15.lean
+    ├── Q16.lean
+    ├── Q17.lean
+    ├── Q18.lean
+    ├── Q19.lean
+    ├── Q20.lean
+    ├── Q21.lean
+    └── Q22.lean
