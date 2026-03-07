@@ -9,7 +9,7 @@ namespace Tests.Optimisations.LoopMemoization
 open ToCore2 in
 unsafe def optimiseCoreTerm (opts : List Optimisation) (p : SProg2) : String :=
   let core := trProg2 p
-  let term' := applyOptimisationsLoc opts core.term
+  let term' := optimiseLoc opts core.term
   Term2.showTermLoc2 [] term'
 
 /-- info: "let x = sum(x, y in {1 -> 10} ++ {2 -> 20} ++ {}) {x -> y} ++ {} in x(1)" -/

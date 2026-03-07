@@ -174,7 +174,7 @@ unsafe def runCase (c : Tests.Cases.TestCase) : IO TestResult := do
                    got? := some outStr, refBin? := some refBinPath }
   | .optimisationEq name sp opts envVars => do
       let baseCp := ToCore2.trProg2 sp
-      let optTerm := applyOptimisationsLoc opts baseCp.term
+      let optTerm := optimiseLoc opts baseCp.term
       let optCp : Prog2 := { baseCp with term := optTerm }
       if baseCp.term == optCp.term then
         let baseCoreStr := Term2.showTermLoc2 [] baseCp.term
