@@ -82,25 +82,18 @@ def liftSubst2 {ctx ctx' : List Ty} {a b : Ty} (σ : Subst ctx ctx') :
     Subst (a :: b :: ctx) (a :: b :: ctx') :=
   liftSubst (a := a) (liftSubst (a := b) σ)
 
-mutual
-  /-- A "dummy" term of a given type, intended only for unreachable substitution branches. -/
-  def defaultTerm2 {ctx : List Ty} : {ty : Ty} → Term2 ctx ty
-    | .bool => .constBool false
-    | .int => .constInt 0
-    | .real => .constReal 0.0
-    | .maxProduct => .promote (.mk SourceLocation.unknown (.constReal 0.0))
-    | .date => .builtin (.DateLit 0) (.mk SourceLocation.unknown (.constRecord .nil))
-    | .string => .constString ""
-    | .record l => .constRecord (defaultFields2 (ctx := ctx) l)
-    | .dict _ _ => .emptyDict
+abbrev ContextParser (ctx₁ ctx₂ : List Ty) : Type :=
+  ∀ {ty : Ty}, Term2 ctx₁ ty → Option (Term2 ctx₂ ty)
 
-  def defaultLoc2 {ctx : List Ty} : {ty : Ty} → TermLoc2 ctx ty
-    | ty => .mk SourceLocation.unknown (defaultTerm2 (ctx := ctx) (ty := ty))
+private abbrev VarParser (ctx₁ ctx₂ : List Ty) : Type :=
+  ∀ {ty : Ty}, Mem ty ctx₁ → Option (Term2 ctx₂ ty)
 
-  def defaultFields2 {ctx : List Ty} : (l : List Ty) → TermFields2 ctx l
-    | [] => .nil
-    | t :: ts => .cons (defaultLoc2 (ctx := ctx) (ty := t)) (defaultFields2 (ctx := ctx) ts)
-end
+private def liftVarParser {ctx₁ ctx₂ : List Ty} {a : Ty}
+    (parse : ContextParser ctx₁ ctx₂) : VarParser (a :: ctx₁) (a :: ctx₂)
+  | _, .head _ => pure (.var (.head _))
+  | _, .tail _ m => do
+      let t ← parse (.var m)
+      pure (wk (a := a) t)
 
 mutual
   def substTerm2 {ctx ctx' : List Ty} {ty : Ty}
@@ -141,38 +134,143 @@ mutual
 end
 
 mutual
-  def mentionsIndex {ctx : List Ty} {ty : Ty} (t : Term2 ctx ty) (i : Nat) : Bool :=
-    match t with
-    | .var m => (Mem.index m == i)
-    | .constInt _ => false
-    | .constReal _ => false
-    | .constBool _ => false
-    | .constString _ => false
-    | .constRecord fields => mentionsIndexFields fields i
-    | .emptyDict => false
-    | .dictInsert k v d => mentionsIndexLoc k i || mentionsIndexLoc v i || mentionsIndexLoc d i
-    | .lookup _ d k => mentionsIndexLoc d i || mentionsIndexLoc k i
-    | .not e => mentionsIndexLoc e i
-    | .ite c t f => mentionsIndexLoc c i || mentionsIndexLoc t i || mentionsIndexLoc f i
-    | .letin bound body => mentionsIndexLoc bound i || mentionsIndexLoc body (i + 1)
-    | .add _ t1 t2 => mentionsIndexLoc t1 i || mentionsIndexLoc t2 i
-    | @Term2.mul _ _ _ _ _ _ _ _ t1 t2 => mentionsIndexLoc t1 i || mentionsIndexLoc t2 i
-    | .semiringMul _ t1 t2 => mentionsIndexLoc t1 i || mentionsIndexLoc t2 i
-    | .closure _ e => mentionsIndexLoc e i
-    | .promote e => mentionsIndexLoc e i
-    | .sum _ d body => mentionsIndexLoc d i || mentionsIndexLoc body (i + 2)
-    | @Term2.proj _ _ _ record _ _ => mentionsIndexLoc record i
-    | .builtin _ arg => mentionsIndexLoc arg i
+  private partial def parseTerm2 {ctx₁ ctx₂ : List Ty}
+      (parseVar : VarParser ctx₁ ctx₂) : {ty : Ty} → Term2 ctx₁ ty → Option (Term2 ctx₂ ty)
+    | _, .var m => parseVar m
+    | _, .constInt n => pure (.constInt n)
+    | _, .constReal r => pure (.constReal r)
+    | _, .constBool b => pure (.constBool b)
+    | _, .constString s => pure (.constString s)
+    | _, .constRecord fields => do
+        let fields' ← parseFields2 parseVar fields
+        pure (.constRecord fields')
+    | _, .emptyDict => pure .emptyDict
+    | _, .dictInsert k v d => do
+        let k' ← parseLoc2 parseVar k
+        let v' ← parseLoc2 parseVar v
+        let d' ← parseLoc2 parseVar d
+        pure (.dictInsert k' v' d')
+    | _, .lookup aRange d k => do
+        let d' ← parseLoc2 parseVar d
+        let k' ← parseLoc2 parseVar k
+        pure (.lookup aRange d' k')
+    | _, .not e => do
+        let e' ← parseLoc2 parseVar e
+        pure (.not e')
+    | _, .ite c t f => do
+        let c' ← parseLoc2 parseVar c
+        let t' ← parseLoc2 parseVar t
+        let f' ← parseLoc2 parseVar f
+        pure (.ite c' t' f')
+    | _, .letin bound body => do
+        let parseHere : ContextParser ctx₁ ctx₂ :=
+          fun {_} t => parseTerm2 parseVar t
+        let bound' ← parseLoc2 parseVar bound
+        let body' ← parseLoc2 (liftVarParser parseHere) body
+        pure (.letin bound' body')
+    | _, .add a t₁ t₂ => do
+        let t₁' ← parseLoc2 parseVar t₁
+        let t₂' ← parseLoc2 parseVar t₂
+        pure (.add a t₁' t₂')
+    | _, @Term2.mul _ sc t₁ t₂ t₃ s₁ s₂ inst e₁ e₂ => do
+        let e₁' ← parseLoc2 parseVar e₁
+        let e₂' ← parseLoc2 parseVar e₂
+        pure (@Term2.mul _ sc t₁ t₂ t₃ s₁ s₂ inst e₁' e₂')
+    | _, .semiringMul hm e₁ e₂ => do
+        let e₁' ← parseLoc2 parseVar e₁
+        let e₂' ← parseLoc2 parseVar e₂
+        pure (.semiringMul hm e₁' e₂')
+    | _, .closure hc e => do
+        let e' ← parseLoc2 parseVar e
+        pure (.closure hc e')
+    | _, .promote e => do
+        let e' ← parseLoc2 parseVar e
+        pure (.promote e')
+    | _, .sum a d body => do
+        let parseHere : ContextParser ctx₁ ctx₂ :=
+          fun {_} t => parseTerm2 parseVar t
+        let parseUnder : ContextParser (_ :: ctx₁) (_ :: ctx₂) :=
+          fun {_} t => parseTerm2 (liftVarParser parseHere) t
+        let d' ← parseLoc2 parseVar d
+        let body' ← parseLoc2 (liftVarParser parseUnder) body
+        pure (.sum a d' body')
+    | _, @Term2.proj _ l t record i inst => do
+        let record' ← parseLoc2 parseVar record
+        pure (@Term2.proj _ l t record' i inst)
+    | _, .builtin f arg => do
+        let arg' ← parseLoc2 parseVar arg
+        pure (.builtin f arg')
 
-  def mentionsIndexLoc {ctx : List Ty} {ty : Ty} (t : TermLoc2 ctx ty) (i : Nat) : Bool :=
-    match t with
-    | .mk _ inner => mentionsIndex inner i
+  private partial def parseLoc2 {ctx₁ ctx₂ : List Ty} {ty : Ty}
+      (parseVar : VarParser ctx₁ ctx₂) : TermLoc2 ctx₁ ty → Option (TermLoc2 ctx₂ ty)
+    | .mk loc inner => do
+        let inner' ← parseTerm2 parseVar inner
+        pure (.mk loc inner')
 
-def mentionsIndexFields {ctx : List Ty} {l : List Ty} (fs : TermFields2 ctx l) (i : Nat) : Bool :=
-    match fs with
-    | .nil => false
-    | .cons h t => mentionsIndexLoc h i || mentionsIndexFields t i
+  private partial def parseFields2 {ctx₁ ctx₂ : List Ty}
+      (parseVar : VarParser ctx₁ ctx₂) :
+      {l : List Ty} → TermFields2 ctx₁ l → Option (TermFields2 ctx₂ l)
+    | [], .nil => pure .nil
+    | _ :: _, .cons h t => do
+        let h' ← parseLoc2 parseVar h
+        let t' ← parseFields2 parseVar t
+        pure (.cons h' t')
 end
+
+/-- Parse a term in `(a :: ctx)` as one that is actually independent of the head variable. -/
+def dropUnusedHead {ctx : List Ty} {a ty : Ty} : Term2 (a :: ctx) ty → Option (Term2 ctx ty) :=
+  parseTerm2 (ctx₁ := a :: ctx) (ctx₂ := ctx) (fun {_} m =>
+    match m with
+    | .head _ => none
+    | .tail _ m => pure (.var m))
+
+/-- Lift a parser under one additional binder, keeping the bound variable available. -/
+def underBinder {ctx₁ ctx₂ : List Ty} {a : Ty}
+    (parse : ContextParser ctx₁ ctx₂) :
+    {ty : Ty} → Term2 (a :: ctx₁) ty → Option (Term2 (a :: ctx₂) ty) :=
+  parseTerm2 (ctx₁ := a :: ctx₁) (ctx₂ := a :: ctx₂) (liftVarParser parse)
+
+abbrev dropVar {ctx : List Ty} {a ty : Ty} :
+    Term2 (a :: ctx) ty → Option (Term2 ctx ty) :=
+  dropUnusedHead
+
+abbrev under {ctx₁ ctx₂ : List Ty} {a : Ty}
+    (parse : ContextParser ctx₁ ctx₂) :
+    {ty : Ty} → Term2 (a :: ctx₁) ty → Option (Term2 (a :: ctx₂) ty) :=
+  underBinder parse
+
+def dropUnusedHeadLoc {ctx : List Ty} {a ty : Ty} :
+    TermLoc2 (a :: ctx) ty → Option (TermLoc2 ctx ty) :=
+  parseLoc2 (ctx₁ := a :: ctx) (ctx₂ := ctx) (fun {_} m =>
+    match m with
+    | .head _ => none
+    | .tail _ m => pure (.var m))
+
+def underBinderLoc {ctx₁ ctx₂ : List Ty} {a : Ty}
+    (parse : ContextParser ctx₁ ctx₂) :
+    {ty : Ty} → TermLoc2 (a :: ctx₁) ty → Option (TermLoc2 (a :: ctx₂) ty) :=
+  parseLoc2 (ctx₁ := a :: ctx₁) (ctx₂ := a :: ctx₂) (liftVarParser parse)
+
+abbrev dropVarLoc {ctx : List Ty} {a ty : Ty} :
+    TermLoc2 (a :: ctx) ty → Option (TermLoc2 ctx ty) :=
+  dropUnusedHeadLoc
+
+abbrev underLoc {ctx₁ ctx₂ : List Ty} {a : Ty}
+    (parse : ContextParser ctx₁ ctx₂) :
+    {ty : Ty} → TermLoc2 (a :: ctx₁) ty → Option (TermLoc2 (a :: ctx₂) ty) :=
+  underBinderLoc parse
+
+/-- Extract an invariant term under two binders by parsing it as independent of both binders. -/
+def extractInvariant {ctx : List Ty} {a b ty : Ty}
+    (e : TermLoc2 (a :: b :: ctx) ty) : Option (TermLoc2 ctx ty) :=
+  do
+    let e' ← dropUnusedHeadLoc (a := a) e
+    dropUnusedHeadLoc (a := b) e'
+
+
+abbrev extractInvariant2 {ctx : List Ty} {a b ty : Ty}
+    (e : TermLoc2 (a :: b :: ctx) ty) : Option (TermLoc2 ctx ty) :=
+  extractInvariant e
 
 end Term2
 

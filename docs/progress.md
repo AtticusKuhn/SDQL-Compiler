@@ -51,6 +51,7 @@ What works:
 - Surface/core terms are DeBruijn-indexed: surface terms in `SurfaceCore2.lean`, core terms in `Term2.lean`, with lowering in `ToCore2`.
 - Optimisation-friendly `Term2` indices: `mul`/`proj` carry `has_tensor`/`has_proj` witnesses to avoid dependent-elimination failures when pattern-matching in optimisation passes.
 - Optimisations over `Term2`: `PartIiProject/Optimisations/Apply.lean` provides a recursive driver for non-recursive `Optimisation` rewrites; `PartIiProject/Optimisations/VerticalLoopFusion.lean` implements key-map and value-map vertical loop fusion with `#guard_msgs` regression tests.
+- Optimisation utility refactor: `PartIiProject/Optimisations/Term2Utils.lean` now provides parser combinators for dropping unused binders (`Term2.dropUnusedHead` / `Term2.underBinder`, plus `dropVar` / `under` aliases). `extractInvariant{,2}` is defined by composing these parsers, and horizontal/vertical fusion as well as loop factorization/LICM/loop memoization now fail structurally when a supposedly dropped binder is referenced instead of relying on `mentionsIndex` checks and dummy default terms.
 
 What's left to build:
 

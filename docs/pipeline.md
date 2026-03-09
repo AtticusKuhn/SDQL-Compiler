@@ -239,7 +239,7 @@ flowchart LR
         F14["Optimisations/LoopFactorization.lean"]
         F15["Optimisations/LoopInvariantCodeMotion.lean"]
         F16["Optimisations/LoopMemoization.lean"]
-        F17["Optimisations/Term2Utils.lean<br/><i>renaming, substitution, mentionsIndex</i>"]
+        F17["Optimisations/Term2Utils.lean<br/><i>renaming, substitution, binder-dropping parsers</i>"]
     end
 
     subgraph "Code Generation"

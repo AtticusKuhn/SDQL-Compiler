@@ -54,6 +54,7 @@ Latest changes:
 - Added a small `Term2` optimisation framework (`PartIiProject/Optimisations/Apply.lean`) where each rewrite is a non-recursive `Optimisation` and `applyOptimisations{,Loc}` performs the recursive traversal + (fuel-bounded) fixpoint iteration.
 - Implemented vertical loop fusion over `Term2` as two separate rewrites in `PartIiProject/Optimisations/VerticalLoopFusion.lean` (`verticalLoopFusionKeyMap2` and `verticalLoopFusionValueMap2`).
 - Added/confirmed `#guard_msgs` coverage for vertical loop fusion in `Tests/Optimisations/VerticalLoopFusion.lean` (pulled in via `Tests/GuardMsgs.lean`).
+- Replaced the old optimisation-side `mentionsIndex`/`defaultTerm2` pattern with parser combinators in `PartIiProject/Optimisations/Term2Utils.lean`: `Term2.dropUnusedHead` / `Term2.underBinder` (with `dropVar` / `under` aliases). `extractInvariant{,2}` is now implemented by composing these parsers, and vertical/horizontal fusion uses the same parse-and-fail path instead of dummy substitutions.
 - Added semiring multiplication `*s` and `closure(e)` across the pipeline: new surface/core evidence (`SHasMul`/`SHasClosure` → `HasMul`/`HasClosure`), parser support, untyped inference, and core lowering.
 - Rust codegen now handles `*s`/`closure` for bool/real inline and introduces runtime stubs `sdql_semiring_mul`/`sdql_closure` for square-matrix cases.
 - Added simple end-to-end tests for `*s` and `closure` in `Tests/Cases.lean`.
