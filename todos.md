@@ -11,7 +11,6 @@
 - three of the supposed “optimisations” actually make the code slower. Horizontal_loop_fusion and loop_factorization_left and loop_invariant_code motion. I should investigate this, but I haven’t investigated this yet.
 - Add `docs/pipeline.md` file documenting the current pipeline
 - Add tree diagram with comments explaining each file.
-- start writing paper (in typst or latex), and add to CI/CD
 - optimisation pipeline is ugly, could this be improved by the use of a monad?
 - Current rust implementation is slowed down a lot by overused of `x.clone()` in BTreeMap. I'm not good enough with Rust to avoid this.
 - Use Rust profiling. Use a profiler for any serious performance analysis.
@@ -21,6 +20,19 @@
 - need to write dissertation
 - it would be really helpful to have a CLI tool so I could just run `compile` or `run` on a string to easily test.
 - refactor viterbi.py to use numpy.
+- I should refactor the `optimisations` submodule because the code is messy
+- I should add more algebraic optimisations, I don't think the original paper was complete. Especially semi-ring
+`*s` and `closure`. 
+- I should change the instance of `scale` to have a single case for "single-dimensional vector space" (depending on `mul`), rather than individual cases for `bool`, `real`, etc...
+- why are q08 and q15 missing from .sdql-flamegraph-out/svgs/*. This is really strange?
+- add algebraic rewrites
+- add CSE
+- refactor the optimisation module. It's really bad archtiecture
+- a record of semi-rings is a semi-ring. Add this.
+- add semi-ring equations as rewrite rules.
+- do experiment of removing typehints @vec to see how it affects performance
+- change architecture of optimisation module to use combinators and strategy.
+
 
 ```bash
 [atticusk@nixos:~/coding/part_ii_project]$ find PartIiProject -name "*.lean" -exec wc -l {} + | sort -nr | head -n10

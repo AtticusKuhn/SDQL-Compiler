@@ -50,7 +50,7 @@ def timeBinaryAvgMs (binPath : FilePath) (iters : Nat) (env : List (String × St
 
 unsafe def runCase (b : BenchCase) : IO (Except String Reading) := do
   let baseCp := ToCore2.trProg2 b.prog
-  let optTerm := applyOptimisationsLoc b.opts baseCp.term
+  let optTerm := optimiseLoc b.opts baseCp.term
   let optCp : Prog2 := { baseCp with term := optTerm }
 
   let unoptBin ←

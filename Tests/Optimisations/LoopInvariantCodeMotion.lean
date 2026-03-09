@@ -9,7 +9,7 @@ namespace Tests.Optimisations.LoopInvariantCodeMotion
 open ToCore2 in
 unsafe def optimiseCoreTerm (p : SProg2) : String :=
   let core := trProg2 p
-  let term' := applyOptimisationsLoc [loopInvariantCodeMotion2] core.term
+  let term' := optimiseLoc [loopInvariantCodeMotion2] core.term
   Term2.showTermLoc2 [] term'
 
 /-- info: "let x = {1 -> 10} ++ {2 -> 20} ++ {} in let y = 5 in sum(z, k in x) k + y" -/

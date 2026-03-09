@@ -9,7 +9,7 @@ namespace Tests.Optimisations.VerticalLoopFusion
 open ToCore2 in
 unsafe def optimiseCoreTerm (p : SProg2) : String :=
   let core := trProg2 p
-  let term' := applyOptimisationsLoc [verticalLoopFusionKeyMap2, verticalLoopFusionValueMap2] core.term
+  let term' := optimiseLoc [verticalLoopFusionKeyMap2, verticalLoopFusionValueMap2] core.term
   Term2.showTermLoc2 [] term'
 
 /-- info: "sum(x, y in {1 -> 10} ++ {2 -> 20} ++ {}) {x + 1 + 2 -> y} ++ {}" -/
