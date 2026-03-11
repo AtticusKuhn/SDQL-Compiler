@@ -10,8 +10,14 @@ abbrev Optimisation : Type :=
 def fail : Optimisation :=
   fun _ => none
 
-def seq (o1 o2 : Optimisation) : Optimisation :=
-  fun t => o1 t <|> o2 t
+def seq : Optimisation → Optimisation → Optimisation :=
+  (fun t => · t <|> · t)
+
+instance :  OrElse Optimisation where
+    orElse x y := seq x (y ())
+
+instance : Inhabited Optimisation where
+    default := fail
 
 mutual
   partial def anySubexpressionTerm (o : Optimisation) {ctx : List Ty} {ty : Ty} :
@@ -83,24 +89,24 @@ mutual
             | none => none
 end
 
-def anySubexpression (o : Optimisation) : Optimisation :=
-    anySubexpressionTerm o
+def anySubexpression : Optimisation → Optimisation :=
+    anySubexpressionTerm
 
 partial def fixpointTerm (o : Optimisation) : Optimisation:= seq o (fixpointTerm o)
 
 
-def fixpoint (o : Optimisation) : Optimisation :=
-  fixpointTerm o
+def fixpoint : Optimisation → Optimisation :=
+  fixpointTerm
 
-def seqAll (opts : List Optimisation) : Optimisation :=
-    opts.foldr (β := Optimisation) seq fail
+def seqAll :   List Optimisation → Optimisation :=
+    (·.foldr (β := Optimisation) seq fail)
 
 
-def seqAnySubexpression (opts : List Optimisation) : Optimisation :=
-    opts.foldr (β := Optimisation) (seq ∘ anySubexpression) fail
+def seqAnySubexpression : List Optimisation → Optimisation :=
+    (·.foldr (β := Optimisation) (seq ∘ anySubexpression) fail)
 
-def optimiseUntilStable (opts : List Optimisation) : Optimisation :=
-  fixpoint (seqAnySubexpression opts)
+def optimiseUntilStable: List Optimisation →  Optimisation :=
+  fixpoint ∘ seqAnySubexpression
 
 def runOptimisation {ctx : List Ty} {ty : Ty} (o : Optimisation) (t : Term2 ctx ty) :
     Term2 ctx ty :=
@@ -112,9 +118,9 @@ def runOptimisationLoc {ctx : List Ty} {ty : Ty}
   | .mk loc inner =>
       .mk loc (runOptimisation o inner)
 
-def optimiseTerm {ctx : List Ty} {ty : Ty} (opts : List Optimisation) (t : Term2 ctx ty) :
-    Term2 ctx ty :=
-  runOptimisation (optimiseUntilStable opts) t
+def optimiseTerm {ctx : List Ty} {ty : Ty} : List Optimisation →  Term2 ctx ty →  Term2 ctx ty :=
+  runOptimisation ∘ optimiseUntilStable
+
 
 def optimiseLoc {ctx : List Ty} {ty : Ty} (opts : List Optimisation) (t : TermLoc2 ctx ty) :
     TermLoc2 ctx ty :=

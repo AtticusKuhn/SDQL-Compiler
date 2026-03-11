@@ -13,13 +13,36 @@
 )
 = Cover page
 #title[SDQL Compiler]
+Examinator: Part II
 
+Year: 2026
 #set page(
     header:[],
 )
+
 = Declaration of originality
+#let today = datetime.today()
+
+I, the candidate for Part II of the Computer Science Tripos with Blind Grading Number #bgn, hereby declare that this report and the work described in it are my own work, unaided except as may be specified below, and that the report does not contain material that has already been used to any substantial extent for a comparable purpose. In preparation of this report, I adhered to the Department of Computer Science and Technology AI Policy. I am content for my report to be made available to the students and staff of the University.
+Date May 14, 2026
+
 
 = Proforma
+BGN: #bgn
+
+Examinaiton: Part II
+
+Word-count: #todo[add wordcount here]
+
+Code line count: #todo[add code line count here]
+
+Project Originator: Neel Krishnaswami
+
+Day-to-Day supervisor: Neel Krishnaswami
+
+Marking Supervisor: Neel Krishnaswami
+
+Ethics Approval: None
 
 = Table of contents
 #outline()
@@ -676,11 +699,18 @@ including (for example):
 + ```sdql <a : <a : int, b : int>, b : <a : int, b : int>```
 + ```sdql {int -> {int  -> real}}```
 
+This also involves an algorithm for taking the
+"square root" of a vector space.
+
+
 == Algebraic Optimisations
 The original SDQL paper mentions algebraic optimisations.
 I implemented these and implemented a test suite
 to test them. The optimisations are in @tab_opt
 
+I applied these optimisations using a combinator/strategy
+architecture. I implemented functional patterns such
+as ```lean4 OrElse``` and ```lean4 Inhabited```.
 
 #figure(
     table(
@@ -704,7 +734,32 @@ to test them. The optimisations are in @tab_opt
     caption: [project tree]
 ) <projtree>
 
-See @projtree.
+See @projtree for the code structure.
+The tree for `tpch-dbgen` and the `sdql` reference
+implementation are omitted from @projtree, because
+those are pre-existing tools that I relied upon but
+did not write. All other code was written by myself.
+
+I'll discuss the files in chronological order of
+a compilation process, and then I'll discuss the
+benchmarking/testing scripts.
+
+=== Compilation Files
++ `SyntaxSDQL.lean`: defines a syntax of SDQL expressions
++ `SyntaxSDQLProg.lean`: defines a syntax of SDQL programs
++ `Untyped/*.lean`: defines the untyped syntax, and transformations from the untyped syntax to the typed syntax
++ `SurfaceCore2.lean`: Defines a transformation from the named syntax to the unnamed syntax
++ `Term2.lean`: Defines the unnamed core syntax
++ `Optimisations/*.lean`: defines optimisations over the core syntax
++ `CodegenRust.lean`: Defines the transformation from the core syntax to the Rust syntax
++ `Rust.lean`: Defines a simplified sybset of Rust syntax.
+=== Documentation Files
++ `docs/*.md`: I was sure to keep accurate and detailed documentation as I went along, so that I would have an easier time writing my dissertation, and so that I would not forget what I did. This demonstrates professional software practice. 
+=== Testing Files
++ `Flamegraph.lean`: generates flamegraphs using the `perf` profiler
++ `GraphPerformance.lean`: compares the performance of lean-sdql against a handwritten Python implementation of graph algorithms
++ `Tests/*.lean` Tests correctness of compilation by, including on the TPC-H benchmark.
+
 
 = Chapter 4: Evaluation
 
@@ -785,6 +840,9 @@ See @graph_txt.
 
 = Chapter 5: Conclusions
 
+Using Lean and dependent typing was painful.
+I wish I had just done this project in Haskell
+instead. It would have been so much easier.
 #bibliography("bib.bib")
 
 = Appendices

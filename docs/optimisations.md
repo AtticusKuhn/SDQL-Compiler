@@ -43,3 +43,9 @@ after: closure(e)
 
 before: e *s closure(e) + 1
 after: closure(e)
+
+before: 1 *s e
+after : e 
+
+before: 0 *s e
+after: 0
